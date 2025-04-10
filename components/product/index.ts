@@ -1,0 +1,9 @@
+export { ProductDetail } from './ProductDetail';
+export { ProductSize } from './ProductSize';
+export { Benefits } from './Benefits';
+export { Ingredients } from './Ingredients';
+export { HowToUse } from './HowToUse';
+export { FrequentlyAskedQuestions } from './FrequentlyAskedQuestions';
+export { CustomerReviews } from './CustomerReviews';
+export { FrequentlyBoughtTogether } from './FrequentlyBoughtTogether';
+export { ProductDescription } from './ProductDescription'; 
