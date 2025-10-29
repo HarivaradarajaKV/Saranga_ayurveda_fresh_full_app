@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Platform,
   StatusBar,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import { useOrders, Order } from '../OrderContext';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Add OrderItem interface
 interface OrderItem {
@@ -33,6 +35,18 @@ interface OrderItem {
   category?: string;
   description?: string;
   offer_percentage?: number;
+}
+
+// Extended shipping address interface to include phone_number
+interface ShippingAddress {
+  full_name: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  phone?: string;
+  phone_number?: string;
 }
 
 // Constants moved outside component to prevent recreation
@@ -113,12 +127,38 @@ export default function OrderDetailsPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { orders, loading, fetchOrders } = useOrders();
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   
   // Use useEffect to fetch orders if not available
   useEffect(() => {
     console.log('[OrderDetailsPage] Initial load - id:', id);
     console.log('[OrderDetailsPage] Initial orders:', orders);
-    fetchOrders();
+    
+    const loadData = async () => {
+      await fetchOrders();
+      setIsInitialLoading(false);
+    };
+    
+    loadData();
+    
+    // Start animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   // Use useMemo to prevent unnecessary recalculations
@@ -145,13 +185,19 @@ export default function OrderDetailsPage() {
   // Memoized format date function
   const formatDate = useMemo(() => (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    
+    // Convert UTC to IST (IST is UTC+5:30)
+    const ISTOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const istDate = new Date(date.getTime() + ISTOffset);
+    
+    // Format date in IST
+    const day = istDate.getUTCDate();
+    const month = istDate.toLocaleString('en-IN', { month: 'short' });
+    const year = istDate.getUTCFullYear();
+    const hours = String(istDate.getUTCHours()).padStart(2, '0');
+    const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
+    
+    return `${day} ${month}, ${year}, ${hours}:${minutes}`;
   }, []);
 
   // Memoized status color function
@@ -210,7 +256,7 @@ export default function OrderDetailsPage() {
               <p>${order.shipping_address.full_name}</p>
               <p>${order.shipping_address.address_line1}</p>
               <p>${order.shipping_address.city}, ${order.shipping_address.state} - ${order.shipping_address.pincode || ''}</p>
-              <p>Phone: ${order.shipping_address.phone}</p>
+              <p>Phone: ${order.shipping_address.phone || (order.shipping_address as any)?.phone_number || (order as any)?.shipping_phone_number || 'N/A'}</p>
             </div>
             <div class="section">
               <h3>Order Details</h3>
@@ -256,11 +302,12 @@ export default function OrderDetailsPage() {
   };
 
   // Show loading state while data is being fetched
-  if (loading) {
+  if (isInitialLoading || loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color="#694d21" />
+          <Text style={styles.loadingText}>Loading order details...</Text>
         </View>
       </SafeAreaView>
     );
@@ -271,12 +318,23 @@ export default function OrderDetailsPage() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#f44336" />
           <Text style={styles.errorText}>Order not found</Text>
+          <Text style={styles.errorSubtext}>Order ID: {id}</Text>
           <TouchableOpacity
             style={styles.refreshButton}
-            onPress={() => fetchOrders()}
+            onPress={async () => {
+              await fetchOrders();
+              setRetryCount(retryCount + 1);
+            }}
           >
             <Text style={styles.refreshButtonText}>Refresh Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -287,128 +345,259 @@ export default function OrderDetailsPage() {
   console.log('[OrderDetailsPage] Order items structure:', order.items);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar backgroundColor="#f5f5f5" barStyle="dark-content" />
-      <Stack.Screen
-        options={{
-          title: `Order #${order.id}`,
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerShadowVisible: false,
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity 
-                onPress={handleSupport}
-                style={{ padding: 8, marginRight: 8 }}
-                hitSlop={HIT_SLOP}
-                activeOpacity={ACTIVE_OPACITY}
-                delayPressIn={PRESS_DELAY}
-              >
-                <Ionicons name="help-circle-outline" size={24} color="#007bff" />
-              </TouchableOpacity>
-            </View>
-          ),
-        }}
+    <View style={{ flex: 1 }}>
+      <LinearGradient
+        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+        style={StyleSheet.absoluteFill}
       />
-      <ScrollView 
-        style={styles.container} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        bounces={true}
-        removeClippedSubviews={true}
-      >
-        <Text style={styles.sectionTitle}>Saranga Ayurveda Order Details</Text>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar backgroundColor="#f8f6f0" barStyle="dark-content" />
+        <Stack.Screen
+          options={{
+            title: `Order #${order.id}`,
+            headerStyle: {
+              backgroundColor: '#f8f6f0',
+            },
+            headerTintColor: '#694d21',
+            headerTitleStyle: {
+              fontWeight: '700',
+              fontSize: 20,
+            },
+            headerShadowVisible: true,
+            headerRight: () => (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity 
+                  onPress={handleSupport}
+                  style={{ padding: 8, marginRight: 8 }}
+                  hitSlop={HIT_SLOP}
+                  activeOpacity={ACTIVE_OPACITY}
+                  delayPressIn={PRESS_DELAY}
+                >
+                  <Ionicons name="help-circle-outline" size={24} color="#694d21" />
+                </TouchableOpacity>
+              </View>
+            ),
+          }}
+        />
+        <ScrollView 
+          style={styles.container} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          bounces={true}
+          removeClippedSubviews={true}
+        >
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }}
+          >
+            <Text style={styles.mainTitle}>Saranga Ayurveda</Text>
+            <Text style={styles.subTitle}>Order Details</Text>
+          </Animated.View>
         {/* Order Status Section */}
-        <View style={styles.section}>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Order Status</Text>
+            <View style={styles.titleContainer}>
+              <Ionicons name="checkmark-circle" size={24} color="#694d21" style={styles.icon} />
+              <Text style={styles.sectionTitle}>Order Status</Text>
+            </View>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
               <Text style={styles.statusText}>{order.status}</Text>
             </View>
           </View>
           <Text style={styles.dateText}>Ordered on {formatDate(order.created_at)}</Text>
-        </View>
+        </Animated.View>
 
         {/* Shipping Address Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shipping Address</Text>
-          <View style={styles.addressCard}>
-            <Text style={styles.addressName}>{order.shipping_address.full_name}</Text>
-            <Text style={styles.addressText}>{order.shipping_address.address_line1}</Text>
-            {order.shipping_address.address_line2 && (
-              <Text style={styles.addressText}>{order.shipping_address.address_line2}</Text>
-            )}
-            <Text style={styles.addressText}>{order.shipping_address.city}, {order.shipping_address.state} - {order.shipping_address.pincode}</Text>
-            <Text style={styles.addressText}>Phone: {order.shipping_address.phone}</Text>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.titleContainer}>
+            <Ionicons name="location" size={22} color="#694d21" style={styles.icon} />
+            <Text style={styles.sectionTitle}>Shipping Address</Text>
           </View>
-        </View>
+          <View style={styles.addressCard}>
+            <View style={styles.addressHeader}>
+              <Ionicons name="person" size={18} color="#694d21" />
+              <Text style={styles.addressName}>{order.shipping_address.full_name}</Text>
+            </View>
+            <View style={styles.addressRow}>
+              <Ionicons name="home" size={16} color="#666" />
+              <Text style={styles.addressText}>{order.shipping_address.address_line1}</Text>
+            </View>
+            {order.shipping_address.address_line2 && (
+              <View style={styles.addressRow}>
+                <Ionicons name="map" size={16} color="#666" />
+                <Text style={styles.addressText}>{order.shipping_address.address_line2}</Text>
+              </View>
+            )}
+            <View style={styles.addressRow}>
+              <Ionicons name="location" size={16} color="#666" />
+              <Text style={styles.addressText}>{order.shipping_address.city}, {order.shipping_address.state} - {order.shipping_address.pincode}</Text>
+            </View>
+            <View style={styles.addressRow}>
+              <Ionicons name="call" size={16} color="#666" />
+              <Text style={styles.addressText}>
+                {order.shipping_address?.phone || 
+                 (order.shipping_address as any)?.phone_number || 
+                 (order as any)?.shipping_phone_number || 
+                 'N/A'}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
 
         {/* Order Items Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Items</Text>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.titleContainer}>
+            <Ionicons name="cube" size={22} color="#694d21" style={styles.icon} />
+            <Text style={styles.sectionTitle}>Order Items</Text>
+          </View>
           {order.items.map((item, index) => (
-            <View key={index} style={styles.itemCard}>
+            <Animated.View 
+              key={index} 
+              style={[
+                styles.itemCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ 
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 30],
+                      outputRange: [0, 0]
+                    })
+                  }]
+                }
+              ]}
+            >
               <View style={styles.itemInfo}>
                 <Text style={styles.itemName}>{item.product_name || 'Product Name Not Available'}</Text>
                 {item.variant && (
                   <Text style={styles.itemVariant}>Variant: {item.variant}</Text>
                 )}
                 <View style={styles.itemDetails}>
-                  <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                  <View style={styles.quantityBadge}>
+                    <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                  </View>
                   <Text style={styles.itemPrice}>₹{item.price_at_time}</Text>
                 </View>
               </View>
-            </View>
+            </Animated.View>
           ))}
-        </View>
+        </Animated.View>
 
         {/* Payment Details Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Details</Text>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.titleContainer}>
+            <Ionicons name="card" size={22} color="#694d21" style={styles.icon} />
+            <Text style={styles.sectionTitle}>Payment Details</Text>
+          </View>
           <View style={styles.paymentCard}>
             <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Payment Method</Text>
+              <View style={styles.paymentLeft}>
+                <Ionicons name="wallet" size={18} color="#694d21" />
+                <Text style={styles.paymentLabel}>Payment Method</Text>
+              </View>
               <Text style={styles.paymentValue}>
                 {order.payment_method_display}
               </Text>
             </View>
+            <View style={styles.divider} />
             <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Total Amount</Text>
-              <Text style={styles.paymentValue}>₹{order.total_amount}</Text>
+              <View style={styles.paymentLeft}>
+                <Ionicons name="cash" size={18} color="#694d21" />
+                <Text style={styles.paymentLabel}>Total Amount</Text>
+              </View>
+              <Text style={[styles.paymentValue, styles.totalAmount]}>₹{order.total_amount}</Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Help Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Need Help?</Text>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.titleContainer}>
+            <Ionicons name="help-buoy" size={22} color="#694d21" style={styles.icon} />
+            <Text style={styles.sectionTitle}>Need Help?</Text>
+          </View>
           <View style={styles.helpButtons}>
             <TouchableOpacity
               style={styles.helpButton}
               onPress={() => router.push('/support/live-chat')}
             >
-              <Ionicons name="chatbubble-ellipses-outline" size={24} color="#007bff" />
-              <Text style={styles.helpButtonText}>Chat with Us</Text>
+              <LinearGradient
+                colors={['#694d21', '#5a3f1a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.helpButtonGradient}
+              >
+                <Ionicons name="chatbubble-ellipses" size={24} color="#fff" />
+                <Text style={styles.helpButtonText}>Chat with Us</Text>
+              </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.helpButton}
               onPress={() => router.push('/support/call')}
             >
-              <Ionicons name="call-outline" size={24} color="#007bff" />
-              <Text style={styles.helpButtonText}>Call Support</Text>
+              <LinearGradient
+                colors={['#694d21', '#5a3f1a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.helpButtonGradient}
+              >
+                <Ionicons name="call" size={24} color="#fff" />
+                <Text style={styles.helpButtonText}>Call Support</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'transparent',
     paddingTop: Platform.OS === 'android' ? STATUS_BAR_HEIGHT : 0,
   },
   container: {
@@ -416,6 +605,30 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 24,
+    paddingTop: 16,
+  },
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#694d21',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  subTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  icon: {
+    marginRight: 8,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   headerButtons: {
     flexDirection: 'row',
@@ -427,15 +640,17 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#fff',
-    marginHorizontal: 12,
-    marginTop: 12,
-    borderRadius: 12,
-    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -444,15 +659,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2c3e50',
+    letterSpacing: 0.5,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statusText: {
     color: '#fff',
@@ -465,38 +685,63 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   addressCard: {
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#f8f6f0',
+    borderRadius: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e8e5e1',
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   addressName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2c3e50',
+    marginLeft: 8,
+    letterSpacing: 0.3,
   },
   addressText: {
     fontSize: 14,
-    color: '#444',
-    marginBottom: 2,
-    lineHeight: 20,
+    color: '#555',
+    marginLeft: 10,
+    lineHeight: 22,
+    flex: 1,
   },
   itemCard: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: 16,
+    backgroundColor: '#f8f6f0',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e8e5e1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
   itemVariant: {
     fontSize: 14,
@@ -507,35 +752,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 8,
+  },
+  quantityBadge: {
+    backgroundColor: '#694d21',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   itemQuantity: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '600',
   },
   itemPrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#694d21',
   },
   paymentCard: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: '#f8f6f0',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e8e5e1',
   },
   paymentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  paymentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   paymentLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#555',
+    fontWeight: '600',
   },
   paymentValue: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#694d21',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 12,
   },
   helpButtons: {
     flexDirection: 'row',
@@ -544,29 +815,63 @@ const styles = StyleSheet.create({
   },
   helpButton: {
     flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginHorizontal: 4,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  helpButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
+    padding: 14,
+    gap: 10,
   },
   helpButtonText: {
-    fontSize: 14,
-    color: '#007bff',
-    fontWeight: '500',
+    fontSize: 15,
+    color: '#fff',
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#694d21',
+    fontWeight: '500',
   },
   errorText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#f44336',
-    marginBottom: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+  },
+  backButton: {
+    backgroundColor: '#694d21',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   refreshButton: {
     padding: 12,

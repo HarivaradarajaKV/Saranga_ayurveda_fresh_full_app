@@ -11,11 +11,17 @@ import {
   RefreshControl,
   Platform,
   SafeAreaView,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAddress } from './AddressContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+
+const { width } = Dimensions.get('window');
 
 export default function AddressesScreen() {
   const router = useRouter();
@@ -23,6 +29,9 @@ export default function AddressesScreen() {
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(30));
+  const [scaleAnim] = useState(new Animated.Value(0.9));
   const [newAddress, setNewAddress] = useState({
     id: null as number | null,
     full_name: '',
@@ -73,6 +82,26 @@ export default function AddressesScreen() {
     };
 
     loadAddresses();
+  }, []);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const handleAddAddress = async () => {
@@ -228,89 +257,104 @@ export default function AddressesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Stack.Screen
-        options={{
-          title: 'Delivery Addresses',
-          headerRight: () => <View />,
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerShadowVisible: false,
-        }}
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#f8f9fa', '#ffffff', '#f1f3f4']}
+        style={styles.backgroundGradient}
       />
-      <ScrollView 
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#FF69B4']}
-            tintColor="#FF69B4"
-          />
-        }
-      >
+      <SafeAreaView style={styles.safeArea}>
+        <Stack.Screen
+          options={{
+            title: 'Delivery Addresses',
+            headerRight: () => <View />,
+            headerStyle: {
+              backgroundColor: '#fff',
+            },
+            headerShadowVisible: false,
+          }}
+        />
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#694d21']}
+              tintColor="#694d21"
+            />
+          }
+        >
         {isLoading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF69B4" />
+            <ActivityIndicator size="large" color="#694d21" />
           </View>
         )}
 
         {!isAdding && (
-          <TouchableOpacity
-            style={styles.addNewButton}
-            onPress={() => {
-              setNewAddress({
-                id: null,
-                full_name: '',
-                phone_number: '',
-                address_line1: '',
-                address_line2: '',
-                city: '',
-                state: '',
-                postal_code: '',
-                country: 'India',
-                address_type: 'Home',
-                is_default: false,
-              });
-              setIsAdding(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="add-circle-outline" size={24} color="#FF69B4" />
-            <Text style={styles.addNewButtonText}>Add New Address</Text>
-          </TouchableOpacity>
+          <Animated.View style={[styles.addNewContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <TouchableOpacity
+              style={styles.addNewButton}
+              onPress={() => {
+                setNewAddress({
+                  id: null,
+                  full_name: '',
+                  phone_number: '',
+                  address_line1: '',
+                  address_line2: '',
+                  city: '',
+                  state: '',
+                  postal_code: '',
+                  country: 'India',
+                  address_type: 'Home',
+                  is_default: false,
+                });
+                setIsAdding(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <BlurView intensity={10} style={styles.addNewBlur}>
+                <View style={styles.addNewContent}>
+                  <View style={styles.addNewIconContainer}>
+                    <Ionicons name="add-circle-outline" size={28} color="#694d21" />
+                  </View>
+                  <Text style={styles.addNewButtonText}>Add New Address</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#694d21" />
+                </View>
+              </BlurView>
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
         {isAdding ? (
-          <View style={styles.addForm}>
-            <View style={styles.formHeader}>
-              <Text style={styles.formTitle}>
-                {newAddress.id ? 'Edit Address' : 'Add New Address'}
-              </Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  setNewAddress({
-                    id: null,
-                    full_name: '',
-                    phone_number: '',
-                    address_line1: '',
-                    address_line2: '',
-                    city: '',
-                    state: '',
-                    postal_code: '',
-                    country: 'India',
-                    address_type: 'Home',
-                    is_default: false,
-                  });
-                  setIsAdding(false);
-                }}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+          <Animated.View style={[styles.addForm, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <BlurView intensity={15} style={styles.formBlur}>
+              <View style={styles.formHeader}>
+                <Text style={styles.formTitle}>
+                  {newAddress.id ? 'Edit Address' : 'Add New Address'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    setNewAddress({
+                      id: null,
+                      full_name: '',
+                      phone_number: '',
+                      address_line1: '',
+                      address_line2: '',
+                      city: '',
+                      state: '',
+                      postal_code: '',
+                      country: 'India',
+                      address_type: 'Home',
+                      is_default: false,
+                    });
+                    setIsAdding(false);
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
 
             <TextInput
               style={styles.input}
@@ -367,25 +411,38 @@ export default function AddressesScreen() {
               value={newAddress.address_type}
               onChangeText={(text) => setNewAddress(prev => ({ ...prev, address_type: text }))}
             />
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => setIsAdding(false)}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.saveButton]}
-                onPress={handleAddAddress}
-              >
-                <Text style={styles.buttonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={() => setIsAdding(false)}
+                >
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.saveButton]}
+                  onPress={handleAddAddress}
+                >
+                  <Text style={styles.buttonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </BlurView>
+          </Animated.View>
         ) : (
           <View style={styles.addressList}>
-            {addresses.map((address) => (
-              <View key={address.id} style={styles.addressCard}>
+            {addresses.map((address, index) => (
+              <Animated.View 
+                key={address.id} 
+                style={[
+                  styles.addressCard,
+                  {
+                    opacity: fadeAnim,
+                    transform: [
+                      { translateY: slideAnim },
+                      { scale: scaleAnim }
+                    ]
+                  }
+                ]}
+              >
                 <View style={styles.addressHeader}>
                   <View style={styles.addressTypeContainer}>
                     {address.address_type && (
@@ -417,7 +474,7 @@ export default function AddressesScreen() {
                       }}
                       style={styles.actionButton}
                     >
-                      <Ionicons name="create-outline" size={20} color="#FF69B4" />
+                      <Ionicons name="create-outline" size={20} color="#694d21" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteAddress(address.id)}
@@ -447,23 +504,34 @@ export default function AddressesScreen() {
                     <Text style={styles.setDefaultText}>Set as Default</Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </Animated.View>
             ))}
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
     paddingTop: Platform.OS === 'android' ? 20 : 0,
@@ -480,30 +548,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     zIndex: 1000,
   },
-  addNewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
+  addNewContainer: {
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
-    borderRadius: 12,
+  },
+  addNewButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  addNewBlur: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  addNewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: '#FF69B4',
+    borderColor: '#694d21',
+    borderRadius: 20,
+  },
+  addNewIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(105, 77, 33, 0.1)',
+    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginRight: 16,
   },
   addNewButtonText: {
-    color: '#FF69B4',
+    flex: 1,
+    color: '#694d21',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
   formHeader: {
     flexDirection: 'row',
@@ -523,24 +609,36 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   addForm: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
     margin: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  formBlur: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   input: {
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e9ecef',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
     fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -549,16 +647,21 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cancelButton: {
     backgroundColor: '#6c757d',
   },
   saveButton: {
-    backgroundColor: '#FF69B4',
+    backgroundColor: '#694d21',
   },
   buttonText: {
     color: '#fff',
@@ -566,20 +669,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   addressList: {
-    padding: 16,
+    paddingTop: 8,
   },
   addressCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
+    marginHorizontal: 16,
     borderWidth: 1,
     borderColor: '#f0f0f0',
-    elevation: 2,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 12,
   },
   addressHeader: {
     flexDirection: 'row',
@@ -597,9 +701,9 @@ const styles = StyleSheet.create({
   },
   addressLabel: {
     fontSize: 14,
-    color: '#FF69B4',
+    color: '#694d21',
     fontWeight: '600',
-    backgroundColor: '#fff5f7',
+    backgroundColor: '#f8f5f0',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -656,7 +760,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   setDefaultText: {
-    color: '#FF69B4',
+    color: '#694d21',
     fontSize: 14,
     fontWeight: '600',
   },

@@ -153,7 +153,7 @@ export default function Chatbot() {
 const styles = StyleSheet.create({
   chatButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 90 : 70,
+    bottom: Platform.OS === 'ios' ? 140 : 120,
     right: 20,
     backgroundColor: '#007bff',
     width: 60,

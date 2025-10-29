@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,18 @@ import {
   Platform,
   TextInputProps,
   Keyboard,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAddress } from '../../AddressContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface FormField {
   value: string;
   error: string;
-  ref: React.RefObject<TextInput>;
+  ref: React.RefObject<TextInput | null>;
 }
 
 interface AddressFormData {
@@ -74,6 +77,25 @@ export default function AddNewAddressPage() {
 
   const [formData, setFormData] = useState<AddressFormData>(initialFormState);
   const [addressType, setAddressType] = useState<'Home' | 'Work' | 'Other'>('Home');
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const updateField = (field: keyof AddressFormData, value: string) => {
     setFormData(prev => ({
@@ -149,7 +171,19 @@ export default function AddNewAddressPage() {
         options={{
           title: 'Add New Address',
           headerShown: true,
+          headerStyle: {
+            backgroundColor: '#f8f6f0',
+          },
+          headerTintColor: '#694d21',
+          headerTitleStyle: {
+            fontWeight: '700',
+            fontSize: 20,
+          },
         }}
+      />
+      <LinearGradient
+        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+        style={StyleSheet.absoluteFill}
       />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -160,8 +194,17 @@ export default function AddNewAddressPage() {
           style={styles.scrollView}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContainer}
         >
-          <View style={styles.form}>
+          <Animated.View 
+            style={[
+              styles.form,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
             <CustomInput
               ref={formData.full_name.ref}
               label="Full Name"
@@ -290,18 +333,33 @@ export default function AddNewAddressPage() {
                       {type}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
+              ))}
             </View>
           </View>
+          </Animated.View>
 
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            activeOpacity={0.8}
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }}
           >
-            <Text style={styles.submitButtonText}>Save Address</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSubmit}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#694d21', '#5a3f1a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.submitButtonGradient}
+              >
+                <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                <Text style={styles.submitButtonText}>Save Address</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -311,81 +369,114 @@ export default function AddNewAddressPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   scrollView: {
     flex: 1,
   },
+  scrollContainer: {
+    paddingBottom: 40,
+  },
   form: {
-    padding: 16,
+    padding: 20,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+    letterSpacing: 0.3,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   inputError: {
     borderColor: '#ff4444',
+    borderWidth: 2,
   },
   errorText: {
     color: '#ff4444',
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: '500',
   },
   textArea: {
-    height: 100,
+    height: 110,
     textAlignVertical: 'top',
   },
   addressTypeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
+    gap: 8,
   },
   addressTypeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    marginHorizontal: 4,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#f5f2eb',
+    marginHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: '#e5e5e5',
   },
   addressTypeButtonActive: {
-    backgroundColor: '#FF69B4',
+    backgroundColor: '#694d21',
+    borderColor: '#5a3f1a',
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   addressTypeText: {
     marginLeft: 8,
     color: '#666',
-    fontWeight: '500',
+    fontWeight: '600',
+    fontSize: 14,
   },
   addressTypeTextActive: {
     color: '#fff',
+    fontWeight: '700',
   },
   submitButton: {
-    backgroundColor: '#FF69B4',
-    paddingVertical: 16,
     margin: 16,
-    borderRadius: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  submitButtonGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 10,
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 }); 

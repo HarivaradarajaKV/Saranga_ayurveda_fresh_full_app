@@ -13,6 +13,7 @@ import AddressProvider from './AddressContext';
 import { OrderProvider } from './OrderContext';
 import { customScreenAnimation } from './navigation/CustomScreenAnimation';
 import { TransitionPresets } from '@react-navigation/stack';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -42,31 +43,33 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <CategoryProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <AddressProvider>
-              <OrderProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    animation: 'slide_from_right',
-                    contentStyle: { backgroundColor: '#fff' },
-                    animationDuration: 300,
-                  }}
-                >
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="auth" options={{ headerShown: false }} />
-                  <Stack.Screen name="admin" options={{ headerShown: false }} />
-                  <Stack.Screen name="home" options={{ title: 'Saranga Ayurveda', headerShown: true }} />
-                </Stack>
-                <StatusBar style="auto" />
-              </OrderProvider>
-            </AddressProvider>
-          </WishlistProvider>
-        </CartProvider>
-      </CategoryProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <CategoryProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <AddressProvider>
+                <OrderProvider>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      animation: 'slide_from_right',
+                      contentStyle: { backgroundColor: '#fff' },
+                      animationDuration: 300,
+                    }}
+                  >
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="auth" options={{ headerShown: false }} />
+                    <Stack.Screen name="admin" options={{ headerShown: false }} />
+                    <Stack.Screen name="home" options={{ title: 'Saranga Ayurveda', headerShown: true }} />
+                  </Stack>
+                  <StatusBar style="auto" />
+                </OrderProvider>
+              </AddressProvider>
+            </WishlistProvider>
+          </CartProvider>
+        </CategoryProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useCategories } from '../CategoryContext';
 import ProductCard from '../components/ProductCard';
 import ProductSearch from '../components/ProductSearch';
 import { apiService } from '../services/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Product {
     id: number;
@@ -46,6 +47,7 @@ export default function CategoryPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const insets = useSafeAreaInsets();
 
     const category = getCategoryById(Number(id));
 
@@ -112,9 +114,32 @@ export default function CategoryPage() {
                 options={{
                     title: name as string,
                     headerShown: true,
+                    headerStyle: {
+                        backgroundColor: '#fff',
+                        height: Platform.OS === 'ios' ? 44 + insets.top : 56 + StatusBar.currentHeight,
+                        shadowColor: '#000',
+                        shadowOffset: {
+                            width: 0,
+                            height: 2,
+                        },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 3.84,
+                        elevation: 5,
+                    },
+                    headerShadowVisible: true,
+                    headerTitleStyle: {
+                        fontSize: 18,
+                        fontWeight: '600',
+                        color: '#000',
+                    },
+                    contentStyle: {
+                        backgroundColor: '#fff',
+                    },
+                    statusBarStyle: 'dark',
+                    statusBarColor: '#fff',
                 }}
             />
-            <View style={styles.container}>
+            <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight }]}>
                 {filteredProducts.length === 0 ? (
                     <View style={styles.centerContainer}>
                         <Text style={styles.noResultsText}>

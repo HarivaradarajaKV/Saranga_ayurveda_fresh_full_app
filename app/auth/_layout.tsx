@@ -34,7 +34,7 @@ export default function AuthLayout() {
                 headerStyle: {
                     backgroundColor: '#fff',
                 },
-                headerTintColor: '#FF69B4',
+                headerTintColor: '#694d21',
                 headerShadowVisible: false,
                 animation: 'slide_from_right',
             }}

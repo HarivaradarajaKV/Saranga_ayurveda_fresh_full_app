@@ -49,11 +49,49 @@ export default function NewProduct() {
                 return;
             }
 
+            // Show aspect ratio options for more flexible cropping
+            Alert.alert(
+                'Select Image Aspect Ratio',
+                'Choose the aspect ratio for your image crop:',
+                [
+                    {
+                        text: 'Square (1:1)',
+                        onPress: () => pickImageWithAspect(index, [1, 1])
+                    },
+                    {
+                        text: 'Landscape (4:3)',
+                        onPress: () => pickImageWithAspect(index, [4, 3])
+                    },
+                    {
+                        text: 'Portrait (3:4)',
+                        onPress: () => pickImageWithAspect(index, [3, 4])
+                    },
+                    {
+                        text: 'Wide (16:9)',
+                        onPress: () => pickImageWithAspect(index, [16, 9])
+                    },
+                    {
+                        text: 'Cancel',
+                        style: 'cancel'
+                    }
+                ]
+            );
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to pick image');
+        }
+    };
+
+    const pickImageWithAspect = async (index: number, aspect: [number, number]) => {
+        try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
+                aspect: aspect, // Flexible aspect ratio based on user choice
+                quality: 0.95, // Higher quality for better images
+                allowsMultipleSelection: false,
+                exif: false, // Disable EXIF data to reduce file size
+                base64: false, // Don't include base64 to reduce memory usage
             });
 
             if (!result.canceled && result.assets[0]) {

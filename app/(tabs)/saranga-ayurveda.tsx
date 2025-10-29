@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Switch, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, AppState, TextInput, Animated, Easing } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, TextInput, Animated, Easing } from 'react-native';
 import { apiService } from '../services/api';
 import ProductCard from '../components/ProductCard';
-import { useRouter } from 'expo-router'; // Import useRouter for navigation
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the Product interface
 interface Product {
@@ -22,54 +21,12 @@ interface Product {
 const SarangaAyurvedaScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isToggleOn, setIsToggleOn] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const searchBarAnim = useRef(new Animated.Value(0)).current;
-
-  // Effect to handle app state changes
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextAppState) => {
-      if (nextAppState === 'background' || nextAppState === 'inactive') {
-        try {
-          await AsyncStorage.setItem('sarangaAyurvedaToggle', 'false');
-          setIsToggleOn(false);
-        } catch (error) {
-          console.error('Error resetting toggle state:', error);
-        }
-      }
-    });
-
-    return () => {
-      subscription.remove();
-      // Reset toggle state when unmounting
-      AsyncStorage.setItem('sarangaAyurvedaToggle', 'false').catch(error => {
-        console.error('Error resetting toggle state:', error);
-      });
-    };
-  }, []);
-
-  // Effect to sync toggle state
-  useEffect(() => {
-    const syncToggleState = async () => {
-      try {
-        const toggleState = await AsyncStorage.getItem('sarangaAyurvedaToggle');
-        setIsToggleOn(toggleState === 'true');
-      } catch (error) {
-        console.error('Error reading toggle state:', error);
-      }
-    };
-    syncToggleState();
-
-    const interval = setInterval(syncToggleState, 1000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -123,20 +80,6 @@ const SarangaAyurvedaScreen = () => {
     setFilteredProducts(products);
   };
 
-  const handleToggle = async () => {
-    const newState = !isToggleOn;
-    setIsToggleOn(newState);
-    try {
-      await AsyncStorage.setItem('sarangaAyurvedaToggle', String(newState));
-      if (!newState) {
-        await AsyncStorage.setItem('sarangaAyurvedaToggle', 'false');
-        router.push('/');
-      }
-    } catch (error) {
-      console.error('Error saving toggle state:', error);
-    }
-  };
-
   // Add animation effect when component mounts
   useEffect(() => {
     Animated.parallel([
@@ -163,7 +106,7 @@ const SarangaAyurvedaScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF69B4" />
+        <ActivityIndicator size="large" color="#694d21" />
         <Text style={styles.loadingText}>Loading Ayurvedic Products...</Text>
       </View>
     );
@@ -188,7 +131,7 @@ const SarangaAyurvedaScreen = () => {
               style={styles.notificationButton}
               onPress={() => router.push('/profile/notifications' as any)}
             >
-              <Ionicons name="notifications-outline" size={24} color="#FF69B4" />
+              <Ionicons name="notifications-outline" size={20} color="#694d21" />
             </TouchableOpacity>
           </View>
 
@@ -204,7 +147,7 @@ const SarangaAyurvedaScreen = () => {
               ]
             }
           ]}>
-            <Ionicons name="search" size={20} color="#FF69B4" style={styles.searchIcon} />
+            <Ionicons name="search" size={18} color="#694d21" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search Ayurvedic products..."
@@ -220,21 +163,10 @@ const SarangaAyurvedaScreen = () => {
                 style={styles.clearButton}
                 onPress={clearSearch}
               >
-                <Ionicons name="close-circle" size={20} color="#FF69B4" />
+                <Ionicons name="close-circle" size={18} color="#694d21" />
               </TouchableOpacity>
             ) : null}
           </Animated.View>
-
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleLabel}>Saranga Ayurveda</Text>
-            <Switch
-              value={isToggleOn}
-              onValueChange={handleToggle}
-              trackColor={{ false: '#ffb6c1', true: '#FF69B4' }}
-              thumbColor={isToggleOn ? '#fff' : '#f4f3f4'}
-              ios_backgroundColor="#ffb6c1"
-            />
-          </View>
         </Animated.View>
         
         <ScrollView 
@@ -260,7 +192,7 @@ const SarangaAyurvedaScreen = () => {
               ))
             ) : (
               <View style={styles.noResultsContainer}>
-                <Ionicons name="search-outline" size={48} color="#FF69B4" />
+                <Ionicons name="search-outline" size={48} color="#694d21" />
                 <Text style={styles.noResultsText}>No products found</Text>
                 <Text style={styles.noResultsSubtext}>Try adjusting your search</Text>
               </View>
@@ -291,7 +223,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#FF69B4',
+    color: '#694d21',
     fontWeight: '500',
   },
   fixedHeader: {
@@ -316,7 +248,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FF69B4',
+    color: '#694d21',
     letterSpacing: 0.5,
   },
   notificationButton: {
@@ -346,20 +278,6 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-  toggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    justifyContent: 'space-between',
-    backgroundColor: '#FFF0F5',
-    padding: 12,
-    borderRadius: 12,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    color: '#FF69B4',
-    fontWeight: '500',
-  },
   scrollContainer: {
     flex: 1,
   },
@@ -387,7 +305,7 @@ const styles = StyleSheet.create({
   noResultsText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FF69B4',
+    color: '#694d21',
     marginTop: 16,
   },
   noResultsSubtext: {

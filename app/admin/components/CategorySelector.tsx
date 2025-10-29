@@ -23,7 +23,7 @@ export default function CategorySelector({
     onSelect,
     selectedCategory,
 }: CategorySelectorProps) {
-    const { mainCategories, subCategories } = useCategories();
+    const { mainCategories, subCategories, loading, error, fetchCategories } = useCategories();
 
     return (
         <Modal
@@ -41,45 +41,68 @@ export default function CategorySelector({
                         </TouchableOpacity>
                     </View>
                     <ScrollView style={styles.categoryList}>
-                        {mainCategories.map(category => (
-                            <View key={category.id}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.categoryItem,
-                                        selectedCategory === category.name && styles.selectedCategory
-                                    ]}
-                                    onPress={() => onSelect(category)}
+                        {loading ? (
+                            <View style={styles.loadingContainer}>
+                                <Text style={styles.loadingText}>Loading categories...</Text>
+                            </View>
+                        ) : error ? (
+                            <View style={styles.errorContainer}>
+                                <Text style={styles.errorText}>Error loading categories: {error}</Text>
+                                <TouchableOpacity 
+                                    style={styles.retryButton}
+                                    onPress={() => {
+                                        // Trigger a refresh by calling fetchCategories
+                                        fetchCategories();
+                                    }}
                                 >
-                                    <Text style={[
-                                        styles.categoryName,
-                                        selectedCategory === category.name && styles.selectedCategoryText
-                                    ]}>
-                                        {category.name}
-                                    </Text>
-                                    {subCategories[category.id]?.length > 0 && (
-                                        <Ionicons name="chevron-forward" size={20} color="#666" />
-                                    )}
+                                    <Text style={styles.retryButtonText}>Retry</Text>
                                 </TouchableOpacity>
-                                {subCategories[category.id]?.map(subCategory => (
+                            </View>
+                        ) : mainCategories.length === 0 ? (
+                            <View style={styles.emptyContainer}>
+                                <Text style={styles.emptyText}>No categories available</Text>
+                            </View>
+                        ) : (
+                            mainCategories.map(category => (
+                                <View key={category.id}>
                                     <TouchableOpacity
-                                        key={subCategory.id}
                                         style={[
                                             styles.categoryItem,
-                                            styles.subCategoryItem,
-                                            selectedCategory === subCategory.name && styles.selectedCategory
+                                            selectedCategory === category.name && styles.selectedCategory
                                         ]}
-                                        onPress={() => onSelect(subCategory)}
+                                        onPress={() => onSelect(category)}
                                     >
                                         <Text style={[
                                             styles.categoryName,
-                                            selectedCategory === subCategory.name && styles.selectedCategoryText
+                                            selectedCategory === category.name && styles.selectedCategoryText
                                         ]}>
-                                            {subCategory.name}
+                                            {category.name}
                                         </Text>
+                                        {subCategories[category.id]?.length > 0 && (
+                                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                                        )}
                                     </TouchableOpacity>
-                                ))}
-                            </View>
-                        ))}
+                                    {subCategories[category.id]?.map(subCategory => (
+                                        <TouchableOpacity
+                                            key={subCategory.id}
+                                            style={[
+                                                styles.categoryItem,
+                                                styles.subCategoryItem,
+                                                selectedCategory === subCategory.name && styles.selectedCategory
+                                            ]}
+                                            onPress={() => onSelect(subCategory)}
+                                        >
+                                            <Text style={[
+                                                styles.categoryName,
+                                                selectedCategory === subCategory.name && styles.selectedCategoryText
+                                            ]}>
+                                                {subCategory.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            ))
+                        )}
                     </ScrollView>
                 </View>
             </View>
@@ -137,5 +160,42 @@ const styles = StyleSheet.create({
     selectedCategoryText: {
         color: '#007bff',
         fontWeight: '600',
+    },
+    loadingContainer: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#666',
+    },
+    errorContainer: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    errorText: {
+        fontSize: 16,
+        color: '#dc3545',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    retryButton: {
+        backgroundColor: '#007bff',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 5,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    emptyContainer: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    emptyText: {
+        fontSize: 16,
+        color: '#666',
     },
 }); 

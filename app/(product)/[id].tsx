@@ -23,6 +23,7 @@ import { useCart } from '../CartContext';
 import { apiService } from '../services/api';
 import ProductReviews from '../components/ProductReviews';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ExpandableDescription } from '../components/ExpandableDescription';
 import {
   ProductSize,
   Benefits,
@@ -106,6 +107,7 @@ export default function ProductPage() {
   const [reviewCount, setReviewCount] = useState(0);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageErrors, setImageErrors] = useState<{[key: number]: boolean}>({});
   const scrollViewRef = useRef(null);
 
   const handleScroll = (event: any) => {
@@ -422,20 +424,26 @@ export default function ProductPage() {
     setIsImageViewerVisible(true);
   };
 
+  // Function to handle image errors
+  const handleImageError = (imageIndex: number) => {
+    console.log(`Image ${imageIndex} failed to load`);
+    setImageErrors(prev => ({ ...prev, [imageIndex]: true }));
+  };
+
   // Function to get image URLs for the viewer
   const getImageUrls = () => {
     if (!productData) return [];
     
     const urls = [
-      { url: apiService.getFullImageUrl(productData.image_url) }
+      { url: imageErrors[0] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url) }
     ];
     
     if (productData.image_url2) {
-      urls.push({ url: apiService.getFullImageUrl(productData.image_url2) });
+      urls.push({ url: imageErrors[1] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url2) });
     }
     
     if (productData.image_url3) {
-      urls.push({ url: apiService.getFullImageUrl(productData.image_url3) });
+      urls.push({ url: imageErrors[2] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url3) });
     }
     
     return urls;
@@ -458,57 +466,93 @@ export default function ProductPage() {
       <ScrollView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="black" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{productData.name}</Text>
-          <TouchableOpacity onPress={handleWishlistPress}>
+          <Text style={styles.headerTitle} numberOfLines={1}>{productData.name}</Text>
+          <TouchableOpacity onPress={handleWishlistPress} style={styles.headerButton}>
             <Ionicons 
               name={isInWishlist(productData.id) ? "heart" : "heart-outline"} 
               size={24} 
-              color={isInWishlist(productData.id) ? "red" : "black"} 
+              color={isInWishlist(productData.id) ? "#FF6B6B" : "#666"} 
             />
           </TouchableOpacity>
         </View>
 
         {/* Product Images */}
-        <ScrollView 
-          ref={scrollViewRef}
-          horizontal 
-          pagingEnabled 
-          showsHorizontalScrollIndicator={false}
-          style={styles.imageContainer}
-          onScroll={(event) => {
-            const contentOffset = event.nativeEvent.contentOffset;
-            const viewSize = event.nativeEvent.layoutMeasurement;
-            const selectedIndex = Math.floor(contentOffset.x / viewSize.width);
-            setCurrentImageIndex(selectedIndex);
-          }}
-          scrollEventThrottle={16}
-        >
-          <TouchableOpacity onPress={() => handleImagePress(0)}>
-            <Image 
-              source={{ uri: apiService.getFullImageUrl(productData.image_url) }} 
-              style={styles.productImage} 
-            />
-          </TouchableOpacity>
-          {productData.image_url2 && (
-            <TouchableOpacity onPress={() => handleImagePress(1)}>
+        <View style={styles.imageSection}>
+          <ScrollView 
+            ref={scrollViewRef}
+            horizontal 
+            pagingEnabled 
+            showsHorizontalScrollIndicator={false}
+            style={styles.imageContainer}
+            onScroll={(event) => {
+              const contentOffset = event.nativeEvent.contentOffset;
+              const viewSize = event.nativeEvent.layoutMeasurement;
+              const selectedIndex = Math.floor(contentOffset.x / viewSize.width);
+              setCurrentImageIndex(selectedIndex);
+            }}
+            scrollEventThrottle={16}
+          >
+            <TouchableOpacity 
+              onPress={() => handleImagePress(0)}
+              style={styles.imageWrapper}
+              activeOpacity={0.9}
+            >
               <Image 
-                source={{ uri: apiService.getFullImageUrl(productData.image_url2) }} 
-                style={styles.productImage} 
+                source={{ uri: imageErrors[0] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url) }} 
+                style={styles.productImage}
+                resizeMode="contain"
+                onError={() => handleImageError(0)}
               />
+              <View style={styles.imageOverlay}>
+                <Ionicons name="expand" size={24} color="rgba(255,255,255,0.8)" />
+              </View>
             </TouchableOpacity>
-          )}
-          {productData.image_url3 && (
-            <TouchableOpacity onPress={() => handleImagePress(2)}>
-              <Image 
-                source={{ uri: apiService.getFullImageUrl(productData.image_url3) }} 
-                style={styles.productImage} 
-              />
-            </TouchableOpacity>
-          )}
-        </ScrollView>
+            {productData.image_url2 && (
+              <TouchableOpacity 
+                onPress={() => handleImagePress(1)}
+                style={styles.imageWrapper}
+                activeOpacity={0.9}
+              >
+                <Image 
+                  source={{ uri: imageErrors[1] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url2) }} 
+                  style={styles.productImage}
+                  resizeMode="contain"
+                  onError={() => handleImageError(1)}
+                />
+                <View style={styles.imageOverlay}>
+                  <Ionicons name="expand" size={24} color="rgba(255,255,255,0.8)" />
+                </View>
+              </TouchableOpacity>
+            )}
+            {productData.image_url3 && (
+              <TouchableOpacity 
+                onPress={() => handleImagePress(2)}
+                style={styles.imageWrapper}
+                activeOpacity={0.9}
+              >
+                <Image 
+                  source={{ uri: imageErrors[2] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url3) }} 
+                  style={styles.productImage}
+                  resizeMode="contain"
+                  onError={() => handleImageError(2)}
+                />
+                <View style={styles.imageOverlay}>
+                  <Ionicons name="expand" size={24} color="rgba(255,255,255,0.8)" />
+                </View>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+          
+          {/* Image Counter */}
+          <View style={styles.imageCounter}>
+            <Text style={styles.imageCounterText}>
+              {currentImageIndex + 1} / {getImageUrls().length}
+            </Text>
+          </View>
+        </View>
 
         {/* Image Pagination Dots */}
         <View style={styles.paginationDots}>
@@ -526,21 +570,32 @@ export default function ProductPage() {
           visible={isImageViewerVisible}
           transparent={true}
           onRequestClose={() => setIsImageViewerVisible(false)}
+          animationType="fade"
         >
-          <ImageViewer
-            imageUrls={getImageUrls()}
-            index={currentImageIndex}
-            enableSwipeDown={true}
-            onSwipeDown={() => setIsImageViewerVisible(false)}
-            renderHeader={() => (
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setIsImageViewerVisible(false)}
-              >
-                <Ionicons name="close" size={28} color="white" />
-              </TouchableOpacity>
-            )}
-          />
+          <View style={styles.imageViewerContainer}>
+            <ImageViewer
+              imageUrls={getImageUrls()}
+              index={currentImageIndex}
+              enableSwipeDown={true}
+              onSwipeDown={() => setIsImageViewerVisible(false)}
+              renderHeader={() => (
+                <View style={styles.imageViewerHeader}>
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setIsImageViewerVisible(false)}
+                  >
+                    <Ionicons name="close" size={28} color="white" />
+                  </TouchableOpacity>
+                  <View style={styles.imageViewerCounter}>
+                    <Text style={styles.imageViewerCounterText}>
+                      {currentImageIndex + 1} / {getImageUrls().length}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              renderIndicator={() => null}
+            />
+          </View>
         </Modal>
 
         {/* Product Info */}
@@ -588,7 +643,14 @@ export default function ProductPage() {
 
           {/* Product Description */}
           {productData.description && (
-            <ProductDescription description={productData.description} />
+            <View style={styles.descriptionSection}>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <ExpandableDescription 
+                description={productData.description}
+                maxLines={4}
+                textStyle={styles.descriptionText}
+              />
+            </View>
           )}
 
           {/* Size Selection */}
@@ -790,83 +852,185 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  headerButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#333',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 16,
+  },
+  imageSection: {
+    backgroundColor: '#f8f9fa',
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   imageContainer: {
     width: Dimensions.get('window').width,
-    height: 300,
+    height: 400,
+  },
+  imageWrapper: {
+    width: Dimensions.get('window').width,
+    height: 400,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
   },
   productImage: {
-    width: Dimensions.get('window').width,
-    height: 300,
-    resizeMode: 'cover',
+    width: Dimensions.get('window').width - 40,
+    height: 400,
+    resizeMode: 'contain',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 8,
+    opacity: 0.8,
+  },
+  imageCounter: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  imageCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   paginationDots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D1D1D1',
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: '#007AFF',
     width: 10,
     height: 10,
     borderRadius: 5,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    marginHorizontal: 6,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+  },
+  activeDot: {
+    backgroundColor: '#007AFF',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    elevation: 2,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
   productInfo: {
-    padding: 16,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   productName: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
+    color: '#1a1a1a',
+    lineHeight: 32,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
+    flexWrap: 'wrap',
   },
   price: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginRight: 8,
+    marginRight: 12,
+    color: '#2c3e50',
   },
   originalPrice: {
-    fontSize: 18,
+    fontSize: 20,
     textDecorationLine: 'line-through',
-    color: '#666',
-    marginRight: 8,
+    color: '#95a5a6',
+    marginRight: 12,
   },
   discount: {
     fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: '600',
+    color: '#27ae60',
+    fontWeight: '700',
+    backgroundColor: '#d5f4e6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   rating: {
     fontSize: 16,
-    fontWeight: '600',
-    marginRight: 4,
+    fontWeight: '700',
+    marginRight: 6,
+    color: '#f39c12',
   },
   reviews: {
     fontSize: 14,
     color: '#666',
     marginLeft: 4,
+  },
+  descriptionSection: {
+    marginVertical: 16,
+    paddingHorizontal: 4,
+  },
+  descriptionText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
+    textAlign: 'left',
   },
   deliveryCheck: {
     marginVertical: 16,
@@ -902,52 +1066,63 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 16,
+    marginVertical: 24,
+    gap: 12,
   },
   button: {
     flex: 1,
-    height: 48,
-    borderRadius: 8,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   addToCartButton: {
     backgroundColor: '#fff',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#007AFF',
-    marginRight: 8,
   },
   addToCartText: {
     color: '#007AFF',
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 8,
+    fontSize: 16,
   },
   buyNowButton: {
     backgroundColor: '#007AFF',
-    marginRight: 8,
   },
   buyNowText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 8,
+    fontSize: 16,
   },
   stockContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   stockText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   inStock: {
-    color: '#00a65a',
+    color: '#27ae60',
   },
   lowStock: {
-    color: '#ff4444',
+    color: '#e74c3c',
   },
   outOfStock: {
-    color: '#ff4444',
-    fontWeight: '600',
+    color: '#e74c3c',
+    fontWeight: '700',
   },
   outOfStockContainer: {
     width: '100%',
@@ -977,5 +1152,39 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 1000,
     padding: 10,
+  },
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+  },
+  imageViewerHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    zIndex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  imageViewerCounter: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  imageViewerCounterText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -8,7 +8,7 @@ export default function AddProductScreen() {
         <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
         >
             <Stack.Screen 
                 options={{

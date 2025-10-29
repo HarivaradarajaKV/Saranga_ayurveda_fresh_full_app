@@ -15,6 +15,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAddress } from '../../AddressContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 
@@ -80,10 +81,19 @@ export default function AddressListPage() {
           title: mode === 'select' ? 'Select Address' : 'My Addresses',
           headerShown: true,
           headerStyle: {
-            backgroundColor: '#fff',
+            backgroundColor: '#f8f6f0',
           },
-          headerShadowVisible: false,
+          headerTintColor: '#694d21',
+          headerTitleStyle: {
+            fontWeight: '700',
+            fontSize: 20,
+          },
+          headerShadowVisible: true,
         }}
+      />
+      <LinearGradient
+        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+        style={StyleSheet.absoluteFill}
       />
       <View style={styles.container}>
         <Animated.View 
@@ -98,12 +108,22 @@ export default function AddressListPage() {
             }
           ]}
         >
-          <Text style={styles.headerTitle}>
-            {addresses.length} {addresses.length === 1 ? 'Address' : 'Addresses'} Saved
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            Manage your delivery locations
-          </Text>
+          <LinearGradient
+            colors={['#f8f6f0', '#f5f2eb', '#fff']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
+          >
+            <View style={styles.iconBadge}>
+              <Ionicons name="location" size={28} color="#694d21" />
+            </View>
+            <Text style={styles.headerTitle}>
+              {addresses.length} {addresses.length === 1 ? 'Address' : 'Addresses'} Saved
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              Manage your delivery locations
+            </Text>
+          </LinearGradient>
         </Animated.View>
 
         <ScrollView 
@@ -123,12 +143,13 @@ export default function AddressListPage() {
                 }
               ]}
             >
-              <LinearGradient
-                colors={['#FFF0F5', '#fff']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.cardGradient}
-              >
+              <BlurView intensity={20} style={styles.cardGradient} tint="light">
+                <LinearGradient
+                  colors={['#f8f6f0', '#fff']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
                 <TouchableOpacity
                   onPress={() => handleAddressSelect(address)}
                   activeOpacity={0.9}
@@ -136,18 +157,18 @@ export default function AddressListPage() {
                 >
                   <View style={styles.addressHeader}>
                     <View style={styles.addressType}>
-                      <LinearGradient
-                        colors={['#FF69B4', '#FF1493']}
-                        style={styles.iconContainer}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                      >
-                        <Ionicons
-                          name={renderAddressIcon()}
-                          size={20}
-                          color="#fff"
-                        />
-                      </LinearGradient>
+                        <LinearGradient
+                          colors={['#694d21', '#5a3f1a']}
+                          style={styles.iconContainer}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                        >
+                          <Ionicons
+                            name={renderAddressIcon()}
+                            size={20}
+                            color="#fff"
+                          />
+                        </LinearGradient>
                       <View style={styles.typeContainer}>
                         <Text style={styles.addressTypeText}>Delivery Address</Text>
                         {address.is_default && (
@@ -166,7 +187,7 @@ export default function AddressListPage() {
                             params: { id: address.id }
                           })}
                         >
-                          <Ionicons name="pencil" size={18} color="#FF69B4" />
+                          <Ionicons name="pencil" size={18} color="#694d21" />
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.actionButton, styles.deleteButton]}
@@ -198,7 +219,7 @@ export default function AddressListPage() {
                       onPress={() => setDefaultAddress(address.id)}
                     >
                       <LinearGradient
-                        colors={['#FF69B4', '#FF1493']}
+                        colors={['#694d21', '#5a3f1a']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.defaultGradient}
@@ -209,7 +230,7 @@ export default function AddressListPage() {
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
-              </LinearGradient>
+              </BlurView>
             </Animated.View>
           ))}
 
@@ -224,10 +245,10 @@ export default function AddressListPage() {
               ]}
             >
               <LinearGradient
-                colors={['#FFF0F5', '#FFE4E1']}
+                colors={['#f8f6f0', '#f5f2eb']}
                 style={styles.emptyStateGradient}
               >
-                <Ionicons name="location-outline" size={64} color="#FF69B4" />
+                <Ionicons name="location-outline" size={64} color="#694d21" />
                 <Text style={styles.emptyStateText}>No addresses saved yet</Text>
                 <Text style={styles.emptyStateSubtext}>
                   Add your delivery addresses to make checkout faster
@@ -242,7 +263,7 @@ export default function AddressListPage() {
           onPress={() => router.push('/profile/addresses/new')}
         >
           <LinearGradient
-            colors={['#FF69B4', '#FF1493']}
+            colors={['#694d21', '#5a3f1a']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.addButtonGradient}
@@ -264,23 +285,50 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   header: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  headerGradient: {
     padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE4E1',
+    alignItems: 'center',
+  },
+  iconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#f5f2eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.1)',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#2c3e50',
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
+    fontWeight: '500',
   },
   addressList: {
     flex: 1,
@@ -289,16 +337,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   addressCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
   },
   cardGradient: {
-    borderRadius: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   cardContent: {
     padding: 16,
@@ -319,30 +368,33 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   iconContainer: {
-    padding: 10,
-    borderRadius: 12,
-    shadowColor: '#FF69B4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    padding: 12,
+    borderRadius: 14,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
   },
   addressTypeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF69B4',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#2c3e50',
+    letterSpacing: 0.3,
   },
   defaultBadge: {
-    backgroundColor: '#FFF0F5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#f5f2eb',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.2)',
   },
   defaultText: {
-    color: '#FF69B4',
+    color: '#694d21',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -353,33 +405,41 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   editButton: {
-    backgroundColor: '#FFF0F5',
+    backgroundColor: '#f5f2eb',
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.2)',
   },
   deleteButton: {
-    backgroundColor: '#FFE4E4',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ff4444',
   },
   addressDetails: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 18,
+    borderRadius: 16,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2c3e50',
     marginBottom: 8,
+    letterSpacing: 0.2,
   },
   addressText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-    lineHeight: 20,
+    color: '#555',
+    marginBottom: 6,
+    lineHeight: 22,
+    fontWeight: '400',
   },
   phone: {
     fontSize: 14,
@@ -408,28 +468,29 @@ const styles = StyleSheet.create({
   },
   addButton: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    borderRadius: 12,
+    bottom: 24,
+    left: 16,
+    right: 16,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#FF69B4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    elevation: 8,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
   addButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 18,
   },
   addButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontSize: 17,
+    fontWeight: '700',
+    marginLeft: 10,
+    letterSpacing: 0.5,
   },
   emptyState: {
     flex: 1,

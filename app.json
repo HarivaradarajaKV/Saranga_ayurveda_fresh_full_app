@@ -1,23 +1,24 @@
 {
   "expo": {
-    "name": "my-app",
-    "slug": "my-app",
+    "name": "SarangaAyurveda",
+    "slug": "saranga-ayurveda-fresh",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "sdkVersion": "54.0.0",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.AyurvedaSaranga.myapp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.Saranga_ayurveda.myapp",
-      "versionCode": 1,
+      "package": "com.sarangaayurveda.fresh",
+      "versionCode": 2,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -39,19 +40,23 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "packagerOpts": {
+      "config": "metro.config.js"
     },
     "extra": {
       "router": {
         "origin": false
       },
       "eas": {
-        "projectId": "777c987e-b0ab-40d8-a597-792695bd7302"
+        "projectId": "4941458a-d243-4bad-99dd-40258896396b"
       }
-    },
-    "owner": "harivaradaraja"
+    }
   }
 }

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
+import RNHTMLtoPDF from 'react-native-html-to-pdf';
 import { Order } from '../OrderContext';
 
 interface OrderInvoiceProps {
@@ -20,158 +21,159 @@ export const generateInvoice = async (order: Order) => {
 
     const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
 
+    // Calculate items subtotal and inferred other charges
+    const itemsSubtotal = (order.items || []).reduce((sum, item) => sum + Number(item.price_at_time || 0) * Number(item.quantity || 0), 0);
+    const inferredOtherChargesRaw = totalAmount - (itemsSubtotal - discountAmount + deliveryCharge);
+    const otherCharges = Math.max(0, Number(isFinite(inferredOtherChargesRaw) ? inferredOtherChargesRaw : 0));
+
+    // Format date in IST
+    const orderDateIST = (() => {
+      try {
+        return new Date(order.created_at).toLocaleString('en-IN', {
+          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata'
+        });
+      } catch {
+        return new Date(order.created_at).toLocaleDateString('en-IN');
+      }
+    })();
+
+    const paymentDisplay = order.payment_method_display || (order.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment');
+
     const invoiceContent = `
       <html>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
           <style>
+            :root {
+              --primary: #2f5d62;
+              --accent: #28a745;
+              --muted: #6c757d;
+              --bg: #f6f8fb;
+              --card: #ffffff;
+              --border: #e9ecef;
+            }
             body { 
-              font-family: Arial, sans-serif; 
-              padding: 20px;
+              font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+              padding: 24px;
               line-height: 1.6;
               color: #333;
+              background: var(--bg);
             }
-            .header { 
-              text-align: center; 
+            .header-wrap {
+              background: linear-gradient(135deg, #f0f4ff, #e6f7f0);
+              border: 1px solid var(--border);
+              border-radius: 16px;
+              padding: 20px;
               margin-bottom: 20px;
-              padding: 100px;
-              background: linear-gradient(to right, #f8f9fa, #e9ecef);
-              border-radius: 20px;
+            }
+            .brand-row {
+              display: flex; align-items: center; justify-content: space-between;
             }
             .brand-name {
-              color: #28a745;
-              font-size: 24px;
-              font-weight: bold;
-              margin-bottom: 10px;
+              color: var(--primary);
+              font-size: 22px;
+              font-weight: 800;
+              letter-spacing: 0.3px;
             }
-            .thank-you {
-              color: #666;
-              font-style: italic;
-              margin: 10px 0;
-            }
+            .invoice-title { margin: 6px 0 0; font-size: 18px; color: #111; }
+            .order-meta { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+            .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
             .section { 
-              margin: 25px 0;
-              padding: 20px;
-              background: #fff;
-              border-radius: 10px;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              margin: 16px 0;
+              padding: 16px;
+              background: var(--card);
+              border-radius: 12px;
+              border: 1px solid var(--border);
             }
             .section h3 {
-              color: #28a745;
-              border-bottom: 2px solid #e9ecef;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
+              color: var(--primary);
+              font-size: 16px;
+              margin: 0 0 10px;
+              padding-bottom: 8px;
+              border-bottom: 1px dashed var(--border);
             }
-            .item { 
-              margin: 10px 0; 
-              padding: 15px;
-              background: #f8f9fa; 
-              border-radius: 8px;
-            }
-            .total { 
-              font-weight: bold; 
-              font-size: 1.2em;
-              color: #28a745;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse;
-              margin: 15px 0;
-            }
-            th, td { 
-              padding: 12px 8px;
-              text-align: left;
-              border-bottom: 1px solid #dee2e6;
-            }
-            th { 
-              background-color: #f8f9fa;
-              color: #495057;
-              font-weight: 600;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding: 20px;
-              background: #f8f9fa;
-              border-radius: 10px;
-              color: #666;
-            }
-            .contact-info {
-              margin-top: 15px;
-              font-size: 0.9em;
-            }
+            .addr p { margin: 4px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+            th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+            th { background: #fafbff; color: #374151; font-weight: 700; }
+            .right { text-align: right; }
+            .muted { color: var(--muted); }
+            .total-row td { font-weight: 800; color: var(--primary); border-top: 2px solid var(--border); }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #eefbf1; color: var(--accent); font-weight: 700; font-size: 11px; }
+            .footer { text-align: center; margin-top: 18px; color: var(--muted); font-size: 12px; }
+            .contact-info { margin-top: 10px; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="brand-name">Saranga Ayurveda</div>
-            <h1>Tax Invoice</h1>
-            <h2>Order #${order.id}</h2>
-            <p>Date: ${new Date(order.created_at).toLocaleDateString()}</p>
-            <p class="thank-you">Thank you for shopping with Saranga Ayurveda!</p>
+          <div class="header-wrap">
+            <div class="brand-row">
+              <div class="brand-name">Saranga Ayurveda</div>
+              <div class="badge">${paymentDisplay}</div>
+            </div>
+            <div class="invoice-title">Tax Invoice • Order #${order.id}</div>
+            <div class="order-meta">Date: ${orderDateIST}</div>
           </div>
           
-          <div class="section">
-            <h3>Shipping Address</h3>
-            <p><strong>${order.shipping_address.full_name}</strong></p>
-            <p>${order.shipping_address.address_line1}</p>
-            ${order.shipping_address.address_line2 ? `<p>${order.shipping_address.address_line2}</p>` : ''}
-            <p>${order.shipping_address.city}, ${order.shipping_address.state} - ${order.shipping_address.pincode || ''}</p>
-            <p>📱 ${order.shipping_address.phone}</p>
+          <div class="grid">
+            <div class="section addr">
+              <h3>Billing & Shipping</h3>
+              <p><strong>${order.shipping_address.full_name}</strong></p>
+              <p>${order.shipping_address.address_line1}</p>
+              ${order.shipping_address.address_line2 ? `<p>${order.shipping_address.address_line2}</p>` : ''}
+              <p>${order.shipping_address.city}, ${order.shipping_address.state} - ${order.shipping_address.pincode || ''}</p>
+              <p>📱 ${order.shipping_address.phone || (order.shipping_address as any)?.phone_number || (order as any)?.shipping_phone_number || ''}</p>
+            </div>
+            <div class="section">
+              <h3>Order Summary</h3>
+              <table>
+                <tr>
+                  <td class="muted">Items Subtotal</td>
+                  <td class="right">${formatPrice(itemsSubtotal)}</td>
+                </tr>
+                ${discountAmount > 0 ? `
+                <tr>
+                  <td class="muted">Discount</td>
+                  <td class="right" style="color:#28a745">- ${formatPrice(discountAmount)}</td>
+                </tr>` : ''}
+                <tr>
+                  <td class="muted">Delivery Charges</td>
+                  <td class="right">${formatPrice(deliveryCharge)}</td>
+                </tr>
+                ${otherCharges > 0 ? `
+                <tr>
+                  <td class="muted">Other Charges</td>
+                  <td class="right">${formatPrice(otherCharges)}</td>
+                </tr>` : ''}
+                <tr class="total-row">
+                  <td>Total Amount</td>
+                  <td class="right">${formatPrice(totalAmount)}</td>
+                </tr>
+              </table>
+            </div>
           </div>
 
           <div class="section">
-            <h3>Order Details</h3>
+            <h3>Items</h3>
             <table>
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>Quantity</th>
-                  <th>Price</th>
-                  <th>Total</th>
+                  <th class="right">Qty</th>
+                  <th class="right">Price</th>
+                  <th class="right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                ${order.items.map(item => `
+                ${(order.items || []).map(item => `
                   <tr>
-                    <td><strong>${item.product_name}</strong></td>
-                    <td>${item.quantity}</td>
-                    <td>${formatPrice(Number(item.price_at_time))}</td>
-                    <td>${formatPrice(Number(item.price_at_time) * Number(item.quantity))}</td>
+                    <td><strong>${item.product_name}</strong>${item.variant ? ` <span class="muted">(${item.variant})</span>` : ''}</td>
+                    <td class="right">${Number(item.quantity || 0)}</td>
+                    <td class="right">${formatPrice(Number(item.price_at_time || 0))}</td>
+                    <td class="right">${formatPrice(Number(item.price_at_time || 0) * Number(item.quantity || 0))}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
-          </div>
-
-          <div class="section">
-            <h3>Price Details</h3>
-            <table>
-              <tr>
-                <td>Subtotal:</td>
-                <td>${formatPrice(totalAmount)}</td>
-              </tr>
-              ${discountAmount > 0 ? `
-                <tr>
-                  <td>Discount:</td>
-                  <td style="color: #28a745">-${formatPrice(discountAmount)}</td>
-                </tr>
-              ` : ''}
-              <tr>
-                <td>Delivery Charges:</td>
-                <td>${formatPrice(deliveryCharge)}</td>
-              </tr>
-              <tr class="total">
-                <td>Total Amount:</td>
-                <td>${formatPrice(totalAmount - discountAmount + deliveryCharge)}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="section">
-            <h3>Payment Information</h3>
-            <p><strong>Payment Method:</strong> ${order.payment_method_display}</p>
-            <p><strong>Order Status:</strong> <span style="color: #28a745">${order.status.toUpperCase()}</span></p>
           </div>
 
           <div class="footer">
@@ -179,7 +181,7 @@ export const generateInvoice = async (order: Order) => {
             <p>We hope you enjoy your Ayurvedic products.</p>
             <div class="contact-info">
               <p>For any queries, please contact us:</p>
-              <p>📧 support@sarangaayurveda.com | 📱 +91-XXXXXXXXXX</p>
+              <p>📧 paysarangaayurveda@gmail.com | 📱 +91-XXXXXXXXXX</p>
               <p>www.sarangaayurveda.com</p>
             </div>
           </div>
@@ -188,35 +190,44 @@ export const generateInvoice = async (order: Order) => {
     `;
 
     console.log('[generateInvoice] Generating PDF...');
-    
-    // Generate PDF file
-    const { uri } = await Print.printToFileAsync({
-      html: invoiceContent,
-      base64: false
-    });
 
-    console.log('[generateInvoice] PDF generated at:', uri);
+    let pdfUri: string | null = null;
 
-    // Create a new file with .pdf extension
-    const pdfPath = `${FileSystem.documentDirectory}invoice_${order.id}_${new Date().toISOString().split('T')[0]}.pdf`;
-    await FileSystem.copyAsync({
-      from: uri,
-      to: pdfPath
-    });
+    // Try using expo-print first
+    try {
+      const printResult = await Print.printToFileAsync({ html: invoiceContent, base64: false });
+      pdfUri = printResult.uri;
+    } catch (err) {
+      console.warn('[generateInvoice] expo-print failed, falling back to RNHTMLtoPDF:', err);
+    }
 
-    // Share the PDF file
+    // Fallback to RNHTMLtoPDF if expo-print failed or is unavailable
+    if (!pdfUri) {
+      const file = await RNHTMLtoPDF.convert({
+        html: invoiceContent,
+        fileName: `invoice_${order.id}`,
+        directory: 'Documents',
+      });
+      pdfUri = file.filePath || null;
+    }
+
+    if (!pdfUri) {
+      throw new Error('Failed to generate invoice PDF');
+    }
+
+    console.log('[generateInvoice] PDF generated at:', pdfUri);
+
+    // Use the generated path directly for sharing
+    const sharePath = pdfUri;
+
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
-      await Sharing.shareAsync(pdfPath, {
+      await Sharing.shareAsync(sharePath, {
         mimeType: 'application/pdf',
         dialogTitle: 'Download Invoice'
       });
-
-      // Clean up temporary files
-      await FileSystem.deleteAsync(uri).catch(console.error);
-      await FileSystem.deleteAsync(pdfPath).catch(console.error);
     } else {
-      Alert.alert('Error', 'Sharing is not available on this device');
+      Alert.alert('Invoice Ready', `Invoice saved at: ${sharePath}`);
     }
   } catch (error) {
     console.error('Error generating invoice:', error);

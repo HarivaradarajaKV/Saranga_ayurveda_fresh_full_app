@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,14 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useWishlist } from '../WishlistContext';
 import { useCart } from '../CartContext';
 import { useRouter } from 'expo-router';
 import { apiService } from '../services/api';
+import { useBottomTabBarHeight } from './_layout';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +28,60 @@ export default function WishlistPage() {
   const { addItem, getCartItems, updateQuantity } = useCart() || {};
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const flatListRef = useRef<FlatList>(null);
+  const isInitialMount = useRef(true);
+  const lastFocusedState = useRef(false);
+  const isFocused = useIsFocused();
+  const navigation = useNavigation();
+  const bottomTabHeight = useBottomTabBarHeight();
+
+  useEffect(() => {
+    // Start animations on mount
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // Scroll to top function for FlatList
+  const scrollToTop = () => {
+    if (flatListRef.current && wishlist.length > 0) {
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      });
+    }
+  };
+
+  // Handle tab press for scroll to top
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', (e) => {
+      if (isFocused) {
+        e.preventDefault();
+        scrollToTop();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, isFocused, wishlist.length]);
+
+  useEffect(() => {
+    // Track focus changes to prevent unwanted scrolling
+    if (isFocused && !lastFocusedState.current) {
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+      }
+    }
+    lastFocusedState.current = isFocused;
+  }, [isFocused]);
 
   const handleRemove = (item: any) => {
     const fadeAnim = new Animated.Value(1);
@@ -107,25 +165,56 @@ export default function WishlistPage() {
         <Stack.Screen 
           options={{
             title: 'Wishlist',
-            headerShown: true,
+            headerShown: false,
             headerStyle: {
-              backgroundColor: '#fff',
+              backgroundColor: 'transparent',
             },
             headerShadowVisible: false,
           }}
         />
-        <View style={styles.emptyContainer}>
-          <Ionicons name="heart-outline" size={80} color="#FFB6C1" />
-          <Text style={styles.emptyTitle}>Your Wishlist is Empty</Text>
-          <Text style={styles.emptySubtitle}>
-            Discover and save your favorite beauty treasures
-          </Text>
-          <TouchableOpacity 
-            style={styles.exploreButton}
-            onPress={() => router.push('/')}
+        <View style={styles.container}>
+          {/* Background Gradient */}
+          <LinearGradient
+            colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+            style={styles.backgroundGradient}
+          />
+          
+          <Animated.View 
+            style={[
+              styles.emptyContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+                paddingTop: 80,
+              }
+            ]}
           >
-            <Text style={styles.exploreButtonText}>Explore Collection</Text>
-          </TouchableOpacity>
+            <LinearGradient
+              colors={['#694d21', '#5a3f1a']}
+              style={styles.emptyIconContainer}
+            >
+              <View style={styles.heartsContainer}>
+                <Ionicons name="heart" size={48} color="#fff" style={styles.largeHeart} />
+                <Ionicons name="heart" size={32} color="rgba(255,255,255,0.7)" style={styles.smallHeart} />
+              </View>
+            </LinearGradient>
+            <Text style={styles.emptyTitle}>Your Wishlist is Empty</Text>
+            <Text style={styles.emptySubtitle}>
+              Discover and save your favorite beauty treasures
+            </Text>
+            <TouchableOpacity 
+              style={styles.exploreButton}
+              onPress={() => router.push('/')}
+            >
+              <LinearGradient
+                colors={['#694d21', '#5a3f1a']}
+                style={styles.exploreButtonGradient}
+              >
+                <Text style={styles.exploreButtonText}>Explore Collection</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.exploreButtonIcon} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </>
     );
@@ -186,42 +275,27 @@ export default function WishlistPage() {
           onPress={() => item.stock_quantity > 0 && handleAddToCart(item, true)}
           disabled={item.stock_quantity === 0}
         >
-          <Ionicons name="cart" size={18} color="#fff" />
-          <Text style={styles.actionButtonText}>Move to Cart</Text>
+          <LinearGradient
+            colors={item.stock_quantity === 0 ? ['#ccc', '#999'] : ['#694d21', '#5a3f1a']}
+            style={styles.actionButtonGradient}
+          >
+            <Ionicons name="cart" size={18} color="#fff" />
+            <Text style={styles.actionButtonText}>Move to Cart</Text>
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[
-            styles.actionButton,
-            styles.buyNowButton,
-            item.stock_quantity === 0 && styles.disabledButton
-          ]}
-          onPress={async () => {
-            const existingItem = await getCartItems().find(cartItem => cartItem.id === item.id);
-            if (existingItem) {
-              Alert.alert('Item already in cart', 'You can view it in your cart.');
-              router.push('/cart');
-            } else {
-              await addItem(item);
-              Alert.alert(
-                'Added to Cart',
-                'Item added to cart successfully',
-                [{ text: 'View Cart', onPress: () => router.push('/cart') }]
-              );
-            }
-          }}
-          disabled={item.stock_quantity === 0}
+          style={[styles.actionButton, styles.removeButton]}
+          onPress={() => handleRemove(item)}
         >
-          <Ionicons name="flash" size={18} color="#fff" />
-          <Text style={styles.actionButtonText}>Buy Now</Text>
+          <LinearGradient
+            colors={['#ff4444', '#cc0000']}
+            style={styles.actionButtonGradient}
+          >
+            <Ionicons name="trash" size={18} color="#fff" />
+            <Text style={styles.actionButtonText}>Remove</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity 
-        style={styles.removeButton}
-        onPress={() => handleRemove(item)}
-      >
-        <Ionicons name="close" size={20} color="#666" />
-      </TouchableOpacity>
     </Animated.View>
   );
 
@@ -230,25 +304,43 @@ export default function WishlistPage() {
       <Stack.Screen 
         options={{
           title: 'Wishlist',
-          headerShown: true,
+          headerShown: false,
           headerStyle: {
-            backgroundColor: '#fff',
+            backgroundColor: 'transparent',
           },
           headerShadowVisible: false,
         }}
       />
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>My Wishlist</Text>
-          <Text style={styles.subtitle}>{wishlist.length} items saved</Text>
-        </View>
-        <FlatList
-          data={wishlist}
-          renderItem={renderItem}
-          keyExtractor={item => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
+        {/* Background Gradient */}
+        <LinearGradient
+          colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+          style={styles.backgroundGradient}
         />
+        
+        <Animated.View 
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+              paddingTop: 30,
+            }
+          ]}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={wishlist}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={{
+              paddingBottom: bottomTabHeight + 20,
+              paddingHorizontal: 16,
+              paddingTop: 40,
+            }}
+            showsVerticalScrollIndicator={false}
+          />
+        </Animated.View>
       </View>
     </>
   );
@@ -259,105 +351,132 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  content: {
+    flex: 1,
+  },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
+    padding: 40,
+    paddingTop: 80,
+    backgroundColor: 'transparent',
+    minHeight: Dimensions.get('window').height * 0.7,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: 'bold',
     color: '#1A1A1A',
-    marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
+    lineHeight: 24,
+    marginBottom: 32,
+    paddingHorizontal: 20,
   },
   exploreButton: {
-    backgroundColor: '#FF69B4',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
+    borderRadius: 16,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  exploreButtonGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   exploreButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginRight: 8,
   },
-  header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8F9FA',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  listContainer: {
-    padding: 16,
+  exploreButtonIcon: {
+    marginLeft: 4,
   },
   productCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
     marginBottom: 20,
-    padding: 16,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   productImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 12,
+    height: 220,
+    borderRadius: 16,
     backgroundColor: '#F8F9FA',
   },
   productInfo: {
-    marginTop: 12,
+    marginTop: 16,
   },
   category: {
     fontSize: 12,
-    color: '#666',
+    color: '#694d21',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: 8,
+    fontWeight: '600',
   },
   productName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#1A1A1A',
-    marginBottom: 8,
-    lineHeight: 22,
+    marginBottom: 12,
+    lineHeight: 24,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   price: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FF69B4',
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#694d21',
   },
   stockContainer: {
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   stockStatus: {
     fontSize: 14,
     fontWeight: '500',
+    marginLeft: 6,
   },
   inStock: {
     color: '#28a745',
@@ -368,39 +487,61 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
+    marginTop: 16,
+    gap: 12,
   },
   actionButton: {
+    flex: 1,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
   },
   moveToCartButton: {
-    backgroundColor: '#007bff',
+    // Gradient handled by LinearGradient
   },
   buyNowButton: {
     backgroundColor: '#28a745',
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    opacity: 0.6,
   },
   actionButtonText: {
     color: '#fff',
-    marginLeft: 4,
+    marginLeft: 8,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   removeButton: {
+    // Gradient handled by LinearGradient
+  },
+  heartsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    width: 80,
+    height: 60,
+  },
+  largeHeart: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 15,
-    padding: 6,
+    left: 5,
+    zIndex: 1,
+  },
+  smallHeart: {
+    position: 'absolute',
+    right: 5,
+    top: 10,
+    zIndex: 2,
   },
 }); 

@@ -5,47 +5,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useWishlist } from '../WishlistContext';
 import { useCart } from '../CartContext';
 import { AnimatedTabBar } from '../navigation/AnimatedTabBar';
-
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Custom hook to get bottom tab height
+export const useBottomTabBarHeight = () => {
+  const insets = useSafeAreaInsets();
+  return 60 + Math.max(insets.bottom, 4); // 60 is the base height of our tab bar
+};
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { wishlist = [] } = useWishlist() || {};
   const { getItemCount = () => 0 } = useCart() || {};
-
-  const renderTabIcon = (iconName: keyof typeof Ionicons.glyphMap, focused: boolean) => (
-    <Ionicons
-      name={iconName}
-      size={24}
-      color={focused ? '#007AFF' : '#8E8E93'}
-    />
-  );
-
-  const renderBadgedIcon = (
-    iconName: keyof typeof Ionicons.glyphMap,
-    focused: boolean,
-    count: number
-  ) => (
-    <View>
-      {renderTabIcon(iconName, focused)}
-      {count > 0 && (
-        <View style={{
-          position: 'absolute',
-          top: -5,
-          right: -10,
-          backgroundColor: '#ff4444',
-          borderRadius: 10,
-          width: 20,
-          height: 20,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-          <Text style={{ color: '#fff', fontSize: 12 }}>{count}</Text>
-        </View>
-      )}
-    </View>
-  );
 
   return (
     <Tabs
@@ -53,6 +26,15 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 0,
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
+        }
       }}
       tabBar={props => <AnimatedTabBar {...props} />}
     >
@@ -60,9 +42,12 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ focused }) => renderTabIcon(
-            focused ? 'home' : 'home-outline',
-            focused
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={24}
+              color={'#694d21'}
+            />
           ),
         }}
       />
@@ -70,9 +55,12 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ focused }) => renderTabIcon(
-            focused ? 'search' : 'search-outline',
-            focused
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'search' : 'search-outline'}
+              size={24}
+              color={'#694d21'}
+            />
           ),
         }}
       />
@@ -80,10 +68,29 @@ export default function TabLayout() {
         name="wishlist"
         options={{
           title: 'Wishlist',
-          tabBarIcon: ({ focused }) => renderBadgedIcon(
-            focused ? 'heart' : 'heart-outline',
-            focused,
-            wishlist?.length || 0
+          tabBarIcon: ({ focused }) => (
+            <View>
+              <Ionicons
+                name={focused ? 'heart' : 'heart-outline'}
+                size={24}
+                color={'#694d21'}
+              />
+              {wishlist?.length > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -10,
+                  backgroundColor: '#ff4444',
+                  borderRadius: 10,
+                  width: 20,
+                  height: 20,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 12 }}>{wishlist.length}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -91,10 +98,29 @@ export default function TabLayout() {
         name="cart"
         options={{
           title: 'Cart',
-          tabBarIcon: ({ focused }) => renderBadgedIcon(
-            focused ? 'cart' : 'cart-outline',
-            focused,
-            getItemCount()
+          tabBarIcon: ({ focused }) => (
+            <View>
+              <Ionicons
+                name={focused ? 'cart' : 'cart-outline'}
+                size={24}
+                color={'#694d21'}
+              />
+              {getItemCount() > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -10,
+                  backgroundColor: '#ff4444',
+                  borderRadius: 10,
+                  width: 20,
+                  height: 20,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 12 }}>{getItemCount()}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -102,9 +128,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused }) => renderTabIcon(
-            focused ? 'person' : 'person-outline',
-            focused
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'person' : 'person-outline'}
+              size={24}
+              color={'#694d21'}
+            />
           ),
         }}
       />

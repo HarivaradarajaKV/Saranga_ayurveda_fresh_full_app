@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import axios, { AxiosInstance } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEV_CONFIG } from './dev';
 import { 
     ApiService, 
     ApiResponse, 
@@ -30,8 +31,8 @@ const initWebSocket = async (userId: string | null) => {
     if (!userId) return;
     
     try {
-        const ip = getLocalIpAddress();
-        const wsUrl = `ws://${ip}:5001`;
+        // Use dev config for WebSocket URL
+        const wsUrl = DEV_CONFIG.getWsUrl();
         
         if (ws?.readyState === WebSocket.OPEN) {
             console.log('[WebSocket] Already connected');
@@ -143,18 +144,21 @@ const getLocalIpAddress = () => {
   }
 };
 
-// Get base URL using the local IP address
+// Get base URL using the dev config
 export const getBaseUrl = () => {
-    // Return the production URL directly
-    return 'https://ayurveda-saranga-backend.vercel.app/api';
+    const apiUrl = DEV_CONFIG.getApiUrl();
+    console.log('[API Config] Using API URL:', apiUrl);
+    return apiUrl;
 };
 
 // Test if the API is reachable
 export const testApiReachable = async () => {
     try {
         const url = getBaseUrl();
+        console.log('[API Config] Testing connection to:', url);
+        
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased timeout to 10 seconds
 
         const response = await fetch(`${url}/health`, {
             method: 'GET',
@@ -171,10 +175,11 @@ export const testApiReachable = async () => {
             return false;
         }
         
-        console.log('[API Config] API is reachable');
+        console.log('[API Config] API is reachable at:', url);
         return true;
     } catch (error) {
         console.error('[API Config] API is not reachable:', error);
+        console.log('[API Config] Make sure your local backend is running on 192.168.31.143:5001');
         return false;
     }
 };
@@ -182,14 +187,14 @@ export const testApiReachable = async () => {
 const DEV_API_URL = getBaseUrl();
 console.log('[API Config] API Base URL:', DEV_API_URL);
 
-export const API_BASE_URL = 'https://ayurveda-saranga-backend.vercel.app/api';
+export const API_BASE_URL = getBaseUrl();
 
 // Update API configuration with improved settings
 export const API_CONFIG = {
     TIMEOUT: 120000, // Increased timeout to 2 minutes for image uploads
     MAX_RETRIES: 3,
     RETRY_DELAY: 2000,
-    BASE_URL: API_BASE_URL,
+    BASE_URL: getBaseUrl(),
     ENDPOINTS: {
       // Auth object for grouped auth endpoints
       AUTH: {
@@ -240,7 +245,7 @@ export const API_CONFIG = {
       
       // Admin endpoints
       ADMIN_STATS: '/admin/stats',
-      ADMIN_PRODUCTS: '/products',
+      ADMIN_PRODUCTS: '/admin/products',
       ADMIN_PRODUCT: (id: number) => `/admin/products/${id}`,
       ADMIN_ORDERS: '/admin/orders',
       ADMIN_ORDER_STATUS: (id: string) => `/admin/orders/${id}/status`,
@@ -789,8 +794,39 @@ export class Api implements ApiService {
 
     // Helper methods
     getFullImageUrl(imageUrl: string | undefined): string {
-        if (!imageUrl) return '';
-        return imageUrl.startsWith('http') ? imageUrl : `${API_CONFIG.BASE_URL}/${imageUrl}`;
+        if (!imageUrl) return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
+        
+        try {
+            // If it's already a full URL, return it
+            if (imageUrl.startsWith('http')) {
+                return imageUrl;
+            }
+            
+            // Get the base URL from the API configuration
+            const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+            
+            // Handle different path formats
+            let fullUrl;
+            if (imageUrl.startsWith('/uploads/')) {
+                fullUrl = `${baseUrl}${imageUrl}`;
+            } else if (imageUrl.startsWith('uploads/')) {
+                fullUrl = `${baseUrl}/${imageUrl}`;
+            } else {
+                fullUrl = `${baseUrl}/uploads/${imageUrl}`;
+            }
+            
+            console.log('Image URL constructed:', {
+                original: imageUrl,
+                baseUrl: baseUrl,
+                fullUrl: fullUrl
+            });
+            
+            // Return the constructed URL - let the Image component handle loading errors
+            return fullUrl;
+        } catch (error) {
+            console.error('Error processing image URL:', error);
+            return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
+        }
     }
 
     // Password reset methods

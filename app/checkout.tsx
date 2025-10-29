@@ -18,10 +18,11 @@ import {
   Button,
   Animated,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import WebView from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { apiService, type Address as ApiAddress } from './services/api';
+import { apiService } from './services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCart } from './CartContext';
 import { initializeRazorpayPayment } from './services/razorpay';
@@ -29,15 +30,23 @@ import RazorpayWebView from './components/RazorpayWebView';
 
 const { width } = Dimensions.get('window');
 
-// Extend the API Address type
-interface Address extends ApiAddress {
-  pincode: string;
-  phone: string;
+// Local Address type for checkout page
+interface Address {
+  id?: number;
   full_name: string;
+  phone?: string;
+  phone_number?: string;
+  pincode?: string;
+  postal_code?: string;
   address_line1: string;
   address_line2?: string;
   city: string;
   state: string;
+  country?: string;
+  address_type?: string;
+  is_default?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface PaymentMethod {
@@ -448,7 +457,7 @@ const CheckoutPage = () => {
           postal_code: selectedAddress.pincode,
           country: selectedAddress.country,
           full_name: selectedAddress.full_name,
-          phone_number: selectedAddress.phone,
+          phone_number: selectedAddress.phone_number || selectedAddress.phone || '',
         },
         payment_method: selectedPayment.id === 'cod' ? 'cod' : 'online',
         items: selectedCartItems.map(item => ({
@@ -503,7 +512,7 @@ const CheckoutPage = () => {
             order_id: razorpayOrderData.id,
             prefill: {
               name: selectedAddress.full_name,
-              contact: selectedAddress.phone,
+              contact: selectedAddress.phone || selectedAddress.phone_number || '',
             },
             theme: {
               color: "#FF69B4"
@@ -641,9 +650,14 @@ const CheckoutPage = () => {
   console.log('Selected Address:', selectedAddress);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+      <LinearGradient
+        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
           {/* Order Summary Section */}
           <TouchableOpacity 
             style={styles.sectionHeader} 
@@ -805,10 +819,10 @@ const CheckoutPage = () => {
                         {selectedAddress.address_line2 ? `, ${selectedAddress.address_line2}` : ''}
                       </Text>
                       <Text style={styles.addressText}>
-                        {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode}
+                        {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode || selectedAddress.postal_code || ''}
                       </Text>
                       <Text style={styles.addressPhone}>
-                        <Ionicons name="call-outline" size={16} color="#666" /> {selectedAddress.phone}
+                        <Ionicons name="call-outline" size={16} color="#666" /> {selectedAddress.phone || selectedAddress.phone_number || ''}
                       </Text>
                     </View>
                   </>
@@ -923,79 +937,80 @@ const CheckoutPage = () => {
               </View>
             </View>
           </View>
-        </ScrollView>
+          </ScrollView>
 
-        {/* Footer with Order Total and Place Order Button */}
-        <View style={styles.footer}>
-          <View style={styles.totalContainer}>
-            <Text style={styles.footerTotalLabel}>Total: </Text>
-            <Text style={styles.footerTotal}>₹{total.toFixed(2)}</Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.placeOrderButton,
-              (!selectedAddress || !selectedPayment) && styles.placeOrderButtonDisabled
-            ]}
-            onPress={handlePlaceOrder}
-            disabled={!selectedAddress || !selectedPayment || loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.placeOrderText}>Place Order</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.placeOrderIcon} />
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-
-      {/* Available Coupons Modal */}
-      <Modal
-        visible={showCouponsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCouponsModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Available Coupons</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowCouponsModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#000" />
-              </TouchableOpacity>
+          {/* Footer with Order Total and Place Order Button */}
+          <View style={styles.footer}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.footerTotalLabel}>Total: </Text>
+              <Text style={styles.footerTotal}>₹{total.toFixed(2)}</Text>
             </View>
-            <FlatList
-              data={filteredCoupons.length > 0 ? filteredCoupons : coupons}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => renderCouponItem(item)}
-            />
+            <TouchableOpacity
+              style={[
+                styles.placeOrderButton,
+                (!selectedAddress || !selectedPayment) && styles.placeOrderButtonDisabled
+              ]}
+              onPress={handlePlaceOrder}
+              disabled={!selectedAddress || !selectedPayment || loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.placeOrderText}>Place Order</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.placeOrderIcon} />
+                </>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+          
+          {/* Available Coupons Modal */}
+          <Modal
+            visible={showCouponsModal}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowCouponsModal(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Available Coupons</Text>
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setShowCouponsModal(false)}
+                  >
+                    <Ionicons name="close" size={24} color="#000" />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={filteredCoupons.length > 0 ? filteredCoupons : coupons}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => renderCouponItem(item)}
+                />
+              </View>
+            </View>
+          </Modal>
 
-      {razorpayOptions && (
-        <RazorpayWebView
-          isVisible={showRazorpay}
-          options={razorpayOptions}
-          orderId={currentOrderId!}
-          onClose={() => setShowRazorpay(false)}
-          onPaymentSuccess={handlePaymentSuccess}
-          onPaymentError={handlePaymentError}
-        />
-      )}
-    </SafeAreaView>
+          {razorpayOptions && (
+            <RazorpayWebView
+              isVisible={showRazorpay}
+              options={razorpayOptions}
+              orderId={currentOrderId!}
+              onClose={() => setShowRazorpay(false)}
+              onPaymentSuccess={handlePaymentSuccess}
+              onPaymentError={handlePaymentError}
+            />
+          )}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
@@ -1009,6 +1024,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContainer: {
+    paddingBottom: 100,
+  },
   scrollViewContent: {
     padding: 20,
   },
@@ -1020,27 +1038,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     marginHorizontal: 16,
     marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontWeight: '700',
+    color: '#2c3e50',
+    letterSpacing: 0.3,
   },
   changeButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#694d21',
   },
   changeButtonText: {
     fontSize: 14,
-    color: '#FF69B4',
+    color: '#694d21',
     fontWeight: '500',
   },
   orderItems: {
@@ -1049,28 +1075,41 @@ const styles = StyleSheet.create({
   orderItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   itemImage: {
     width: 80,
     height: 80,
-    borderRadius: 4,
-    marginRight: 10,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#f5f5f5',
   },
   itemDetails: {
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 4,
   },
   itemQuantity: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#7f8c8d',
+    marginBottom: 2,
   },
   itemPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#694d21',
   },
   couponContainer: {
     marginBottom: 20,
@@ -1078,10 +1117,16 @@ const styles = StyleSheet.create({
   couponInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 10,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 4,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   couponInput: {
     flex: 1,
@@ -1090,11 +1135,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   applyCouponButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     backgroundColor: '#FF69B4',
-    borderRadius: 4,
+    borderRadius: 10,
     marginLeft: 8,
+    shadowColor: '#FF69B4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   applyCouponText: {
     color: '#fff',
@@ -1146,7 +1196,7 @@ const styles = StyleSheet.create({
   },
   discountText: {
     fontSize: 14,
-    color: '#FF69B4',
+    color: '#694d21',
     fontWeight: '600',
     marginTop: 4,
   },
@@ -1158,15 +1208,15 @@ const styles = StyleSheet.create({
   },
   addressCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#e8e8e8',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   addressHeader: {
     flexDirection: 'row',
@@ -1185,17 +1235,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   changeAddressButton: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#FF69B4',
+    backgroundColor: '#fef5e7',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#694d21',
   },
   changeAddressText: {
-    color: '#FF69B4',
-    fontSize: 14,
-    fontWeight: '500',
+    color: '#694d21',
+    fontSize: 13,
+    fontWeight: '600',
   },
   addressName: {
     fontSize: 16,
@@ -1221,7 +1271,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#FF69B4',
+    borderColor: '#694d21',
     borderStyle: 'dashed',
   },
   addAddressContent: {
@@ -1232,7 +1282,7 @@ const styles = StyleSheet.create({
   addAddressText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#FF69B4',
+    color: '#694d21',
     fontWeight: '500',
   },
   paymentMethodsContainer: {
@@ -1240,16 +1290,21 @@ const styles = StyleSheet.create({
   },
   paymentMethodCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e0e0e0',
     overflow: 'hidden',
-    elevation: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
   selectedPaymentCard: {
-    backgroundColor: '#FF69B4',
-    borderColor: '#FF69B4',
+    backgroundColor: '#694d21',
+    borderColor: '#694d21',
+    borderWidth: 2.5,
   },
   paymentMethodContent: {
     flexDirection: 'row',
@@ -1266,7 +1321,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 105, 180, 0.1)',
+    backgroundColor: '#b89c72',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1295,7 +1350,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#FF69B4',
+    borderColor: '#694d21',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -1365,11 +1420,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#FF69B4',
-    borderRadius: 8,
-    minWidth: 150,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    backgroundColor: '#694d21',
+    borderRadius: 12,
+    minWidth: 160,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   placeOrderButtonDisabled: {
     backgroundColor: '#f0f0f0',

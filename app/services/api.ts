@@ -88,11 +88,11 @@ export class Api implements ApiService {
         this.client.interceptors.request.use(
             async (config) => {
                 try {
-                    // Check network connection
-                    const isConnected = await checkNetworkConnection();
-                    if (!isConnected) {
-                        throw new Error('Cannot connect to server. Please check your network connection.');
-                    }
+                    // Skip network check for now since it's causing issues
+                    // const isConnected = await checkNetworkConnection();
+                    // if (!isConnected) {
+                    //     throw new Error('Cannot connect to server. Please check your network connection.');
+                    // }
 
                     // Log request details only in development
                     if (process.env.NODE_ENV === 'development') {
@@ -173,20 +173,20 @@ export class Api implements ApiService {
         // Initialize user ID from storage
         this.initializeUserId();
 
-        // Test connection with retry
-        this.testConnection()
-            .then((success) => {
-                if (!success) {
-                    console.log('Initial connection failed, retrying...');
-                    this.retryConnection(API_CONFIG.MAX_RETRIES);
-                } else {
-                    console.log('Successfully connected to API');
-                }
-            })
-            .catch((error) => {
-                console.error('Connection error:', error);
-                this.retryConnection(API_CONFIG.MAX_RETRIES);
-            });
+        // Skip initial connection test for now
+        // this.testConnection()
+        //     .then((success) => {
+        //         if (!success) {
+        //             console.log('Initial connection failed, retrying...');
+        //             this.retryConnection(API_CONFIG.MAX_RETRIES);
+        //         } else {
+        //             console.log('Successfully connected to API');
+        //         }
+        //     })
+        //     .catch((error) => {
+        //         console.error('Connection error:', error);
+        //         this.retryConnection(API_CONFIG.MAX_RETRIES);
+        //     });
     }
 
     private async initializeAuthToken() {
@@ -278,15 +278,6 @@ export class Api implements ApiService {
 
             return { data: response.data };
         } catch (error: any) {
-            if (isNetworkError(error)) {
-                if (isPublicEndpoint(endpoint)) {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.debug(`Network error on public endpoint ${endpoint}, returning empty data`);
-                    }
-                    return { data: null };
-                }
-            }
-
             const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
             if (process.env.NODE_ENV === 'development') {
                 console.debug('[API] Request failed:', error);
@@ -696,13 +687,19 @@ export class Api implements ApiService {
     async addProduct(formData: FormData): Promise<ApiResponse<ProductData>> {
         try {
             console.log('[API] Adding product - FormData entries:', Array.from(formData.entries()));
+            console.log('[API] Using endpoint:', this.ENDPOINTS.PRODUCTS);
+            console.log('[API] Full URL:', `${this.client.defaults.baseURL}${this.ENDPOINTS.PRODUCTS}`);
+            
+            // Get auth token for admin endpoint
+            const token = await AsyncStorage.getItem('auth_token');
             
             const response = await this.client.post(
-                this.ENDPOINTS.ADMIN_PRODUCTS,
+                this.ENDPOINTS.PRODUCTS,
                 formData,
                 {
                     headers: {
                         'Content-Type': 'multipart/form-data',
+                        'Authorization': token ? `Bearer ${token}` : '',
                     },
                     timeout: 30000, // 30 seconds timeout for image upload
                 }
@@ -715,8 +712,32 @@ export class Api implements ApiService {
                 error: error,
                 response: error.response,
                 status: error.response?.status,
-                url: this.ENDPOINTS.ADMIN_PRODUCTS
+                url: this.ENDPOINTS.PRODUCTS,
+                fullUrl: `${this.client.defaults.baseURL}${this.ENDPOINTS.PRODUCTS}`,
+                headers: error.config?.headers
             });
+
+            // Handle specific error cases
+            if (error.response?.status === 404) {
+                return {
+                    data: null,
+                    error: 'Product endpoint not found. Please check if the backend server is running and accessible.'
+                };
+            }
+
+            if (error.response?.status === 401) {
+                return {
+                    data: null,
+                    error: 'Unauthorized. Please log in again to add products.'
+                };
+            }
+
+            if (error.response?.status === 403) {
+                return {
+                    data: null,
+                    error: 'Access denied. You do not have permission to add products.'
+                };
+            }
 
             return {
                 data: null,
@@ -871,6 +892,7 @@ export class Api implements ApiService {
                 fullUrl: fullUrl
             });
             
+            // Return the constructed URL - let the Image component handle loading errors
             return fullUrl;
         } catch (error) {
             console.error('Error processing image URL:', error);

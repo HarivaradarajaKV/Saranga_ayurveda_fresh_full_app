@@ -79,17 +79,22 @@ export default function OrdersPage() {
     const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
     const diffMinutes = Math.floor(diffTime / (1000 * 60));
 
-    // Format the actual date and time
-    const formattedDate = date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-    const formattedTime = date.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    // Convert UTC to IST (IST is UTC+5:30)
+    const ISTOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(date.getTime() + ISTOffset);
+    
+    // Format date in IST
+    const day = istDate.getUTCDate();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[istDate.getUTCMonth()];
+    const year = istDate.getUTCFullYear();
+    const hours = istDate.getUTCHours();
+    const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    
+    const formattedDate = `${day} ${month}, ${year}`;
+    const formattedTime = `${displayHours}:${minutes} ${ampm}`;
 
     // Return relative time for recent orders
     if (diffMinutes < 60) {
@@ -176,7 +181,7 @@ export default function OrdersPage() {
           headerShown: true,
         }}
       />
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}>
         <Text style={styles.sectionTitle}>Saranga Ayurveda My Orders</Text>
         {orders.map((order) => {
           const orderDate = formatDate(order.date);

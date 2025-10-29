@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, Image, Pressable, View, ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -64,6 +64,7 @@ export const AnimatedProductCard: React.FC<AnimatedProductCardProps> = ({
 }) => {
   const scale = useSharedValue(1);
   const cartButtonScale = useSharedValue(1);
+  const [imageError, setImageError] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -97,7 +98,15 @@ export const AnimatedProductCard: React.FC<AnimatedProductCardProps> = ({
       entering={entering}
       layout={Layout.springify()}
     >
-      <Image source={{ uri: product.image_url }} style={styles.image} />
+      <Image 
+        source={{ uri: imageError ? 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image' : product.image_url }} 
+        style={styles.image}
+        onError={() => {
+          console.log('Image failed to load:', product.image_url);
+          setImageError(true);
+        }}
+        onLoad={() => setImageError(false)}
+      />
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
         <Text style={styles.price}>₹{product.price}</Text>
