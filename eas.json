@@ -15,7 +15,10 @@
           "buildType": "apk"
         },
         "env": {
-          "EAS_SKIP_AUTO_FINGERPRINT": "1"
+          "EAS_SKIP_AUTO_FINGERPRINT": "1",
+          "EXPO_PUBLIC_USE_LOCAL": "1",
+          "EXPO_PUBLIC_API_BASE_URL": "http://192.168.31.143:5001/api",
+          "EXPO_PUBLIC_WS_URL": "ws://192.168.31.143:5001"
         },
         "node": "22.13.1"
       },
