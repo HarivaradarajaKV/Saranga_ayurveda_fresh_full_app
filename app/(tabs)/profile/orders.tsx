@@ -253,7 +253,13 @@ export default function OrdersPage() {
               <View style={styles.orderFooter}>
                 <View style={styles.footerLeft}>
                   <Text style={styles.totalLabel}>Total Amount:</Text>
-                  <Text style={styles.totalAmount}>₹{order.total_amount}</Text>
+                  {(() => {
+                    const itemsSubtotal = (order.items || []).reduce((sum, it) => sum + Number(it.price_at_time || 0) * Number(it.quantity || 0), 0);
+                    const discount = Number(order.discount_amount || 0);
+                    const delivery = Number(order.delivery_charge || 0);
+                    const payable = itemsSubtotal - discount + delivery;
+                    return <Text style={styles.totalAmount}>₹{payable.toFixed(2)}</Text>;
+                  })()}
                 </View>
                 <View style={styles.actionButtons}>
                   <TouchableOpacity

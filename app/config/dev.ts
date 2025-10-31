@@ -35,7 +35,8 @@ export const DEV_CONFIG = {
         }
         // Default to PROD API (Vercel) to ensure production connectivity during development as well
         console.log('[DEV_CONFIG] Using default PROD API:', DEV_CONFIG.PROD_API_BASE_URL);
-        return DEV_CONFIG.PROD_API_BASE_URL;
+        return DEV_CONFIG.LOCAL_API_BASE_URL;
+        //return DEV_CONFIG.PROD_API_BASE_URL;
     },
     getWsUrl: () => {
         // Prefer public env or extra for WS if provided

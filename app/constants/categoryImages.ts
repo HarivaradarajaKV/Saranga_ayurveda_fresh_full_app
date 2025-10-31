@@ -41,7 +41,7 @@ interface CategoryImageType {
       banner: 'https://images.pexels.com/photos/7290706/pexels-photo-7290706.jpeg?auto=compress&cs=tinysrgb&w=600'
     },
     'All Products': {
-      tile: 'https://images.pexels.com/photos/6621555/pexels-photo-6621555.jpeg?auto=compress&cs=tinysrgb&w=300&dpr=2',
+      tile: 'https://images.pexels.com/photos/6621540/pexels-photo-6621540.jpeg?auto=compress&cs=tinysrgb&w=300&dpr=2',
       banner: 'https://images.pexels.com/photos/7290713/pexels-photo-7290713.jpeg?auto=compress&cs=tinysrgb&w=600'
     },
     'Natural': {

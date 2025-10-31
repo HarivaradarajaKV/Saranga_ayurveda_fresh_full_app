@@ -454,19 +454,25 @@ const CheckoutPage = () => {
           address_line2: selectedAddress.address_line2,
           city: selectedAddress.city,
           state: selectedAddress.state,
-          postal_code: selectedAddress.pincode,
+          postal_code: selectedAddress.postal_code || selectedAddress.pincode || '',
           country: selectedAddress.country,
           full_name: selectedAddress.full_name,
           phone_number: selectedAddress.phone_number || selectedAddress.phone || '',
         },
         payment_method: selectedPayment.id === 'cod' ? 'cod' : 'online',
-        items: selectedCartItems.map(item => ({
-          product_id: item.id,
-          quantity: item.quantity,
-          price: Number(item.price),
-          name: item.name
-        })),
+        items: selectedCartItems.map(item => {
+          const base = Number(item.price) || 0;
+          const offerPct = Number(item.offer_percentage || 0);
+          const effective = Math.round(base * (1 - (offerPct / 100)) * 100) / 100;
+          return {
+            product_id: item.id,
+            quantity: item.quantity,
+            price: effective,
+            name: item.name
+          };
+        }),
         total_amount: total,
+        delivery_charge: deliveryCharge,
         coupon_id: appliedCoupon?.id || null,
         discount_amount: discountAmount
       };

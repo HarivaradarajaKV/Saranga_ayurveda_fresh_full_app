@@ -196,7 +196,7 @@ export default function AllProductsPage() {
         onPress={() => handleProductPress(item)}
         style={styles.productTouchable}
       >
-        <ProductCard product={item} hideActions={true} />
+        <ProductCard product={item} />
       </TouchableOpacity>
     </View>
   );
@@ -216,7 +216,7 @@ export default function AllProductsPage() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF69B4" />
+        <ActivityIndicator size="large" color="#694d21" />
         <Text style={styles.loadingText}>Loading amazing products...</Text>
       </View>
     );
@@ -229,11 +229,14 @@ export default function AllProductsPage() {
         options={{
           title: title as string || 'All Products',
           headerShown: true,
+          headerStyle: { backgroundColor: '#694d21' }, // match app theme
+          headerTitleStyle: { color: '#fff', fontWeight: 'bold', fontSize: 19 },
+          headerTintColor: '#fff', // makes back arrow white for contrast
         }}
       />
       {products.length === 0 && !loading ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="cube-outline" size={64} color="#ccc" />
+          <Ionicons name="cube-outline" size={64} color="#8E8E93" />
           <Text style={styles.emptyText}>No products available</Text>
         </View>
       ) : (
@@ -253,7 +256,7 @@ export default function AllProductsPage() {
           ListFooterComponent={() => (
             isLoadingMore ? (
               <View style={styles.loadingMore}>
-                <ActivityIndicator size="small" color="#FF69B4" />
+                <ActivityIndicator size="small" color="#694d21" />
               </View>
             ) : null
           )}
@@ -261,8 +264,8 @@ export default function AllProductsPage() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh}
-              colors={['#FF69B4']}
-              tintColor="#FF69B4"
+              colors={['#694d21']}
+              tintColor="#694d21"
             />
           }
         />
@@ -271,10 +274,22 @@ export default function AllProductsPage() {
   );
 }
 
+const colors = {
+  primary: '#694d21', // rich brown (from Home tab icon)
+  accent: '#007AFF', // blue (from active tab)
+  secondary: '#8E8E93', // gray (from tabBar)
+  background: '#fcf5ed', // soft natural background
+  card: '#fff',
+  highlight: '#ffe5c5', // subtle highlight/light brown
+  success: '#27ae60',
+  error: '#e74c3c',
+  shadow: '#e0d2c1',
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   header: {
     backgroundColor: '#fff',
@@ -282,24 +297,30 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     paddingTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight,
   },
-  searchContainer: {
+  searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 12,
     marginHorizontal: 16,
-    marginVertical: 8,
-    height: 44,
+    marginTop: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchIcon: {
     marginRight: 8,
+    color: colors.secondary,
   },
   searchInput: {
     flex: 1,
     height: '100%',
     fontSize: 16,
-    color: '#333',
+    color: colors.primary,
   },
   productGrid: {
     padding: 8,
@@ -308,9 +329,18 @@ const styles = StyleSheet.create({
     flex: 1,
     margin: 8,
     maxWidth: '50%',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.09,
+    shadowRadius: 8,
+    elevation: 3,
   },
   productTouchable: {
     flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   emptyContainer: {
     flex: 1,
@@ -320,33 +350,36 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.secondary,
     textAlign: 'center',
     marginTop: 16,
     marginBottom: 8,
+    fontWeight: '500',
   },
   clearSearchButton: {
     marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#FF69B4',
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    backgroundColor: colors.primary,
     borderRadius: 20,
+    elevation: 1,
   },
   clearSearchText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+    fontSize: 17,
+    color: colors.secondary,
+    fontWeight: '500',
   },
   loadingMore: {
     paddingVertical: 20,

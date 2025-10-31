@@ -16,6 +16,13 @@ import { useOrders } from '../OrderContext';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Linking from 'expo-linking';
+import { API_CONFIG, getBaseUrl, ENDPOINTS } from '../config/api';
 import { Order, OrderStatus } from '../OrderContext';
 
 const { width } = Dimensions.get('window');
@@ -65,6 +72,11 @@ const AdminOrders = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -86,6 +98,67 @@ const AdminOrders = () => {
       await fetchOrders();
     } catch (error) {
       console.error('Error updating order status:', error);
+    }
+  };
+
+  const toYMD = (d: Date) => format(d, 'yyyy-MM-dd');
+
+  const buildExportUrl = () => {
+    const base = getBaseUrl();
+    const params: string[] = [];
+    if (startDate) params.push(`start=${encodeURIComponent(toYMD(startDate))}`);
+    if (endDate) params.push(`end=${encodeURIComponent(toYMD(endDate))}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    return `${base}${ENDPOINTS.ADMIN_ORDERS_EXPORT}${qs}`;
+  };
+
+  const downloadPdf = async () => {
+    try {
+      setDownloading(true);
+      const url = buildExportUrl();
+      const token = await AsyncStorage.getItem('auth_token');
+
+      if (Platform.OS === 'web') {
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/pdf' } : { Accept: 'application/pdf' }
+        });
+        if (!res.ok) throw new Error('Failed to download');
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `orders_${startDate ? toYMD(startDate) : 'all'}_${endDate ? toYMD(endDate) : 'all'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || FileSystemLegacy.documentDirectory || FileSystemLegacy.cacheDirectory;
+        if (!baseDir) throw new Error('No writable directory available');
+        const downloadsDir = `${baseDir}downloads/`;
+        const dirInfo = await FileSystemLegacy.getInfoAsync(downloadsDir);
+        if (!dirInfo.exists) {
+          await FileSystemLegacy.makeDirectoryAsync(downloadsDir, { intermediates: true });
+        }
+        const fileUri = `${downloadsDir}orders_${startDate ? toYMD(startDate) : 'all'}_${endDate ? toYMD(endDate) : 'all'}.pdf`;
+        const headers = token ? { Authorization: `Bearer ${token}`, Accept: 'application/pdf' } : { Accept: 'application/pdf' };
+        const downloadResumable = FileSystemLegacy.createDownloadResumable(
+          url,
+          fileUri,
+          { headers }
+        );
+        const result = await downloadResumable.downloadAsync();
+        const savedUri = result?.uri || fileUri;
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(savedUri);
+        } else {
+          await Linking.openURL(savedUri);
+        }
+      }
+    } catch (e) {
+      console.error('Download PDF error:', e);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -298,6 +371,52 @@ const AdminOrders = () => {
             <Picker.Item label="Delivered" value="delivered" />
             <Picker.Item label="Cancelled" value="cancelled" />
           </Picker>
+        </View>
+        <View style={{ marginTop: 12 }}>
+          <Text style={styles.filterLabel}>Export orders by date:</Text>
+          <View style={{ flexDirection: 'row', marginTop: 8, alignItems: 'stretch' }}>
+            <TouchableOpacity
+              onPress={() => setShowStartPicker(true)}
+              style={{ flex: 1, marginRight: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#333', textAlign: 'center' }}>{startDate ? `Start: ${format(startDate, 'MMM dd, yyyy')}` : 'Select start date'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowEndPicker(true)}
+              style={{ flex: 1, marginLeft: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#333', textAlign: 'center' }}>{endDate ? `End: ${format(endDate, 'MMM dd, yyyy')}` : 'Select end date'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            disabled={downloading}
+            onPress={downloadPdf}
+            style={{ marginTop: 8, backgroundColor: '#0066cc', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600' }}>{downloading ? 'Downloading...' : 'Download PDF'}</Text>
+          </TouchableOpacity>
+          {showStartPicker && (
+            <DateTimePicker
+              value={startDate || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, date) => {
+                setShowStartPicker(false);
+                if (date) setStartDate(date);
+              }}
+            />
+          )}
+          {showEndPicker && (
+            <DateTimePicker
+              value={endDate || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, date) => {
+                setShowEndPicker(false);
+                if (date) setEndDate(date);
+              }}
+            />
+          )}
         </View>
       </View>
 

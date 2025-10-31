@@ -7,21 +7,30 @@ interface ExpandableDescriptionProps {
   maxLines?: number;
   style?: any;
   textStyle?: any;
+  expandLabel?: string;
+  collapseLabel?: string;
 }
 
 export const ExpandableDescription: React.FC<ExpandableDescriptionProps> = ({
   description,
   maxLines = 4,
   style,
-  textStyle
+  textStyle,
+  expandLabel = 'Show more details',
+  collapseLabel = 'Show less'
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showExpandButton, setShowExpandButton] = useState(false);
+  const [isMeasured, setIsMeasured] = useState(false);
 
   const handleTextLayout = (event: any) => {
-    const { lines } = event.nativeEvent;
-    if (lines.length > maxLines) {
-      setShowExpandButton(true);
+    // Measure full text first (without numberOfLines) to know if it overflows
+    if (!isMeasured) {
+      const { lines } = event.nativeEvent;
+      if (Array.isArray(lines) && lines.length > maxLines) {
+        setShowExpandButton(true);
+      }
+      setIsMeasured(true);
     }
   };
 
@@ -33,7 +42,8 @@ export const ExpandableDescription: React.FC<ExpandableDescriptionProps> = ({
     <View style={[styles.container, style]}>
       <Text
         style={[styles.description, textStyle]}
-        numberOfLines={isExpanded ? undefined : maxLines}
+        numberOfLines={isMeasured ? (isExpanded ? undefined : maxLines) : undefined}
+        ellipsizeMode="tail"
         onTextLayout={handleTextLayout}
       >
         {description}
@@ -46,7 +56,7 @@ export const ExpandableDescription: React.FC<ExpandableDescriptionProps> = ({
           activeOpacity={0.7}
         >
           <Text style={styles.expandButtonText}>
-            {isExpanded ? 'Show less' : 'Show more details'}
+            {isExpanded ? collapseLabel : expandLabel}
           </Text>
           <Ionicons
             name={isExpanded ? 'chevron-up' : 'chevron-down'}

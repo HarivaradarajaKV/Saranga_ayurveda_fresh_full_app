@@ -23,6 +23,7 @@ import CategorySelector from './components/CategorySelector';
 import AddProductForm from './components/AddProductForm';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import EditProductForm from './components/EditProductForm';
+import { ExpandableDescription } from '../components/ExpandableDescription';
 
 interface Product {
     id: number;
@@ -894,9 +895,11 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                                     {selectedProductForDetails.description && (
                                         <View style={styles.productDetailsSection}>
                                             <Text style={styles.productDetailsSectionTitle}>Description</Text>
-                                            <Text style={styles.productDetailsSectionText}>
-                                                {selectedProductForDetails.description}
-                                            </Text>
+                                            <ExpandableDescription
+                                              description={selectedProductForDetails.description}
+                                              maxLines={4}
+                                              textStyle={styles.productDetailsSectionText}
+                                            />
                                         </View>
                                     )}
                                     

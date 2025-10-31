@@ -635,20 +635,102 @@ const ExploreScreen = () => {
   }, [navigation, isFocused, scrollToTop]);
 
   // Add search filtering effect
+  const normalize = (s: string) => s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const getProductDisplayName = (product: any) => {
+    const preferred = [
+      product?.name,
+      product?.title,
+      product?.product_name,
+      product?.productName,
+      product?.attributes?.name,
+      product?.details?.name,
+    ].find((v) => typeof v === 'string' && v.trim().length > 0);
+    if (preferred) return preferred as string;
+
+    try {
+      const entries = Object.entries(product || {});
+      for (const [key, value] of entries) {
+        if (typeof value === 'string' && /name|title/i.test(key)) {
+          return value;
+        }
+      }
+    } catch {}
+
+    return '';
+  };
+
+  const fetchAllProductsForSearch = async (): Promise<any[]> => {
+    try {
+      const response = await apiService.get(apiService.ENDPOINTS.PRODUCTS);
+      let productsData: any[] = [];
+      if (response.data?.products) {
+        productsData = response.data.products;
+      } else if (Array.isArray(response.data)) {
+        productsData = response.data;
+      }
+      setProducts(productsData);
+      return productsData;
+    } catch (e) {
+      return products;
+    }
+  };
+
+  const tryServerSearch = async (query: string): Promise<any[] | null> => {
+    const keys = ['search', 'q', 'name'];
+    for (const key of keys) {
+      try {
+        const endpoint = `${apiService.ENDPOINTS.PRODUCTS}?${key}=${encodeURIComponent(query)}`;
+        const response = await apiService.get(endpoint);
+        let productsData: any[] = [];
+        if (response.data?.products) {
+          productsData = response.data.products;
+        } else if (Array.isArray(response.data)) {
+          productsData = response.data;
+        }
+        if (productsData.length > 0) return productsData;
+      } catch {}
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredProducts([]);
       return;
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    const filtered = products.filter(product => 
-      product.name.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query) ||
-      product.category.toLowerCase().includes(query)
-    );
-    
-    setFilteredProducts(filtered);
+    const query = normalize(searchQuery);
+    const runFilter = async (list: any[]) => {
+      const filtered = list.filter((product: any) => {
+        const name = normalize(getProductDisplayName(product));
+        return name.includes(query);
+      });
+      if (filtered.length > 0) {
+        setFilteredProducts(filtered);
+        return;
+      }
+      const server = await tryServerSearch(query);
+      if (server && server.length > 0) {
+        setFilteredProducts(server);
+      } else {
+        setFilteredProducts([]);
+      }
+    };
+
+    if (products.length === 0 || hasMore) {
+      // Fetch full list for search to avoid missing items due to pagination
+      fetchAllProductsForSearch().then(runFilter);
+      return;
+    }
+
+    runFilter(products);
   }, [searchQuery, products]);
 
   const handleSearch = (text: string) => {

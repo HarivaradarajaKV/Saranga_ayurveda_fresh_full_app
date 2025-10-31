@@ -53,20 +53,99 @@ const SearchScreen = () => {
     }
   };
 
-  const handleSearch = (text: string) => {
+  const normalize = (s: string) => s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const getProductDisplayName = (product: any) => {
+    const preferred = [
+      product?.name,
+      product?.title,
+      product?.product_name,
+      product?.productName,
+      product?.attributes?.name,
+      product?.details?.name,
+    ].find((v) => typeof v === 'string' && v.trim().length > 0);
+    if (preferred) return preferred as string;
+
+    try {
+      const entries = Object.entries(product || {});
+      for (const [key, value] of entries) {
+        if (typeof value === 'string' && /name|title/i.test(key)) {
+          return value;
+        }
+      }
+    } catch {}
+
+    return '';
+  };
+
+  const ensureProductsLoaded = async () => {
+    if (allProducts.length > 0 || loading) return allProducts;
+    try {
+      setLoading(true);
+      const response = await apiService.get(apiService.ENDPOINTS.PRODUCTS);
+      let productsData: any[] = [];
+      if (response.data?.products) {
+        productsData = response.data.products;
+      } else if (Array.isArray(response.data)) {
+        productsData = response.data;
+      }
+      setAllProducts(productsData);
+      return productsData;
+    } catch (e) {
+      setAllProducts([]);
+      return [] as any[];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const tryServerSearch = async (query: string): Promise<any[] | null> => {
+    const keys = ['search', 'q', 'name'];
+    for (const key of keys) {
+      try {
+        const endpoint = `${apiService.ENDPOINTS.PRODUCTS}?${key}=${encodeURIComponent(query)}`;
+        const response = await apiService.get(endpoint);
+        let productsData: any[] = [];
+        if (response.data?.products) {
+          productsData = response.data.products;
+        } else if (Array.isArray(response.data)) {
+          productsData = response.data;
+        }
+        if (productsData.length > 0) return productsData;
+      } catch {}
+    }
+    return null;
+  };
+
+  const handleSearch = async (text: string) => {
     setSearchQuery(text);
     if (!text.trim()) {
       setFilteredProducts([]);
       return;
     }
 
-    const query = text.toLowerCase().trim();
-    const filtered = allProducts.filter(product => 
-      product.name.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query) ||
-      product.category.toLowerCase().includes(query)
-    );
-    setFilteredProducts(filtered);
+    const list = await ensureProductsLoaded();
+    const query = normalize(text);
+    const filtered = list.filter((product: any) => {
+      const name = normalize(getProductDisplayName(product));
+      return name.includes(query);
+    });
+    if (filtered.length > 0) {
+      setFilteredProducts(filtered);
+      return;
+    }
+    const server = await tryServerSearch(query);
+    if (server && server.length > 0) {
+      setFilteredProducts(server);
+    } else {
+      setFilteredProducts([]);
+    }
   };
 
   const handleSearchSubmit = async () => {
@@ -155,12 +234,15 @@ const SearchScreen = () => {
                 <Text>Searching...</Text>
               </View>
             ) : filteredProducts.length > 0 ? (
-              <View style={styles.productsGrid}>
-                {filteredProducts.map((product) => (
-                  <View key={product.id} style={styles.productItem}>
-                    <ProductCard product={product} />
-                  </View>
-                ))}
+              <View>
+                <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Results ({filteredProducts.length})</Text>
+                <View style={styles.productsGrid}>
+                  {filteredProducts.map((product) => (
+                    <View key={product.id} style={styles.productItem}>
+                      <ProductCard product={product} />
+                    </View>
+                  ))}
+                </View>
               </View>
             ) : (
               <View style={styles.centerContent}>

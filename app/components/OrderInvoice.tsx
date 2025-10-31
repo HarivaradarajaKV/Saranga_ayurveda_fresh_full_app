@@ -17,14 +17,14 @@ export const generateInvoice = async (order: Order) => {
     // Ensure all numeric values are properly converted and defaulted
     const discountAmount = Number(order.discount_amount || 0);
     const deliveryCharge = Number(order.delivery_charge || 0);
-    const totalAmount = Number(order.total_amount || 0);
+    // Compute payable from components to ensure consistency across screens
+    const itemsSubtotal = (order.items || []).reduce((sum, item) => sum + Number(item.price_at_time || 0) * Number(item.quantity || 0), 0);
+    const totalAmount = itemsSubtotal - discountAmount + deliveryCharge;
 
     const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
 
-    // Calculate items subtotal and inferred other charges
-    const itemsSubtotal = (order.items || []).reduce((sum, item) => sum + Number(item.price_at_time || 0) * Number(item.quantity || 0), 0);
-    const inferredOtherChargesRaw = totalAmount - (itemsSubtotal - discountAmount + deliveryCharge);
-    const otherCharges = Math.max(0, Number(isFinite(inferredOtherChargesRaw) ? inferredOtherChargesRaw : 0));
+    // itemsSubtotal already computed above; no separate other charges at this time
+    const otherCharges = 0;
 
     // Format date in IST
     const orderDateIST = (() => {

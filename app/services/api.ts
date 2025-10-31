@@ -287,6 +287,31 @@ export class Api implements ApiService {
         }
     }
 
+    async getProductReviews(productId: number): Promise<ApiResponse<any[]>> {
+        try {
+            const endpoint = this.ENDPOINTS.PRODUCT_REVIEWS(productId);
+            const response = await this.client.get<any[]>(endpoint);
+            const data = Array.isArray(response.data)
+                ? response.data
+                : Array.isArray((response.data as any)?.reviews)
+                    ? (response.data as any).reviews
+                    : [];
+            return { data };
+        } catch (error: any) {
+            return { data: [], error: error.message };
+        }
+    }
+
+    async deleteReview(reviewId: number): Promise<ApiResponse<void>> {
+        try {
+            const endpoint = this.ENDPOINTS.ADMIN_REVIEW(reviewId);
+            const response = await retryRequest(() => this.client.delete(endpoint));
+            return { data: response.data };
+        } catch (error: any) {
+            return { data: null as any, error: error.message };
+        }
+    }
+
     async post<T = any>(endpoint: string, data: any): Promise<ApiResponse<T>> {
         try {
             if (process.env.NODE_ENV === 'development') {

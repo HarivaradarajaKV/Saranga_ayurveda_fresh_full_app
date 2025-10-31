@@ -649,6 +649,8 @@ export default function ProductPage() {
                 description={productData.description}
                 maxLines={4}
                 textStyle={styles.descriptionText}
+                expandLabel="See more"
+                collapseLabel="See less"
               />
             </View>
           )}

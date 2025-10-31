@@ -11,7 +11,7 @@ export default function RefundPolicyScreen() {
           headerShown: true,
         }}
       />
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.content}>
           <Text style={styles.title}>Refund Policy</Text>
           <Text style={styles.lastUpdated}>Last updated: February 24, 2024</Text>
@@ -60,10 +60,17 @@ export default function RefundPolicyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fffbe9',
+  },
+  contentContainer: {
+    padding: 16,
   },
   content: {
     padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#efd8bb',
   },
   title: {
     fontSize: 24,

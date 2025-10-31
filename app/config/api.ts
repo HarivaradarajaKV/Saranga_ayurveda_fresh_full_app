@@ -248,10 +248,14 @@ export const API_CONFIG = {
       ADMIN_PRODUCTS: '/admin/products',
       ADMIN_PRODUCT: (id: number) => `/admin/products/${id}`,
       ADMIN_ORDERS: '/admin/orders',
+      ADMIN_ORDERS_EXPORT: '/admin/orders/export',
       ADMIN_ORDER_STATUS: (id: string) => `/admin/orders/${id}/status`,
+      ADMIN_REVIEWS: '/admin/reviews',
+      ADMIN_REVIEW: (id: number) => `/admin/reviews/${id}`,
       ADMIN_USERS: '/admin/users',
       ADMIN_CATEGORIES: '/admin/categories',
       ADMIN_CATEGORY: (id: number) => `/admin/categories/${id}`,
+      ADMIN_REVIEW: (id: number) => `/admin/reviews/${id}`,
       
       // Address endpoints
       ADDRESSES: '/addresses',

@@ -1893,6 +1893,7 @@ const Page = () => {
   const [loading, setLoading] = useState(true);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userName, setUserName] = useState<string>('');
   const [showNewDealsPopup, setShowNewDealsPopup] = useState(true);
   const router = useRouter();
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -2012,13 +2013,46 @@ const Page = () => {
       try {
         const token = await AsyncStorage.getItem('auth_token');
         setIsAuthenticated(!!token);
+        const storedName = (await AsyncStorage.getItem('name')) || (await AsyncStorage.getItem('user_name'));
+        setUserName(storedName || '');
+        if (!!token && !storedName) {
+          try {
+            const profileRes = await apiService.getUserProfile();
+            const fetchedName = (profileRes.data as any)?.name || (profileRes.data as any)?.full_name || '';
+            if (fetchedName) {
+              setUserName(fetchedName);
+              await AsyncStorage.setItem('name', fetchedName);
+            }
+          } catch {}
+        }
       } catch (error) {
         console.error('Error checking auth status:', error);
         setIsAuthenticated(false);
+        setUserName('');
       }
     };
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        let storedName = (await AsyncStorage.getItem('name')) || (await AsyncStorage.getItem('user_name'));
+        if (!storedName) {
+          const profileRes = await apiService.getUserProfile();
+          const fetchedName = (profileRes.data as any)?.name || (profileRes.data as any)?.full_name || '';
+          if (fetchedName) {
+            storedName = fetchedName;
+            await AsyncStorage.setItem('name', fetchedName);
+          }
+        }
+        setUserName(storedName || '');
+      } catch {}
+    };
+    if (isMenuOpen && isAuthenticated) {
+      loadUserName();
+    }
+  }, [isMenuOpen, isAuthenticated]);
 
   // Fetch products only when authenticated
   useEffect(() => {
@@ -2062,19 +2096,103 @@ const Page = () => {
   }, []);
 
   // Add search filter effect
+  const normalize = (s: string) => s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const getProductDisplayName = (product: any) => {
+    const preferred = [
+      product?.name,
+      product?.title,
+      product?.product_name,
+      product?.productName,
+      product?.attributes?.name,
+      product?.details?.name,
+    ].find((v) => typeof v === 'string' && v.trim().length > 0);
+    if (preferred) return preferred as string;
+
+    // Fallback: search any string field whose key hints at a name/title
+    try {
+      const entries = Object.entries(product || {});
+      for (const [key, value] of entries) {
+        if (typeof value === 'string' && /name|title/i.test(key)) {
+          return value;
+        }
+      }
+    } catch {}
+
+    return '';
+  };
+
+  const fetchProductsForSearch = async () => {
+    try {
+      const response = await apiService.get(apiService.ENDPOINTS.PRODUCTS);
+      let productsData: any[] = [];
+      if (response.data?.products) {
+        productsData = response.data.products;
+      } else if (Array.isArray(response.data)) {
+        productsData = response.data;
+      }
+      setAllProducts(productsData);
+      return productsData;
+    } catch (e) {
+      return [] as any[];
+    }
+  };
+
+  const tryServerSearch = async (query: string): Promise<any[] | null> => {
+    const keys = ['search', 'q', 'name'];
+    for (const key of keys) {
+      try {
+        const endpoint = `${apiService.ENDPOINTS.PRODUCTS}?${key}=${encodeURIComponent(query)}`;
+        const response = await apiService.get(endpoint);
+        let productsData: any[] = [];
+        if (response.data?.products) {
+          productsData = response.data.products;
+        } else if (Array.isArray(response.data)) {
+          productsData = response.data;
+        }
+        if (productsData.length > 0) return productsData;
+      } catch {}
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredProducts([]);
       return;
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    const filtered = allProducts.filter(product => 
-      product.name.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query) ||
-      product.category.toLowerCase().includes(query)
-    );
-    setFilteredProducts(filtered);
+    const query = normalize(searchQuery);
+    const runFilter = async (list: any[]) => {
+      const filtered = list.filter((product: any) => {
+        const name = normalize(getProductDisplayName(product));
+        return name.includes(query);
+      });
+      if (filtered.length > 0) {
+        setFilteredProducts(filtered);
+        return;
+      }
+      // Fallback to server-side search if local list has no matches
+      const server = await tryServerSearch(query);
+      if (server && server.length > 0) {
+        setFilteredProducts(server);
+      } else {
+        setFilteredProducts([]);
+      }
+    };
+
+    if (allProducts.length === 0) {
+      fetchProductsForSearch().then((list) => runFilter(list));
+      return;
+    }
+
+    runFilter(allProducts);
   }, [searchQuery, allProducts]);
 
   const handleSearch = (text: string) => {
@@ -2261,7 +2379,7 @@ const Page = () => {
               <View style={styles.menuUserIcon}>
                 <Ionicons name="person" size={32} color="#f5f5f5" />
               </View>
-              <Text style={styles.menuUserText}>Welcome</Text>
+              <Text style={styles.menuUserText}>Welcome{userName ? ` ${userName}` : ''}</Text>
             </View>
             <View style={styles.menuDivider} />
             <TouchableOpacity 
@@ -2604,14 +2722,46 @@ const Page = () => {
               )}
             </TouchableOpacity>
           </Animated.View>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity 
-                style={styles.searchIconButton}
-                onPress={() => router.push('/search')}
-              >
-                <Ionicons name="search" size={28} color="#694d21" />
-              </TouchableOpacity>
-            </Animated.View>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity 
+              style={styles.searchIconButton}
+              onPress={() => router.push('/search')}
+            >
+              <Ionicons name="search" size={28} color="#694d21" />
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }], flex: 1 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#fff',
+                borderWidth: 1,
+                borderColor: '#e0e0e0',
+                borderRadius: 24,
+                paddingHorizontal: 12,
+                height: 40,
+                marginHorizontal: 8,
+              }}
+            >
+              <Ionicons name="search" size={20} color="#694d21" />
+              <TextInput
+                style={{ flex: 1, marginLeft: 8, color: '#333', paddingVertical: Platform.OS === 'ios' ? 8 : 6 }}
+                placeholder="Search products..."
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={handleSearch}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={clearSearch}>
+                  <Ionicons name="close-circle" size={20} color="#694d21" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </Animated.View>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <TouchableOpacity 
                 style={styles.natureButton}
@@ -2710,6 +2860,9 @@ const Page = () => {
           ) : searchQuery ? (
             <View style={styles.searchResultsContainer}>
               <Text style={[styles.sectionTitle, { marginLeft: 16 }]}>Search Results</Text>
+              <Text style={{ marginLeft: 16, color: '#666', marginTop: 4 }}>
+                {filteredProducts.length} result{filteredProducts.length === 1 ? '' : 's'} for "{searchQuery}"
+              </Text>
               {filteredProducts.length > 0 ? (
                 <Animated.View style={[styles.searchResultsGrid, {
                   transform: [{ translateY: productSlideAnim }]
@@ -3291,7 +3444,7 @@ const Page = () => {
                   <Ionicons name="heart-outline" size={20} color="#694d21" />
                   <Text style={styles.footerLinkText}>Wishlist</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/offers')}>
+                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/explore')}>
                   <Ionicons name="pricetag-outline" size={20} color="#694d21" />
                   <Text style={styles.footerLinkText}>Offers & Deals</Text>
                 </TouchableOpacity>

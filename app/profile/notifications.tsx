@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { apiService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -18,6 +18,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     checkAuth();
@@ -156,6 +157,11 @@ export default function NotificationsPage() {
         options={{
           title: 'Notifications',
           headerShown: true,
+          headerRight: () => (
+            <TouchableOpacity onPress={() => router.push('/settings')} style={{ paddingHorizontal: 8 }}>
+              <Ionicons name="settings-outline" size={22} color="#694d21" />
+            </TouchableOpacity>
+          )
         }}
       />
       <View style={styles.container}>
@@ -174,6 +180,22 @@ export default function NotificationsPage() {
             renderItem={renderNotification}
             keyExtractor={item => item.id.toString()}
             contentContainerStyle={styles.listContainer}
+            ListHeaderComponent={() => (
+              <TouchableOpacity
+                onPress={() => router.push('/settings')}
+                activeOpacity={0.8}
+                style={styles.settingsCard}
+              >
+                <View style={styles.settingsIconWrap}>
+                  <Ionicons name="color-palette-outline" size={20} color="#694d21" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsTitle}>Theme & Appearance</Text>
+                  <Text style={styles.settingsSubtitle}>Switch between light and dark mode</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#694d21" />
+              </TouchableOpacity>
+            )}
           />
         )}
       </View>
@@ -200,6 +222,37 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+  },
+  settingsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#efd8bb',
+    marginBottom: 12,
+  },
+  settingsIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fffbe9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#efd8bb',
+  },
+  settingsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  settingsSubtitle: {
+    fontSize: 12,
+    color: '#694d21',
+    marginTop: 2,
   },
   notificationItem: {
     flexDirection: 'row',

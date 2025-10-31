@@ -131,6 +131,14 @@ export default function AdminDashboard() {
               <Text style={styles.menuText}>Coupons</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/admin/reviews')}
+            >
+              <Ionicons name="chatbubbles-outline" size={32} color="#1a1a1a" />
+              <Text style={styles.menuText}>Reviews</Text>
+            </TouchableOpacity>
+
             {/* <TouchableOpacity
               style={styles.menuItem}
               onPress={() => navigateTo('/admin/settings')}

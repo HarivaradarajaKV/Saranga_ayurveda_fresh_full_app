@@ -18,8 +18,9 @@ const { width } = Dimensions.get('window');
 export default function WishlistPage() {
   const { items, removeFromWishlist } = useWishlist();
   const router = useRouter();
+  const wishlistItems = Array.isArray(items) ? items : [];
 
-  if (items.length === 0) {
+  if (wishlistItems.length === 0) {
     return (
       <>
         <Stack.Screen 
@@ -51,7 +52,7 @@ export default function WishlistPage() {
         }}
       />
       <FlatList
-        data={items}
+        data={wishlistItems}
         numColumns={2}
         contentContainerStyle={styles.container}
         renderItem={({ item }) => (
@@ -90,7 +91,7 @@ export default function WishlistPage() {
             </TouchableOpacity>
           </View>
         )}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={item => String(item?.id)}
       />
     </>
   );

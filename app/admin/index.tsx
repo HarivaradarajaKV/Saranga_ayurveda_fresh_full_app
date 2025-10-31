@@ -48,6 +48,7 @@ const ADMIN_ROUTES = {
     CATEGORIES: '/admin/categories' as const,
     COUPONS: '/admin/coupons' as const,
     ORDERS: '/admin/orders' as const,
+    REVIEWS: '/admin/reviews' as const,
 } as const;
 
 const { width } = Dimensions.get('window');
@@ -58,6 +59,7 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+    const [reviewCount, setReviewCount] = useState(0);
     
     // Animation values
     const fadeAnim = new Animated.Value(0);
@@ -66,31 +68,24 @@ export default function AdminDashboard() {
 
     const fetchStats = async () => {
         try {
-            const response = await apiService.get(apiService.ENDPOINTS.ADMIN_STATS);
-            if (response.data) {
-                setStats(response.data);
+            const [statsResponse, reviewsResponse] = await Promise.all([
+                apiService.get(apiService.ENDPOINTS.ADMIN_STATS),
+                apiService.get(apiService.ENDPOINTS.ADMIN_REVIEWS).catch(() => ({ data: [] }))
+            ]);
+
+            if (statsResponse.data) {
+                setStats(statsResponse.data);
                 setLastUpdated(new Date());
-                
-                // Trigger animations when data loads
-                Animated.parallel([
-                    Animated.timing(fadeAnim, {
-                        toValue: 1,
-                        duration: 800,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(slideAnim, {
-                        toValue: 0,
-                        duration: 600,
-                        useNativeDriver: true,
-                    }),
-                    Animated.spring(scaleAnim, {
-                        toValue: 1,
-                        tension: 100,
-                        friction: 8,
-                        useNativeDriver: true,
-                    }),
-                ]).start();
             }
+
+            const count = Array.isArray(reviewsResponse.data) ? reviewsResponse.data.length : 0;
+            setReviewCount(count);
+
+            Animated.parallel([
+                Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+                Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+                Animated.spring(scaleAnim, { toValue: 1, tension: 100, friction: 8, useNativeDriver: true }),
+            ]).start();
         } catch (error) {
             console.error('Error fetching stats:', error);
         } finally {
@@ -245,6 +240,13 @@ export default function AdminDashboard() {
                                 <Ionicons name="refresh" size={20} color="#FF69B4" />
                             </TouchableOpacity>
                             <TouchableOpacity
+                                onPress={() => router.push(ADMIN_ROUTES.REVIEWS)}
+                                style={styles.refreshButton}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="chatbubbles-outline" size={22} color="#FF69B4" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
                                 onPress={() => router.push(ADMIN_ROUTES.PROFILE)}
                                 style={styles.profileButton}
                                 activeOpacity={0.7}
@@ -333,6 +335,13 @@ export default function AdminDashboard() {
                             trendValue="+15%"
                             onPress={() => router.push(ADMIN_ROUTES.ANALYTICS)}
                         />
+                        <AdminCard
+                            title="Reviews"
+                            value={reviewCount}
+                            icon="chatbubbles-outline"
+                            color="#b0761b"
+                            onPress={() => router.push(ADMIN_ROUTES.REVIEWS)}
+                        />
                     </View>
                 </Animated.View>
 
@@ -348,32 +357,60 @@ export default function AdminDashboard() {
                     <Text style={styles.sectionTitle}>Quick Actions</Text>
                     <View style={styles.quickActionsGrid}>
                         <QuickAction
+                            title="View Products"
+                            icon="cube"
+                            color="#2196F3"
+                            description="See your product catalog"
+                            onPress={handleManageProducts}
+                        />
+                        <QuickAction
                             title="Add Product"
                             icon="add-circle"
-                            color="#4CAF50"
+                            color="#FF69B4"
                             description="Create new product"
                             onPress={handleAddProduct}
                         />
                         <QuickAction
-                            title="Manage Categories"
+                            title="Categories"
                             icon="list"
-                            color="#2196F3"
-                            description="Organize products"
+                            color="#333"
+                            description="Group products"
                             onPress={handleManageCategories}
                         />
                         <QuickAction
-                            title="View Orders"
-                            icon="receipt"
-                            color="#FF9800"
-                            description="Track orders"
+                            title="Orders"
+                            icon="cart"
+                            color="#333"
+                            description="View order history"
                             onPress={() => router.push(ADMIN_ROUTES.ORDERS)}
                         />
                         <QuickAction
-                            title="Manage Coupons"
+                            title="Users"
+                            icon="people"
+                            color="#333"
+                            description="View all platform users"
+                            onPress={() => router.push(ADMIN_ROUTES.USERS)}
+                        />
+                        <QuickAction
+                            title="Coupons"
                             icon="pricetag"
-                            color="#E91E63"
-                            description="Discount codes"
+                            color="#333"
+                            description="All coupon codes"
                             onPress={() => router.push(ADMIN_ROUTES.COUPONS)}
+                        />
+                        <QuickAction
+                            title="Reviews"
+                            icon="chatbubbles-outline"
+                            color="#b0761b"
+                            description="Manage reviews"
+                            onPress={() => router.push(ADMIN_ROUTES.REVIEWS)}
+                        />
+                        <QuickAction
+                            title="Support"
+                            icon="help-circle"
+                            color="#694d21"
+                            description="Reach support team"
+                            onPress={() => {}} // You may update navigation here
                         />
                     </View>
                 </Animated.View>
@@ -563,20 +600,27 @@ const styles = StyleSheet.create({
     quickActionsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        gap: 12,
+        alignItems: 'stretch',
+        justifyContent: 'center',
+        gap: 14,
+        paddingHorizontal: 10,
+        marginTop: 8,
     },
     quickActionCard: {
-        width: (width - 44) / 2,
-        backgroundColor: '#4CAF50',
-        borderRadius: 16,
-        padding: 20,
+        flexBasis: '45%', // 4 in a row on small screens
+        maxWidth: '45%',
+        marginBottom: 16,
+        minHeight: 110,
+        backgroundColor: '#fff',
+        borderRadius: 18,
         alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
     },
     quickActionIcon: {
         width: 56,
@@ -590,13 +634,13 @@ const styles = StyleSheet.create({
     quickActionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#fff',
+        color: '#363636',
         marginBottom: 4,
         textAlign: 'center',
     },
     quickActionDescription: {
         fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: '#666',
         textAlign: 'center',
     },
     recentActivitySection: {

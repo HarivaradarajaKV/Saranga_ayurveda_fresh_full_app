@@ -184,14 +184,21 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const processedOrders = response.data.map((order: RawOrderData) => {
         // Extract shipping address from flattened fields
+        const sanitize = (v: any) => {
+          if (v === null || v === undefined) return '';
+          const s = String(v);
+          const lower = s.toLowerCase();
+          return (lower === 'null' || lower === 'undefined') ? '' : s;
+        };
+
         const shippingAddress = {
-          full_name: order.shipping_full_name,
-          address_line1: order.shipping_address_line1,
-          address_line2: order.shipping_address_line2,
-          city: order.shipping_city,
-          state: order.shipping_state,
-          pincode: order.shipping_postal_code,
-          phone: order.shipping_phone_number
+          full_name: sanitize(order.shipping_full_name),
+          address_line1: sanitize(order.shipping_address_line1),
+          address_line2: sanitize(order.shipping_address_line2),
+          city: sanitize(order.shipping_city),
+          state: sanitize(order.shipping_state),
+          pincode: sanitize((order as any).shipping_postal_code || (order as any).shipping_pincode),
+          phone: sanitize(order.shipping_phone_number)
         };
 
         // Ensure status is lowercase and valid

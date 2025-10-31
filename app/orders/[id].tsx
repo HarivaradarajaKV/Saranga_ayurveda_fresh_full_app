@@ -448,7 +448,9 @@ export default function OrderDetailsPage() {
             )}
             <View style={styles.addressRow}>
               <Ionicons name="location" size={16} color="#666" />
-              <Text style={styles.addressText}>{order.shipping_address.city}, {order.shipping_address.state} - {order.shipping_address.pincode}</Text>
+              <Text style={styles.addressText}>
+                {order.shipping_address.city}, {order.shipping_address.state} - {order.shipping_address.pincode || (order as any)?.shipping_postal_code || ''}
+              </Text>
             </View>
             <View style={styles.addressRow}>
               <Ionicons name="call" size={16} color="#666" />
@@ -533,13 +535,47 @@ export default function OrderDetailsPage() {
               </Text>
             </View>
             <View style={styles.divider} />
-            <View style={styles.paymentRow}>
-              <View style={styles.paymentLeft}>
-                <Ionicons name="cash" size={18} color="#694d21" />
-                <Text style={styles.paymentLabel}>Total Amount</Text>
-              </View>
-              <Text style={[styles.paymentValue, styles.totalAmount]}>₹{order.total_amount}</Text>
-            </View>
+            {(() => {
+              const itemsSubtotal = order.items.reduce((sum, it) => sum + Number(it.price_at_time) * Number(it.quantity), 0);
+              const discount = Number(order.discount_amount || 0);
+              const delivery = Number(order.delivery_charge || 0);
+              const payable = itemsSubtotal - discount + delivery;
+              return (
+                <>
+                  <View style={styles.paymentRow}>
+                    <View style={styles.paymentLeft}>
+                      <Ionicons name="pricetag" size={18} color="#694d21" />
+                      <Text style={styles.paymentLabel}>Items Subtotal</Text>
+                    </View>
+                    <Text style={styles.paymentValue}>₹{itemsSubtotal.toFixed(2)}</Text>
+                  </View>
+                  {discount > 0 && (
+                    <View style={styles.paymentRow}>
+                      <View style={styles.paymentLeft}>
+                        <Ionicons name="remove-circle" size={18} color="#694d21" />
+                        <Text style={styles.paymentLabel}>Discount</Text>
+                      </View>
+                      <Text style={styles.paymentValue}>-₹{discount.toFixed(2)}</Text>
+                    </View>
+                  )}
+                  <View style={styles.paymentRow}>
+                    <View style={styles.paymentLeft}>
+                      <Ionicons name="bicycle" size={18} color="#694d21" />
+                      <Text style={styles.paymentLabel}>Delivery Charges</Text>
+                    </View>
+                    <Text style={styles.paymentValue}>₹{delivery.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.paymentRow}>
+                    <View style={styles.paymentLeft}>
+                      <Ionicons name="cash" size={18} color="#694d21" />
+                      <Text style={styles.paymentLabel}>Total Amount</Text>
+                    </View>
+                    <Text style={[styles.paymentValue, styles.totalAmount]}>₹{payable.toFixed(2)}</Text>
+                  </View>
+                </>
+              );
+            })()}
           </View>
         </Animated.View>
 
