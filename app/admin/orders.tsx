@@ -280,6 +280,10 @@ const AdminOrders = () => {
                   <Text style={styles.infoValue}>{order.shipping_address.phone}</Text>
                 </View>
                 <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Payment:</Text>
+                  <Text style={styles.infoValue}>{order.payment_method_display || (order.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment')}</Text>
+                </View>
+                <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Address:</Text>
                   <Text style={styles.infoValue}>
                     {order.shipping_address.address_line1}
@@ -308,28 +312,35 @@ const AdminOrders = () => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Order Summary</Text>
               <View style={styles.summaryContainer}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Subtotal:</Text>
-                  <Text style={styles.summaryValue}>₹{order.total_amount}</Text>
-                </View>
-                {order.discount_amount ? (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Discount:</Text>
-                    <Text style={[styles.summaryValue, styles.discountText]}>-₹{order.discount_amount}</Text>
-                  </View>
-                ) : null}
-                {order.delivery_charge ? (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Delivery:</Text>
-                    <Text style={styles.summaryValue}>₹{order.delivery_charge}</Text>
-                  </View>
-                ) : null}
-                <View style={[styles.summaryRow, styles.totalRow]}>
-                  <Text style={styles.totalLabel}>Total:</Text>
-                  <Text style={styles.totalValue}>
-                    ₹{order.total_amount + (order.delivery_charge || 0) - (order.discount_amount || 0)}
-                  </Text>
-                </View>
+                {(() => {
+                  const itemsSubtotal = (order.items || []).reduce((sum, item) => sum + Number(item.price_at_time || 0) * Number(item.quantity || 0), 0);
+                  const delivery = Number(order.delivery_charge || 0);
+                  const discount = Number(order.discount_amount || 0);
+                  return (
+                    <>
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Subtotal:</Text>
+                        <Text style={styles.summaryValue}>₹{itemsSubtotal}</Text>
+                      </View>
+                      {order.discount_amount ? (
+                        <View style={styles.summaryRow}>
+                          <Text style={styles.summaryLabel}>Discount:</Text>
+                          <Text style={[styles.summaryValue, styles.discountText]}>-₹{discount}</Text>
+                        </View>
+                      ) : null}
+                      {order.delivery_charge ? (
+                        <View style={styles.summaryRow}>
+                          <Text style={styles.summaryLabel}>Delivery:</Text>
+                          <Text style={styles.summaryValue}>₹{delivery}</Text>
+                        </View>
+                      ) : null}
+                      <View style={[styles.summaryRow, styles.totalRow]}>
+                        <Text style={styles.totalLabel}>Total:</Text>
+                        <Text style={styles.totalValue}>₹{order.total_amount}</Text>
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
             </View>
           </View>

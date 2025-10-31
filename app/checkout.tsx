@@ -18,6 +18,7 @@ import {
   Button,
   Animated,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import WebView from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -94,6 +95,7 @@ interface RazorpayOptions {
 
 const CheckoutPage = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const { items: cartItems, clearCart, getSelectedItems } = useCart();
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -196,7 +198,7 @@ const CheckoutPage = () => {
     {
       id: 'razorpay',
       type: 'online',
-      name: 'Pay with Razorpay',
+      name: 'Pay Online',
       description: 'Pay securely using UPI, Card, or Net Banking'
     }
   ];
@@ -510,7 +512,7 @@ const CheckoutPage = () => {
           
           // Configure Razorpay options
           const options: RazorpayOptions = {
-            key: razorpayOrderData.key_id,
+            key: razorpayOrderData.key || razorpayOrderData.key_id,
             amount: razorpayOrderData.amount,
             currency: razorpayOrderData.currency,
             name: "Your Cosmetics Store",
@@ -521,7 +523,7 @@ const CheckoutPage = () => {
               contact: selectedAddress.phone || selectedAddress.phone_number || '',
             },
             theme: {
-              color: "#FF69B4"
+              color: "#694d21"
             }
           };
 
@@ -880,7 +882,7 @@ const CheckoutPage = () => {
                           <Ionicons
                             name={method.id === 'cod' ? 'cash-outline' : 'card-outline'}
                             size={24}
-                            color={selectedPayment?.id === method.id ? '#fff' : '#FF69B4'}
+                            color={selectedPayment?.id === method.id ? '#fff' : '#694d21'}
                           />
                         </View>
                         <View style={styles.paymentMethodInfo}>
@@ -946,7 +948,7 @@ const CheckoutPage = () => {
           </ScrollView>
 
           {/* Footer with Order Total and Place Order Button */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(16, (insets?.bottom || 0) + 8) }]}>
             <View style={styles.totalContainer}>
               <Text style={styles.footerTotalLabel}>Total: </Text>
               <Text style={styles.footerTotal}>₹{total.toFixed(2)}</Text>
@@ -1408,6 +1410,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
     paddingBottom: Platform.OS === 'ios' ? 20 : 16,
   },
+  
   totalContainer: {
     flexDirection: 'row',
     alignItems: 'center',
