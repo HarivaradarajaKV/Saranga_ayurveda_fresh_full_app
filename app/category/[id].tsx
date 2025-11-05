@@ -116,15 +116,6 @@ export default function CategoryPage() {
                     headerShown: true,
                     headerStyle: {
                         backgroundColor: '#fff',
-                        height: Platform.OS === 'ios' ? 44 + insets.top : 56 + StatusBar.currentHeight,
-                        shadowColor: '#000',
-                        shadowOffset: {
-                            width: 0,
-                            height: 2,
-                        },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 3.84,
-                        elevation: 5,
                     },
                     headerShadowVisible: true,
                     headerTitleStyle: {
@@ -136,10 +127,9 @@ export default function CategoryPage() {
                         backgroundColor: '#fff',
                     },
                     statusBarStyle: 'dark',
-                    statusBarColor: '#fff',
                 }}
             />
-            <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight }]}>
+            <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 0 : (StatusBar.currentHeight || 0) }]}>
                 {filteredProducts.length === 0 ? (
                     <View style={styles.centerContainer}>
                         <Text style={styles.noResultsText}>
@@ -147,40 +137,39 @@ export default function CategoryPage() {
                         </Text>
                     </View>
                 ) : (
-                    <>
-                        <View style={styles.header}>
-                            <Text style={styles.categoryName}>{category?.name}</Text>
-                            <Text style={styles.productCount}>
-                                {products.length} Products
-                            </Text>
-                            {category?.description && (
-                                <Text style={styles.description}>
-                                    {category.description}
+                    <FlatList
+                        data={filteredProducts}
+                        renderItem={({ item }) => (
+                            <View style={styles.productItem}>
+                                <ProductCard product={item} hideActions={true} />
+                            </View>
+                        )}
+                        keyExtractor={item => item.id.toString()}
+                        numColumns={2}
+                        contentContainerStyle={styles.productGrid}
+                        columnWrapperStyle={styles.productRow}
+                        showsVerticalScrollIndicator={false}
+                        ListHeaderComponent={
+                            <View style={styles.header}>
+                                <Text style={styles.categoryName}>{category?.name}</Text>
+                                <Text style={styles.productCount}>
+                                    {products.length} Products
                                 </Text>
-                            )}
-                        </View>
-
-                        <FlatList
-                            data={products}
-                            renderItem={({ item }) => (
-                                <View style={styles.productItem}>
-                                    <ProductCard product={item} hideActions={true} />
-                                </View>
-                            )}
-                            keyExtractor={item => item.id.toString()}
-                            numColumns={2}
-                            contentContainerStyle={styles.productGrid}
-                            columnWrapperStyle={styles.productRow}
-                            showsVerticalScrollIndicator={false}
-                            ListEmptyComponent={
-                                <View style={styles.emptyContainer}>
-                                    <Text style={styles.emptyText}>
-                                        No products found in this category
+                                {category?.description && (
+                                    <Text style={styles.description}>
+                                        {category.description}
                                     </Text>
-                                </View>
-                            }
-                        />
-                    </>
+                                )}
+                            </View>
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Text style={styles.emptyText}>
+                                    No products found in this category
+                                </Text>
+                            </View>
+                        }
+                    />
                 )}
             </View>
         </>
@@ -196,6 +185,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+        backgroundColor: '#fff',
     },
     categoryName: {
         fontSize: 24,

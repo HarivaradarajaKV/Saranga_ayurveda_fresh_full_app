@@ -52,7 +52,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const navigateTo = (route: '/admin/products' | '/admin/categories' | '/admin/orders' | '/admin/users' | '/admin/coupons' | '/admin/settings' | '/admin/add-product') => {
+  const navigateTo = (route: '/admin/products' | '/admin/categories' | '/admin/orders' | '/admin/users' | '/admin/coupons' | '/admin/combos' | '/admin/settings' | '/admin/add-product') => {
     if (route === '/admin/add-product') {
       router.push({ pathname: '/admin/products', params: { showAddForm: 'true' } });
     } else {
@@ -129,6 +129,14 @@ export default function AdminDashboard() {
             >
               <Ionicons name="ticket-outline" size={32} color="#1a1a1a" />
               <Text style={styles.menuText}>Coupons</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateTo('/admin/combos')}
+            >
+              <Ionicons name="cube-outline" size={32} color="#1a1a1a" />
+              <Text style={styles.menuText}>Combos</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

@@ -47,6 +47,7 @@ const ADMIN_ROUTES = {
     NEW_PRODUCT: '/admin/products/new' as const,
     CATEGORIES: '/admin/categories' as const,
     COUPONS: '/admin/coupons' as const,
+    COMBOS: '/admin/combos' as const,
     ORDERS: '/admin/orders' as const,
     REVIEWS: '/admin/reviews' as const,
 } as const;
@@ -60,6 +61,7 @@ export default function AdminDashboard() {
     const [refreshing, setRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [reviewCount, setReviewCount] = useState(0);
+    const [combosCount, setCombosCount] = useState(0);
     
     // Animation values
     const fadeAnim = new Animated.Value(0);
@@ -68,9 +70,10 @@ export default function AdminDashboard() {
 
     const fetchStats = async () => {
         try {
-            const [statsResponse, reviewsResponse] = await Promise.all([
+            const [statsResponse, reviewsResponse, combosResponse] = await Promise.all([
                 apiService.get(apiService.ENDPOINTS.ADMIN_STATS),
-                apiService.get(apiService.ENDPOINTS.ADMIN_REVIEWS).catch(() => ({ data: [] }))
+                apiService.get(apiService.ENDPOINTS.ADMIN_REVIEWS).catch(() => ({ data: [] })),
+                apiService.get(apiService.ENDPOINTS.ADMIN_COMBOS_ALL).catch(() => ({ data: [] }))
             ]);
 
             if (statsResponse.data) {
@@ -80,6 +83,9 @@ export default function AdminDashboard() {
 
             const count = Array.isArray(reviewsResponse.data) ? reviewsResponse.data.length : 0;
             setReviewCount(count);
+
+            const combos = Array.isArray(combosResponse.data) ? combosResponse.data : [];
+            setCombosCount(combos.length);
 
             Animated.parallel([
                 Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
@@ -336,6 +342,13 @@ export default function AdminDashboard() {
                             onPress={() => router.push(ADMIN_ROUTES.ANALYTICS)}
                         />
                         <AdminCard
+                            title="Combos"
+                            value={combosCount}
+                            icon="cube"
+                            color="#8BC34A"
+                            onPress={() => router.push(ADMIN_ROUTES.COMBOS)}
+                        />
+                        <AdminCard
                             title="Reviews"
                             value={reviewCount}
                             icon="chatbubbles-outline"
@@ -397,6 +410,13 @@ export default function AdminDashboard() {
                             color="#333"
                             description="All coupon codes"
                             onPress={() => router.push(ADMIN_ROUTES.COUPONS)}
+                        />
+                        <QuickAction
+                            title="Combos"
+                            icon="cube"
+                            color="#333"
+                            description="Manage combo offers"
+                            onPress={() => router.push(ADMIN_ROUTES.COMBOS)}
                         />
                         <QuickAction
                             title="Reviews"

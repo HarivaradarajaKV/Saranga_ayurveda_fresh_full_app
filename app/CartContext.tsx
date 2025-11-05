@@ -56,12 +56,19 @@ export interface CartItem {
   shades?: string[];
   sizes?: string[];
   discounted_price: number;
+  // Combo offer fields
+  is_from_combo?: boolean;
+  combo_id?: number;
+  combo_discount_type?: 'percentage' | 'fixed';
+  combo_discount_value?: number;
+  combo_original_price?: number; // Original price before combo discount
+  combo_discounted_price?: number; // Price after combo discount
 }
 
 interface CartContextType {
   items: CartItem[];
   selectedItems: number[];
-  addItem: (product: Product, variant?: string) => void;
+  addItem: (product: Product, variant?: string, comboInfo?: { comboId: number; comboDiscountType: 'percentage' | 'fixed'; comboDiscountValue: number; comboTotalPrice: number; comboDiscountedPrice: number; itemOriginalPrice: number }) => void;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, increment: boolean) => void;
   getItemCount: () => number;
@@ -134,27 +141,80 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         if (response.data) {
           // Transform the backend response to match our CartItem interface
           const transformedItems = await Promise.all(response.data.map(async (item: any) => {
-            const productResponse = await apiService.get(`/products/${item.product_id}`);
-            console.log('Fetched product details:', productResponse.data);
+            // Use price from cart response first (backend already includes it)
+            const cartPrice = Number(item.price) || 0;
+            const cartOfferPercentage = Number(item.offer_percentage) || 0;
+            
+            // Try to fetch full product details, but use cart data if fetch fails
+            let productData: any = null;
+            try {
+              const productResponse = await apiService.get(`/products/${item.product_id}`);
+              productData = productResponse.data;
+            } catch (error) {
+              console.warn('Could not fetch product details, using cart data:', error);
+            }
+            
+            // Use price from cart response (from backend), fallback to product data if available
+            const finalPrice = cartPrice || (productData ? Number(productData.price) || 0 : 0);
+            // Use offer_percentage from cart response first, then product data
+            const offerPercentage = cartOfferPercentage || (productData ? Number(productData.offer_percentage) || 0 : 0);
+            
+            // Try to load combo info from AsyncStorage if available
+            let comboInfo: any = null;
+            try {
+              const storedCartItems = await AsyncStorage.getItem(`cart_items_${userId}`);
+              if (storedCartItems) {
+                const storedItems = JSON.parse(storedCartItems);
+                const storedItem = storedItems.find((si: any) => 
+                  si.id === Number(item.product_id) && si.variant === item.variant
+                );
+                if (storedItem?.is_from_combo) {
+                  comboInfo = {
+                    is_from_combo: storedItem.is_from_combo,
+                    combo_id: storedItem.combo_id,
+                    combo_discount_type: storedItem.combo_discount_type,
+                    combo_discount_value: storedItem.combo_discount_value,
+                    combo_original_price: storedItem.combo_original_price,
+                    combo_discounted_price: storedItem.combo_discounted_price,
+                  };
+                }
+              }
+            } catch (error) {
+              console.warn('Could not load combo info from storage:', error);
+            }
+            
+            // Calculate discounted price - use combo price if available, otherwise normal discount
+            let discountedPrice = finalPrice * (1 - offerPercentage / 100);
+            if (comboInfo?.combo_discounted_price !== undefined) {
+              discountedPrice = comboInfo.combo_discounted_price;
+            }
+            
             return {
               id: Number(item.product_id),
               cartId: Number(item.id),
-              name: productResponse.data.name,
-              description: productResponse.data.description || '',
-              price: Number(productResponse.data.price) || 0,
-              category: productResponse.data.category || 'Default Category',
-              image_url: productResponse.data.image_url,
-              stock_quantity: Number(productResponse.data.stock_quantity) || 0,
+              name: item.name || productData?.name || `Product ${item.product_id}`,
+              description: productData?.description || '',
+              price: finalPrice,
+              category: productData?.category || 'Default Category',
+              image_url: item.image_url || productData?.image_url || '',
+              stock_quantity: productData ? Number(productData.stock_quantity) || 0 : 999,
               created_at: item.created_at || new Date().toISOString(),
-              offer_percentage: Number(productResponse.data.offer_percentage) || 0,
+              offer_percentage: offerPercentage,
               quantity: Number(item.quantity) || 1,
               variant: item.variant,
-              usage_instructions: productResponse.data.usage_instructions,
-              benefits: productResponse.data.benefits,
-              ingredients: productResponse.data.ingredients,
-              shades: productResponse.data.shades,
-              sizes: productResponse.data.sizes,
-              discounted_price: Number(productResponse.data.price) * (1 - Number(productResponse.data.offer_percentage) / 100)
+              usage_instructions: productData?.usage_instructions,
+              benefits: productData?.benefits,
+              ingredients: productData?.ingredients,
+              shades: productData?.shades,
+              sizes: productData?.sizes,
+              discounted_price: discountedPrice,
+              // Preserve combo info if available
+              is_from_combo: comboInfo?.is_from_combo || false,
+              combo_id: comboInfo?.combo_id,
+              combo_discount_type: comboInfo?.combo_discount_type,
+              combo_discount_value: comboInfo?.combo_discount_value,
+              combo_original_price: comboInfo?.combo_original_price,
+              combo_discounted_price: comboInfo?.combo_discounted_price,
             };
           }));
           setItems(transformedItems);
@@ -171,7 +231,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     loadCartItems();
   }, [userId]);
 
-  const addItem = async (product: Product, variant?: string) => {
+  const addItem = async (product: Product, variant?: string, comboInfo?: { comboId: number; comboDiscountType: 'percentage' | 'fixed'; comboDiscountValue: number; comboTotalPrice: number; comboDiscountedPrice: number; itemOriginalPrice: number }) => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token || !userId) {
@@ -194,16 +254,44 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       }
 
       // Define newItem after checking for existing items
+      const itemPrice = typeof product.price === 'number' ? product.price : (parseFloat(String(product.price)) || 0);
+      const itemOfferPercentage = typeof product.offer_percentage === 'number' ? product.offer_percentage : (parseFloat(String(product.offer_percentage)) || 0);
+      
+      // Calculate price based on whether it's from combo or normal
+      let finalPrice = itemPrice;
+      let finalDiscountedPrice = itemPrice * (1 - itemOfferPercentage / 100);
+      
+      // If this item is from a combo, apply combo discount proportionally
+      if (comboInfo) {
+        const { comboTotalPrice, comboDiscountedPrice: comboFinalPrice, itemOriginalPrice } = comboInfo;
+        
+        // Calculate proportional discount for this item
+        // itemOriginalPrice is the total price for this item in the combo (price * quantity)
+        // Item's share of total = itemOriginalPrice / comboTotalPrice
+        // Item's total discounted price = comboFinalPrice * (itemOriginalPrice / comboTotalPrice)
+        // Item's unit discounted price = (comboFinalPrice * (itemOriginalPrice / comboTotalPrice)) / itemQuantity
+        if (comboTotalPrice > 0 && itemOriginalPrice > 0) {
+          const itemProportion = itemOriginalPrice / comboTotalPrice;
+          const itemTotalDiscountedPrice = comboFinalPrice * itemProportion;
+          // Since we're adding items one by one, each unit gets the same discounted price
+          // We need to calculate per-unit price from the total item price
+          // Find quantity by dividing itemOriginalPrice by unit price
+          const itemQuantityInCombo = itemOriginalPrice / itemPrice;
+          finalPrice = itemPrice; // Store original unit price
+          finalDiscountedPrice = itemTotalDiscountedPrice / itemQuantityInCombo; // Per-unit discounted price
+        }
+      }
+      
       const newItem: CartItem = {
         id: product.id,
         name: product.name,
-        description: product.description,
-        price: product.price,
-        category: product.category,
-        image_url: product.image_url,
-        stock_quantity: product.stock_quantity,
-        created_at: product.created_at,
-        offer_percentage: product.offer_percentage,
+        description: product.description || '',
+        price: finalPrice,
+        category: product.category || '',
+        image_url: product.image_url || '',
+        stock_quantity: typeof product.stock_quantity === 'number' ? product.stock_quantity : (parseInt(String(product.stock_quantity)) || 0),
+        created_at: product.created_at || new Date().toISOString(),
+        offer_percentage: itemOfferPercentage,
         quantity: 1,
         variant: variant,
         cartId: 0, // Placeholder, will be updated after backend response
@@ -212,7 +300,14 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         ingredients: product.ingredients,
         shades: product.shades,
         sizes: product.sizes,
-        discounted_price: product.price * (1 - product.offer_percentage / 100)
+        discounted_price: finalDiscountedPrice,
+        // Combo offer information
+        is_from_combo: !!comboInfo,
+        combo_id: comboInfo?.comboId,
+        combo_discount_type: comboInfo?.comboDiscountType,
+        combo_discount_value: comboInfo?.comboDiscountValue,
+        combo_original_price: comboInfo ? itemPrice : undefined,
+        combo_discounted_price: comboInfo ? finalDiscountedPrice : undefined,
       };
 
       // Add to backend first

@@ -409,7 +409,14 @@ const CheckoutPage = () => {
     if (!selectedCartItems || selectedCartItems.length === 0) return;
 
     const itemsTotal = selectedCartItems.reduce((sum, item) => {
-      return sum + (Number(item.price) * (1 - (item.offer_percentage / 100)) * item.quantity);
+      // Use combo discounted price if item is from combo, otherwise use normal discounted price
+      let finalPrice: number;
+      if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+        finalPrice = item.combo_discounted_price;
+      } else {
+        finalPrice = Number(item.price) * (1 - (item.offer_percentage / 100));
+      }
+      return sum + (finalPrice * item.quantity);
     }, 0);
 
     setSubtotal(itemsTotal);
@@ -463,9 +470,15 @@ const CheckoutPage = () => {
         },
         payment_method: selectedPayment.id === 'cod' ? 'cod' : 'online',
         items: selectedCartItems.map(item => {
-          const base = Number(item.price) || 0;
-          const offerPct = Number(item.offer_percentage || 0);
-          const effective = Math.round(base * (1 - (offerPct / 100)) * 100) / 100;
+          // Use combo discounted price if item is from combo, otherwise use normal discounted price
+          let effective: number;
+          if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+            effective = Math.round(item.combo_discounted_price * 100) / 100;
+          } else {
+            const base = Number(item.price) || 0;
+            const offerPct = Number(item.offer_percentage || 0);
+            effective = Math.round(base * (1 - (offerPct / 100)) * 100) / 100;
+          }
           return {
             product_id: item.id,
             quantity: item.quantity,
@@ -693,7 +706,18 @@ const CheckoutPage = () => {
                     <View style={styles.itemDetails}>
                       <Text style={styles.itemName}>{item.name}</Text>
                       <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
-                      <Text style={styles.itemPrice}>₹{(Number(item.price) * (1 - (item.offer_percentage / 100)) * item.quantity).toFixed(2)}</Text>
+                      <Text style={styles.itemPrice}>
+                        ₹{(() => {
+                          // Use combo discounted price if item is from combo, otherwise use normal discounted price
+                          let finalPrice: number;
+                          if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+                            finalPrice = item.combo_discounted_price;
+                          } else {
+                            finalPrice = Number(item.price) * (1 - (item.offer_percentage / 100));
+                          }
+                          return (finalPrice * item.quantity).toFixed(2);
+                        })()}
+                      </Text>
                     </View>
                   </View>
                 ))}

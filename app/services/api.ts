@@ -709,6 +709,61 @@ export class Api implements ApiService {
         }
     }
 
+    // Combo offers
+    async getCombos(): Promise<ApiResponse<any[]>> {
+        try {
+            const response = await this.client.get(this.ENDPOINTS.COMBOS);
+            return { data: response.data };
+        } catch (error) {
+            return { data: [], error: this.handleError(error) };
+        }
+    }
+
+    async getComboDetails(id: number): Promise<ApiResponse<any>> {
+        try {
+            const response = await this.client.get(this.ENDPOINTS.COMBO_DETAILS(id));
+            return { data: response.data };
+        } catch (error) {
+            return { error: this.handleError(error) };
+        }
+    }
+
+    async getAllCombosAdmin(): Promise<ApiResponse<any[]>> {
+        try {
+            const response = await this.client.get(this.ENDPOINTS.ADMIN_COMBOS_ALL);
+            return { data: response.data };
+        } catch (error) {
+            return { data: [], error: this.handleError(error) };
+        }
+    }
+
+    async createCombo(comboData: any): Promise<ApiResponse<any>> {
+        try {
+            const response = await this.client.post(this.ENDPOINTS.ADMIN_COMBOS, comboData);
+            return { data: response.data };
+        } catch (error) {
+            return { error: this.handleError(error) };
+        }
+    }
+
+    async updateCombo(id: number, comboData: any): Promise<ApiResponse<any>> {
+        try {
+            const response = await this.client.put(`${this.ENDPOINTS.ADMIN_COMBOS}/${id}`, comboData);
+            return { data: response.data };
+        } catch (error) {
+            return { error: this.handleError(error) };
+        }
+    }
+
+    async deleteCombo(id: number): Promise<ApiResponse<void>> {
+        try {
+            const response = await this.client.delete(`${this.ENDPOINTS.ADMIN_COMBOS}/${id}`);
+            return { data: response.data };
+        } catch (error) {
+            return { error: this.handleError(error) } as any;
+        }
+    }
+
     async addProduct(formData: FormData): Promise<ApiResponse<ProductData>> {
         try {
             console.log('[API] Adding product - FormData entries:', Array.from(formData.entries()));

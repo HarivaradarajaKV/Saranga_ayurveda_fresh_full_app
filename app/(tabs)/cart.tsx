@@ -77,7 +77,19 @@ export default function CartPage() {
   const calculateSelectedTotal = () => {
     return items
       .filter(item => selectedItems.includes(item.id))
-      .reduce((total, item) => total + ((item.price*(1-item.offer_percentage/100)) * item.quantity), 0);
+      .reduce((total, item) => {
+        const itemQuantity = typeof item.quantity === 'number' ? item.quantity : (parseInt(String(item.quantity)) || 1);
+        
+        // If item is from combo, use combo discounted price
+        if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+          return total + (item.combo_discounted_price * itemQuantity);
+        }
+        
+        // Otherwise use normal discounted price
+        const itemPrice = typeof item.price === 'number' ? item.price : (parseFloat(String(item.price)) || 0);
+        const itemOffer = typeof item.offer_percentage === 'number' ? item.offer_percentage : (parseFloat(String(item.offer_percentage)) || 0);
+        return total + ((itemPrice * (1 - itemOffer / 100)) * itemQuantity);
+      }, 0);
   };
 
   const subtotal = calculateSelectedTotal();
@@ -304,8 +316,18 @@ export default function CartPage() {
               <BlurView intensity={20} style={styles.cartItemsContainer}>
                 {items.map((item: CartItem) => {
                   console.log('Rendering cart item:', item);
-                  const displayPrice = typeof item.price === 'number' ? item.price : parseFloat(item.price)|| 0;
-                  const formattedPrice = (displayPrice*(1-item.offer_percentage/100)).toFixed(2);
+                  const displayPrice = typeof item.price === 'number' ? item.price : (parseFloat(String(item.price)) || 0);
+                  const offerPercentage = typeof item.offer_percentage === 'number' ? item.offer_percentage : (parseFloat(String(item.offer_percentage)) || 0);
+                  
+                  // Use combo discounted price if item is from combo, otherwise use normal discounted price
+                  let finalPrice: number;
+                  if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+                    finalPrice = item.combo_discounted_price;
+                  } else {
+                    finalPrice = displayPrice * (1 - offerPercentage / 100);
+                  }
+                  
+                  const formattedPrice = finalPrice.toFixed(2);
                   return (
                     <View key={`${item.id}-${item.variant || 'no-variant'}-${item.quantity}`} style={styles.cartItem}>
                       <TouchableOpacity
@@ -333,9 +355,9 @@ export default function CartPage() {
                             source={{ uri: apiService.getFullImageUrl(item.image_url) }} 
                             style={styles.itemImage}
                           />
-                          {item.offer_percentage > 0 && (
+                          {offerPercentage > 0 && (
                             <View style={styles.offerBadge}>
-                              <Text style={styles.offerText}>{item.offer_percentage}% OFF</Text>
+                              <Text style={styles.offerText}>{offerPercentage}% OFF</Text>
                             </View>
                           )}
                         </View>
@@ -343,7 +365,7 @@ export default function CartPage() {
                           <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
                           <View style={styles.priceContainer}>
                             <Text style={styles.price}>₹{formattedPrice}</Text>
-                            {item.offer_percentage > 0 && (
+                            {offerPercentage > 0 && (
                               <Text style={styles.originalPrice}>₹{displayPrice.toFixed(2)}</Text>
                             )}
                           </View>

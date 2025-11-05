@@ -272,6 +272,12 @@ export const API_CONFIG = {
       ADMIN_COUPONS: '/admin/coupons',
       GET_COUPONS: '/coupons',
 
+      // Combo offers endpoints
+      COMBOS: '/combos',
+      COMBO_DETAILS: (id: number) => `/combos/${id}`,
+      ADMIN_COMBOS: '/admin/combos',
+      ADMIN_COMBOS_ALL: '/admin/combos/all',
+
       // Payment endpoints
       PAYMENT_METHODS: '/payments/payment-methods' as const,
 
@@ -503,6 +509,31 @@ export class Api implements ApiService {
     async getAdminProducts(queryParams?: string): Promise<ApiResponse<ProductData[]>> {
         const endpoint = queryParams ? `${this.ENDPOINTS.PRODUCTS}?${queryParams}` : this.ENDPOINTS.PRODUCTS;
         return this.get(endpoint);
+    }
+
+    // Combo offers methods
+    async getCombos(): Promise<ApiResponse<any[]>> {
+        return this.get(this.ENDPOINTS.COMBOS);
+    }
+
+    async getComboDetails(id: number): Promise<ApiResponse<any>> {
+        return this.get(this.ENDPOINTS.COMBO_DETAILS(id));
+    }
+
+    async createCombo(comboData: any): Promise<ApiResponse<any>> {
+        return this.post(this.ENDPOINTS.ADMIN_COMBOS, comboData);
+    }
+
+    async updateCombo(id: number, comboData: any): Promise<ApiResponse<any>> {
+        return this.put(`${this.ENDPOINTS.ADMIN_COMBOS}/${id}`, comboData);
+    }
+
+    async deleteCombo(id: number): Promise<ApiResponse<void>> {
+        return this.delete(`${this.ENDPOINTS.ADMIN_COMBOS}/${id}`);
+    }
+
+    async getAllCombosAdmin(): Promise<ApiResponse<any[]>> {
+        return this.get(this.ENDPOINTS.ADMIN_COMBOS_ALL);
     }
 
     async addProduct(formData: FormData): Promise<ApiResponse<ProductData>> {

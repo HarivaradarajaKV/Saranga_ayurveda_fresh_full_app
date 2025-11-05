@@ -1895,6 +1895,9 @@ const Page = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>('');
   const [showNewDealsPopup, setShowNewDealsPopup] = useState(true);
+  const [activeCombos, setActiveCombos] = useState<any[]>([]);
+  const [coreProductsOffset, setCoreProductsOffset] = useState(0);
+  const coreProductsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const { mainCategories, loading: categoriesLoading } = useCategories();
@@ -1947,6 +1950,15 @@ const Page = () => {
   const productSlideAnim = useRef(new Animated.Value(40)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  // Combo card animations - different from existing animations
+  const comboCard1Rotate = useRef(new Animated.Value(-15)).current;
+  const comboCard1TranslateX = useRef(new Animated.Value(-150)).current;
+  const comboCard1TranslateY = useRef(new Animated.Value(50)).current;
+  const comboCard2Rotate = useRef(new Animated.Value(15)).current;
+  const comboCard2TranslateX = useRef(new Animated.Value(150)).current;
+  const comboCard2TranslateY = useRef(new Animated.Value(50)).current;
+  const comboCard1Scale = useRef(new Animated.Value(0.5)).current;
+  const comboCard2Scale = useRef(new Animated.Value(0.5)).current;
   const [textWidth, setTextWidth] = useState(0);
   const recommendedSectionRef = useRef<View>(null);
   const isFocused = useIsFocused();
@@ -2054,12 +2066,200 @@ const Page = () => {
     }
   }, [isMenuOpen, isAuthenticated]);
 
+  // Function to check if a combo is active based on dates
+  const isComboActive = (combo: any): boolean => {
+    if (!combo.is_active) {
+      return false;
+    }
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // If no dates are set, consider it active if is_active is true
+    if (!combo.start_date && !combo.end_date) {
+      return combo.is_active;
+    }
+
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+
+    if (combo.start_date) {
+      startDate = new Date(combo.start_date);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    if (combo.end_date) {
+      endDate = new Date(combo.end_date);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    // Check if current date is between start and end dates
+    if (startDate && endDate) {
+      return now >= startDate && now <= endDate;
+    } else if (startDate) {
+      return now >= startDate;
+    } else if (endDate) {
+      return now <= endDate;
+    }
+
+    return combo.is_active;
+  };
+
+  // Function to check if a combo is upcoming based on dates
+  const isComboUpcoming = (combo: any): boolean => {
+    if (!combo.is_active) {
+      return false;
+    }
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // If no start date, it's not upcoming
+    if (!combo.start_date) {
+      return false;
+    }
+
+    const startDate = new Date(combo.start_date);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Check if current date is before start date
+    return now < startDate;
+  };
+
+  // Fetch active and upcoming combos
+  useEffect(() => {
+    const fetchHomeCombos = async () => {
+      try {
+        const response = await apiService.getCombos();
+        if (response.data && Array.isArray(response.data)) {
+          // Filter active combos based on dates
+          const active = response.data.filter((combo: any) => isComboActive(combo));
+          
+          // Sort active by created_at (newest first)
+          const sortedActive = active.sort((a: any, b: any) => {
+            const dateA = new Date(a.created_at || a.id || 0).getTime();
+            const dateB = new Date(b.created_at || b.id || 0).getTime();
+            return dateB - dateA;
+          });
+
+          // Get active combos (up to 2)
+          let displayCombos = sortedActive.slice(0, 2);
+          
+          // If we have less than 2 active combos, add upcoming combos
+          if (displayCombos.length < 2) {
+            // Get active combo IDs to exclude from upcoming
+            const activeIds = new Set(displayCombos.map((c: any) => c.id));
+            
+            // Filter upcoming combos (excluding those already in active list)
+            const upcoming = response.data.filter((combo: any) => 
+              isComboUpcoming(combo) && !activeIds.has(combo.id)
+            );
+            
+            // Sort upcoming by created_at (newest first)
+            const sortedUpcoming = upcoming.sort((a: any, b: any) => {
+              const dateA = new Date(a.created_at || a.id || 0).getTime();
+              const dateB = new Date(b.created_at || b.id || 0).getTime();
+              return dateB - dateA;
+            });
+            
+            // Add upcoming combos to fill up to 2
+            const needed = 2 - displayCombos.length;
+            displayCombos = [...displayCombos, ...sortedUpcoming.slice(0, needed)];
+          }
+          
+          setActiveCombos(displayCombos);
+        }
+      } catch (error) {
+        console.error('Error fetching combos:', error);
+        setActiveCombos([]);
+      }
+    };
+
+    fetchHomeCombos();
+  }, []);
+
+  // Animate combo cards when they are loaded
+  useEffect(() => {
+    if (activeCombos.length > 0) {
+      // Reset animations
+      comboCard1Rotate.setValue(-15);
+      comboCard1TranslateX.setValue(-150);
+      comboCard1TranslateY.setValue(50);
+      comboCard1Scale.setValue(0.5);
+      comboCard2Rotate.setValue(15);
+      comboCard2TranslateX.setValue(150);
+      comboCard2TranslateY.setValue(50);
+      comboCard2Scale.setValue(0.5);
+
+      // Animate first card - rotate with slide from left and bounce
+      Animated.parallel([
+        Animated.spring(comboCard1Rotate, {
+          toValue: 0,
+          tension: 40,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.spring(comboCard1TranslateX, {
+          toValue: 0,
+          tension: 40,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.spring(comboCard1TranslateY, {
+          toValue: 0,
+          tension: 40,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.spring(comboCard1Scale, {
+          toValue: 1,
+          tension: 40,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate second card - rotate with slide from right and bounce (staggered)
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.spring(comboCard2Rotate, {
+            toValue: 0,
+            tension: 40,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.spring(comboCard2TranslateX, {
+            toValue: 0,
+            tension: 40,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.spring(comboCard2TranslateY, {
+            toValue: 0,
+            tension: 40,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.spring(comboCard2Scale, {
+            toValue: 1,
+            tension: 40,
+            friction: 6,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }, 200);
+    }
+  }, [activeCombos]);
+
   // Fetch products only when authenticated
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await apiService.get(apiService.ENDPOINTS.PRODUCTS);
+        
+        // Fetch all products by using a high limit to get all products at once
+        // This ensures the Core Collection can cycle through ALL products
+        const response = await apiService.get(`${apiService.ENDPOINTS.PRODUCTS}?limit=1000`);
         
         if (response.error) {
           console.error('API Error:', response.error);
@@ -2073,6 +2273,9 @@ const Page = () => {
         } else if (Array.isArray(response.data)) {
           productsData = response.data;
         }
+
+        console.log(`[Core Collection] Fetched ${productsData.length} products from backend`);
+        console.log(`[Core Collection] Product IDs:`, productsData.map(p => p.id).slice(0, 20));
 
         setAllProducts(productsData);
         setFilteredProducts(productsData);
@@ -2094,6 +2297,55 @@ const Page = () => {
 
     fetchProducts();
   }, []);
+
+  // Update core products display to cycle through all products circularly
+  useEffect(() => {
+    // Clear any existing interval first
+    if (coreProductsIntervalRef.current) {
+      clearInterval(coreProductsIntervalRef.current);
+      coreProductsIntervalRef.current = null;
+    }
+
+    if (allProducts.length > 0) {
+      // Reset offset when products change
+      setCoreProductsOffset(0);
+
+      // Set up interval to update every 10 seconds
+      coreProductsIntervalRef.current = setInterval(() => {
+        setCoreProductsOffset((prevOffset) => {
+          // Always increment by 4 and use modulo to wrap around
+          // This ensures we cycle through ALL products regardless of total count
+          const totalProducts = allProducts.length;
+          const nextOffset = (prevOffset + 4) % totalProducts;
+          
+          // Log which products will be displayed
+          const productsToShow = [];
+          for (let i = 0; i < 4; i++) {
+            const index = (nextOffset + i) % totalProducts;
+            productsToShow.push({
+              index,
+              id: allProducts[index]?.id,
+              name: allProducts[index]?.name || 'Unknown'
+            });
+          }
+          console.log(`Core Collection: Cycling products. Offset: ${prevOffset} -> ${nextOffset}, Total products: ${totalProducts}`);
+          console.log(`Core Collection: Displaying products:`, productsToShow);
+          return nextOffset;
+        });
+      }, 10000); // 10 seconds
+
+      // Cleanup interval on unmount or when allProducts changes
+      return () => {
+        if (coreProductsIntervalRef.current) {
+          clearInterval(coreProductsIntervalRef.current);
+          coreProductsIntervalRef.current = null;
+        }
+      };
+    } else {
+      // Reset offset if allProducts is empty
+      setCoreProductsOffset(0);
+    }
+  }, [allProducts]);
 
   // Add search filter effect
   const normalize = (s: string) => s
@@ -2600,7 +2852,7 @@ const Page = () => {
 
   const handleViewDeals = () => {
     setShowNewDealsPopup(false);
-    router.push('/saranga-ayurveda');
+    router.push('/deals/combo-offers');
   };
 
   const handleSearchSubmit = () => {
@@ -2729,38 +2981,6 @@ const Page = () => {
             >
               <Ionicons name="search" size={28} color="#694d21" />
             </TouchableOpacity>
-          </Animated.View>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }], flex: 1 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: '#fff',
-                borderWidth: 1,
-                borderColor: '#e0e0e0',
-                borderRadius: 24,
-                paddingHorizontal: 12,
-                height: 40,
-                marginHorizontal: 8,
-              }}
-            >
-              <Ionicons name="search" size={20} color="#694d21" />
-              <TextInput
-                style={{ flex: 1, marginLeft: 8, color: '#333', paddingVertical: Platform.OS === 'ios' ? 8 : 6 }}
-                placeholder="Search products..."
-                placeholderTextColor="#999"
-                value={searchQuery}
-                onChangeText={handleSearch}
-                returnKeyType="search"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {searchQuery ? (
-                <TouchableOpacity onPress={clearSearch}>
-                  <Ionicons name="close-circle" size={20} color="#694d21" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
           </Animated.View>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <TouchableOpacity 
@@ -2958,79 +3178,158 @@ const Page = () => {
 
               {/* New Combo Offers Section */}
               <View style={styles.comboSection}>
-                <SectionHeader title="Combo Offers" />
+                <TouchableWithoutFeedback 
+                  onPress={() => router.push('/deals/combo-offers')}
+                >
+                  <Animated.View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Combo Offers</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#000" />
+                  </Animated.View>
+                </TouchableWithoutFeedback>
                 
-                {/* Face & Body Care Combo */}
-                <TouchableOpacity 
-                  style={styles.comboCard}
-                  onPress={() => router.push('/explore')}
-                >
-                  <View style={styles.comboHeader}>
-                    <Ionicons name="gift-outline" size={24} color="#694d21" />
-                    <Text style={styles.comboTitle}>Face & Body Care Package</Text>
-                  </View>
-                  <Text style={styles.comboDescription}>
-                    Complete skincare routine with premium face and body care products
-                  </Text>
-                  <View style={styles.comboProductsRow}>
-                    <Image 
-                      source={{ uri: 'https://images.pexels.com/photos/3785147/pexels-photo-3785147.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                      style={styles.comboProductImage}
-                      resizeMode="cover"
-                    />
-                    <Image 
-                      source={{ uri: 'https://images.pexels.com/photos/4465124/pexels-photo-4465124.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                      style={styles.comboProductImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <View style={styles.comboPriceRow}>
-                    <Text style={styles.comboPrice}>₹1,499</Text>
-                    <Text style={styles.comboSaveText}>Save 25%</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.viewComboButton}
-                    onPress={() => router.push('/explore')}
-                  >
-                    <Text style={styles.viewComboButtonText}>View Package</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
+                {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
+                {activeCombos.length > 0 ? (
+                  activeCombos.map((combo, index) => {
+                    // Calculate prices
+                    const calculateTotalPrice = () => {
+                      return (combo.items || []).reduce((sum: number, item: any) => {
+                        const price = Number(item.price || 0);
+                        const quantity = Number(item.quantity || 1);
+                        return sum + (price * quantity);
+                      }, 0);
+                    };
 
-                {/* Skincare Essentials Combo */}
-                <TouchableOpacity 
-                  style={styles.comboCard}
-                  onPress={() => router.push('/explore')}
-                >
-                  <View style={styles.comboHeader}>
-                    <Ionicons name="gift-outline" size={24} color="#694d21" />
-                    <Text style={styles.comboTitle}>Skincare Essentials</Text>
-                  </View>
-                  <Text style={styles.comboDescription}>
-                    Daily skincare essentials for a radiant and healthy glow
-                  </Text>
-                  <View style={styles.comboProductsRow}>
-                    <Image 
-                      source={{ uri: 'https://images.pexels.com/photos/3685530/pexels-photo-3685530.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                      style={styles.comboProductImage}
-                      resizeMode="cover"
-                    />
-                    <Image 
-                      source={{ uri: 'https://images.pexels.com/photos/3685523/pexels-photo-3685523.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                      style={styles.comboProductImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <View style={styles.comboPriceRow}>
-                    <Text style={styles.comboPrice}>₹1,299</Text>
-                    <Text style={styles.comboSaveText}>Save 20%</Text>
-                  </View>
+                    const calculateDiscountedPrice = () => {
+                      const total = calculateTotalPrice();
+                      const discountValue = Number(combo.discount_value || 0);
+                      if (combo.discount_type === 'percentage') {
+                        return total - (total * (discountValue / 100));
+                      } else {
+                        return Math.max(0, total - discountValue);
+                      }
+                    };
+
+                    const totalPrice = calculateTotalPrice();
+                    const discountedPrice = calculateDiscountedPrice();
+                    const savings = totalPrice - discountedPrice;
+
+                    // Get combo images (up to 2 for display)
+                    const comboImages = [
+                      combo.image_url,
+                      combo.image_url2,
+                      combo.image_url3,
+                      combo.image_url4
+                    ].filter(img => img && typeof img === 'string').slice(0, 2);
+
+                    const handleComboPress = () => {
+                      router.push({
+                        pathname: '/deals/combo-detail/[id]',
+                        params: {
+                          id: combo.id.toString(),
+                          comboData: JSON.stringify(combo),
+                        },
+                      });
+                    };
+
+                    // Apply different animations to each card
+                    const isFirstCard = index === 0;
+                    const rotate = isFirstCard ? comboCard1Rotate : comboCard2Rotate;
+                    const translateX = isFirstCard ? comboCard1TranslateX : comboCard2TranslateX;
+                    const translateY = isFirstCard ? comboCard1TranslateY : comboCard2TranslateY;
+                    const scale = isFirstCard ? comboCard1Scale : comboCard2Scale;
+
+                    return (
+                      <Animated.View
+                        key={combo.id}
+                        style={{
+                          transform: [
+                            { rotate: rotate.interpolate({
+                                inputRange: [-15, 0, 15],
+                                outputRange: ['-15deg', '0deg', '15deg']
+                              }) },
+                            { translateX },
+                            { translateY },
+                            { scale }
+                          ],
+                        }}
+                      >
+                      <TouchableOpacity 
+                        style={styles.comboCard}
+                        onPress={handleComboPress}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.comboHeader}>
+                          <Ionicons name="gift-outline" size={24} color="#694d21" />
+                          <Text style={styles.comboTitle}>{combo.title || 'Combo Offer'}</Text>
+                        </View>
+                        {combo.description && (
+                          <Text style={styles.comboDescription} numberOfLines={2}>
+                            {combo.description}
+                          </Text>
+                        )}
+                        <View style={styles.comboProductsRow}>
+                          {comboImages.length > 0 ? (
+                            comboImages.map((img, idx) => (
+                              <Image 
+                                key={idx}
+                                source={{ uri: apiService.getFullImageUrl(img) }}
+                                style={styles.comboProductImage}
+                                resizeMode="cover"
+                              />
+                            ))
+                          ) : (
+                            <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                              <Ionicons name="image-outline" size={32} color="#999" />
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.comboPriceRow}>
+                          <Text style={styles.comboPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                          <Text style={styles.comboSaveText}>
+                            Save {combo.discount_type === 'percentage' 
+                              ? `${Number(combo.discount_value || 0)}%` 
+                              : `₹${Number(combo.discount_value || 0)}`}
+                          </Text>
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.viewComboButton}
+                          onPress={handleComboPress}
+                        >
+                          <Text style={styles.viewComboButtonText}>View Combo</Text>
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                      </Animated.View>
+                    );
+                  })
+                ) : (
+                  // Fallback: Show placeholder when no active combos
                   <TouchableOpacity 
-                    style={styles.viewComboButton}
-                    onPress={() => router.push('/explore')}
+                    style={styles.comboCard}
+                    onPress={() => router.push('/deals/combo-offers')}
                   >
-                    <Text style={styles.viewComboButtonText}>View Package</Text>
+                    <View style={styles.comboHeader}>
+                      <Ionicons name="gift-outline" size={24} color="#694d21" />
+                      <Text style={styles.comboTitle}>Check Out Our Combo Offers</Text>
+                    </View>
+                    <Text style={styles.comboDescription}>
+                      Discover amazing combo deals and save more on your favorite products
+                    </Text>
+                    <View style={styles.comboProductsRow}>
+                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="gift" size={32} color="#999" />
+                      </View>
+                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="star" size={32} color="#999" />
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.viewComboButton}
+                      onPress={() => router.push('/deals/combo-offers')}
+                    >
+                      <Text style={styles.viewComboButtonText}>View All Combo Offers</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
+                )}
               </View>
 
               {/* All Products Section */}
@@ -3046,23 +3345,46 @@ const Page = () => {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.productsGrid}>
-                  {allProducts.slice(0, 4).map((product, index) => (
-                    <Animated.View 
-                      key={product.id} 
-                      style={[
-                        styles.productItem,
-                        {
-                          opacity: fadeAnim,
-                          transform: [
-                            { translateY: productSlideAnim },
-                            { scale: scaleAnim }
-                          ]
-                        }
-                      ]}
-                    >
-                      <ProductCard product={product} />
-                    </Animated.View>
-                  ))}
+                  {(() => {
+                    // Get current 4 products circularly from all products in backend
+                    // This works for ANY number of products - 5, 10, 50, 100, 1000, etc.
+                    if (allProducts.length === 0) {
+                      return null;
+                    }
+                    
+                    const totalProducts = allProducts.length;
+                    const currentProducts: Product[] = [];
+                    
+                    // Always show 4 products, using modulo to wrap around
+                    // This ensures we cycle through ALL products regardless of total count
+                    for (let i = 0; i < 4; i++) {
+                      // Use modulo to wrap around when we reach the end of the array
+                      // This works for any number of products in the backend
+                      const index = (coreProductsOffset + i) % totalProducts;
+                      currentProducts.push(allProducts[index]);
+                    }
+                    
+                    // Log current display state for debugging (only when offset changes)
+                    // Note: This may log on every render, but that's expected with React re-renders
+                    
+                    return currentProducts.map((product, index) => (
+                      <Animated.View 
+                        key={`${product.id}-${coreProductsOffset}-${index}`} 
+                        style={[
+                          styles.productItem,
+                          {
+                            opacity: fadeAnim,
+                            transform: [
+                              { translateY: productSlideAnim },
+                              { scale: scaleAnim }
+                            ]
+                          }
+                        ]}
+                      >
+                        <ProductCard product={product} />
+                      </Animated.View>
+                    ));
+                  })()}
                 </View>
               </View>
 
@@ -3525,6 +3847,10 @@ const Page = () => {
                 </View>
                 <Text style={[styles.footerBottomText, { marginTop: 16 }]}>
                   Made with ♥ in India
+                  
+                </Text>
+                <Text style={styles.footerBottomText}>Crafted and powered with care by Curiospry Technologies
+
                 </Text>
               </View>
             </View>

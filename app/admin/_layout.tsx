@@ -78,6 +78,13 @@ export default function AdminLayout() {
                 }} 
             />
             <Stack.Screen 
+                name="combos" 
+                options={{ 
+                    title: 'Manage Combo Offers',
+                    animation: 'slide_from_right'
+                }} 
+            />
+            <Stack.Screen 
                 name="profile" 
                 options={{ 
                     title: 'Admin Profile',
