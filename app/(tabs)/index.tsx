@@ -2713,7 +2713,10 @@ const Page = () => {
               onPress={async () => {
                 console.log('Logout button pressed');
                 handleDrawerClose();
-                await AsyncStorage.clear();
+                await AsyncStorage.removeItem('auth_token');
+                await AsyncStorage.removeItem('user_role');
+                await AsyncStorage.removeItem('cart_items');
+                await AsyncStorage.removeItem('wishlist_items');
                 setIsAuthenticated(false);
                 router.replace('/auth/login');
               }}

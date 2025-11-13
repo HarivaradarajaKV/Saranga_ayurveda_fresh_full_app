@@ -5,6 +5,9 @@ import Constants from 'expo-constants';
 import { API_BASE_URL, API_CONFIG, getBaseUrl, checkNetworkConnection } from '../config/api';
 import { ApiService, ApiResponse, ProductData, AuthResponse, GoogleAuthResponse, Category, Address, UserProfile } from '../types/api';
 
+// Gate verbose logs to avoid memory pressure in dev
+const DEBUG_API = __DEV__ && String((Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_DEBUG_API || (process.env as any)?.EXPO_PUBLIC_DEBUG_API || '').trim() === '1';
+
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 500;
 const CONNECTION_TIMEOUT = 5000;
@@ -64,10 +67,21 @@ export class Api implements ApiService {
     private retryCount = 0;
     private client: AxiosInstance;
     private userId: string | null = null;
+    // Lightweight dedup + short-lived caches to avoid request storms
+    private adminProductsCache: { data: ProductData[]; ts: number } | null = null;
+    private adminProductsInFlight: Promise<ApiResponse<ProductData[]>> | null = null;
+    private couponsCache: { data: any[]; ts: number } | null = null;
+    private couponsInFlight: Promise<ApiResponse<any[]>> | null = null;
+    private combosCache: { data: any[]; ts: number } | null = null;
+    private combosInFlight: Promise<ApiResponse<any[]>> | null = null;
 
     constructor() {
         const baseURL = getBaseUrl();
-        console.log('[API Service] Initializing with base URL:', baseURL);
+        if (DEBUG_API) {
+            try {
+                console.log('[API Service] Initializing with base URL:', String(baseURL).slice(0, 120));
+            } catch {}
+        }
         
         this.client = axios.create({
             baseURL,
@@ -94,8 +108,8 @@ export class Api implements ApiService {
                     //     throw new Error('Cannot connect to server. Please check your network connection.');
                     // }
 
-                    // Log request details only in development
-                    if (process.env.NODE_ENV === 'development') {
+                    // Log request details only when debug flag is enabled
+                    if (DEBUG_API) {
                         console.debug('[API] Request:', {
                             method: config.method,
                             url: config.url,
@@ -105,48 +119,62 @@ export class Api implements ApiService {
 
                     return config;
                 } catch (error) {
-                    if (process.env.NODE_ENV === 'development') {
+                    if (DEBUG_API) {
                         console.debug('[API] Request preparation failed:', error);
                     }
                     return Promise.reject(error);
                 }
             },
             (error) => {
-                if (process.env.NODE_ENV === 'development') {
+                if (DEBUG_API) {
                     console.debug('[API] Request Error:', error);
                 }
                 return Promise.reject(error);
             }
         );
 
-        // Log all responses for debugging
+        // Log all responses for debugging (with preview to avoid memory spikes)
         this.client.interceptors.response.use(
             (response) => {
-                if (process.env.NODE_ENV === 'development') {
+                if (DEBUG_API) {
+                    let dataPreview = '[unserializable]';
+                    try {
+                        const str = typeof response.data === 'string'
+                            ? response.data
+                            : JSON.stringify(response.data);
+                        dataPreview = str.length > 200 ? `${str.slice(0, 200)}… (+${str.length - 200} chars)` : str;
+                    } catch {}
                     console.debug('[API] Response:', {
                         status: response.status,
                         statusText: response.statusText,
-                        data: response.data,
-                        headers: response.headers
+                        dataPreview,
                     });
                 }
                 return response;
             },
             async (error) => {
                 // Only log in development
-                if (process.env.NODE_ENV === 'development') {
+                if (DEBUG_API) {
+                    let responsePreview = '[no response]';
+                    try {
+                        if (error.response?.data) {
+                            const str = typeof error.response.data === 'string'
+                                ? error.response.data
+                                : JSON.stringify(error.response.data);
+                            responsePreview = str.length > 200 ? `${str.slice(0, 200)}… (+${str.length - 200} chars)` : str;
+                        }
+                    } catch {}
+                    const cfg = {
+                        url: error.config?.url,
+                        method: error.config?.method,
+                        baseURL: error.config?.baseURL,
+                    };
                     console.debug('[API] Response Error:', {
                         message: error.message,
                         code: error.code,
-                        response: error.response?.data,
                         status: error.response?.status,
-                        headers: error.response?.headers,
-                        config: {
-                            url: error.config?.url,
-                            method: error.config?.method,
-                            baseURL: error.config?.baseURL,
-                            headers: error.config?.headers
-                        }
+                        responsePreview,
+                        config: cfg
                     });
                 }
 
@@ -160,7 +188,7 @@ export class Api implements ApiService {
                             return { data: null };
                         }
                     } catch (clearError) {
-                        if (process.env.NODE_ENV === 'development') {
+                        if (DEBUG_API) {
                             console.debug('[API] Error clearing auth data:', clearError);
                         }
                     }
@@ -244,12 +272,14 @@ export class Api implements ApiService {
             const headers = await this.getHeaders();
             const config = { headers };
 
-            console.log('[API] Making request:', {
-                baseURL: this.client.defaults.baseURL,
-                url: endpoint,
-                method: 'get',
-                headers: headers
-            });
+            if (DEBUG_API) {
+                try {
+                    console.log('[API] GET:', {
+                        baseURL: String(this.client.defaults.baseURL).slice(0, 120),
+                        url: endpoint,
+                    });
+                } catch {}
+            }
 
             // Special handling for brand-reviews endpoint
             if (endpoint === this.ENDPOINTS.BRAND_REVIEWS) {
@@ -257,7 +287,7 @@ export class Api implements ApiService {
                     const response = await this.client.get<T>(endpoint, config);
                     return { data: response.data };
                 } catch (error) {
-                    console.log('Brand reviews endpoint error:', error);
+                    if (DEBUG_API) console.log('Brand reviews endpoint error');
                     // Return empty array for brand-reviews endpoint on error
                     return { data: [] as unknown as T };
                 }
@@ -270,18 +300,21 @@ export class Api implements ApiService {
                 API_CONFIG.RETRY_DELAY
             );
 
-            console.log('[API] Received response:', {
-                status: response.status,
-                headers: response.headers,
-                data: response.data
-            });
+            if (DEBUG_API) {
+                try {
+                    const preview = JSON.stringify(response.data);
+                    console.log('[API] GET OK:', {
+                        status: response.status,
+                        dataPreview: preview.length > 400 ? `${preview.slice(0, 400)}… (+${preview.length - 400} chars)` : preview
+                    });
+                } catch {}
+            }
 
             return { data: response.data };
         } catch (error: any) {
             const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
-            if (process.env.NODE_ENV === 'development') {
-                console.debug('[API] Request failed:', error);
-                console.debug('GET Error:', { endpoint, error: errorMessage, details: error.response?.data });
+            if (DEBUG_API) {
+                console.debug('GET Error:', { endpoint, error: errorMessage });
             }
             return { error: errorMessage, details: error.response?.data };
         }
@@ -465,6 +498,7 @@ export class Api implements ApiService {
     async logout(): Promise<ApiResponse<void>> {
         try {
             await AsyncStorage.removeItem('auth_token');
+            await AsyncStorage.removeItem('user_role');
             await AsyncStorage.removeItem('cart_items');
             await AsyncStorage.removeItem('wishlist_items');
             this.client.defaults.headers.common['Authorization'] = '';
@@ -672,27 +706,66 @@ export class Api implements ApiService {
 
     async getAdminProducts(queryParams?: string): Promise<ApiResponse<ProductData[]>> {
         try {
-            console.log('[API] Making request to get admin products...');
+            // Cache hit within 30s
+            const now = Date.now();
+            if (this.adminProductsCache && now - this.adminProductsCache.ts < 30000) {
+                return { data: this.adminProductsCache.data };
+            }
+            // Deduplicate in-flight
+            if (this.adminProductsInFlight) {
+                return await this.adminProductsInFlight;
+            }
+
+            if (DEBUG_API) {
+                console.log('[API] Making request to get admin products...');
+            }
             const endpoint = this.ENDPOINTS.ADMIN_PRODUCTS;
-            console.log('[API] Request URL:', `${this.client.defaults.baseURL}${endpoint}`);
+            if (DEBUG_API) {
+                console.log('[API] Request URL:', `${this.client.defaults.baseURL}${endpoint}`);
+            }
             
             interface ProductResponse {
                 products?: ProductData[];
             }
-            
-            const response = await this.client.get<ProductData[] | ProductResponse>(endpoint);
-            
-            if (!response.data) {
-                console.log('[API] No data in response');
-                return { data: [] };
-            }
-
-            // Ensure we're returning an array of products with proper type checking
-            const products = Array.isArray(response.data) ? response.data :
-                           (response.data as ProductResponse).products || [];
-            
-            console.log('[API] Fetched products count:', products.length);
-            return { data: products };
+            this.adminProductsInFlight = this.client.get<ProductData[] | ProductResponse>(endpoint)
+                .then((response) => {
+                    if (!response.data) {
+                        if (DEBUG_API) {
+                            console.log('[API] No data in response');
+                        }
+                        const res = { data: [] as ProductData[] };
+                        this.adminProductsCache = { data: res.data, ts: Date.now() };
+                        return res;
+                    }
+                    // Ensure we're returning an array of products with proper type checking
+                    const products = Array.isArray(response.data) ? response.data :
+                                   (response.data as ProductResponse).products || [];
+                    
+                    if (DEBUG_API) {
+                        console.log('[API] Fetched products count:', products.length);
+                    }
+                    const res = { data: products };
+                    this.adminProductsCache = { data: products, ts: Date.now() };
+                    return res;
+                })
+                .catch((error) => {
+                    console.error('[API] Error in getAdminProducts:', error);
+                    if (axios.isAxiosError(error)) {
+                        return {
+                            data: null,
+                            error: error.response?.data?.error || error.message,
+                            details: error.response?.data
+                        } as any;
+                    }
+                    return { 
+                        data: null, 
+                        error: error instanceof Error ? error.message : 'Failed to fetch products'
+                    } as any;
+                })
+                .finally(() => {
+                    this.adminProductsInFlight = null;
+                });
+            return await this.adminProductsInFlight;
         } catch (error) {
             console.error('[API] Error in getAdminProducts:', error);
             if (axios.isAxiosError(error)) {
@@ -730,8 +803,28 @@ export class Api implements ApiService {
 
     async getAllCombosAdmin(): Promise<ApiResponse<any[]>> {
         try {
-            const response = await this.client.get(this.ENDPOINTS.ADMIN_COMBOS_ALL);
-            return { data: response.data };
+            const now = Date.now();
+            if (this.combosCache && now - this.combosCache.ts < 30000) {
+                return { data: this.combosCache.data };
+            }
+            if (this.combosInFlight) {
+                return await this.combosInFlight;
+            }
+
+            this.combosInFlight = this.client.get(this.ENDPOINTS.ADMIN_COMBOS_ALL)
+                .then((response) => {
+                    const data = Array.isArray(response.data) ? response.data : [];
+                    this.combosCache = { data, ts: Date.now() };
+                    return { data };
+                })
+                .catch((error) => {
+                    return { data: [], error: this.handleError(error) } as any;
+                })
+                .finally(() => {
+                    this.combosInFlight = null;
+                });
+
+            return await this.combosInFlight;
         } catch (error) {
             return { data: [], error: this.handleError(error) };
         }
@@ -766,9 +859,12 @@ export class Api implements ApiService {
 
     async addProduct(formData: FormData): Promise<ApiResponse<ProductData>> {
         try {
-            console.log('[API] Adding product - FormData entries:', Array.from(formData.entries()));
-            console.log('[API] Using endpoint:', this.ENDPOINTS.PRODUCTS);
-            console.log('[API] Full URL:', `${this.client.defaults.baseURL}${this.ENDPOINTS.PRODUCTS}`);
+            if (DEBUG_API) {
+                try {
+                    const entries = Array.from(formData.entries()).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 60) : '[binary]']);
+                    console.log('[API] Adding product - entries preview:', entries);
+                } catch {}
+            }
             
             // Get auth token for admin endpoint
             const token = await AsyncStorage.getItem('auth_token');
@@ -785,17 +881,15 @@ export class Api implements ApiService {
                 }
             );
 
-            console.log('[API] Product added successfully:', response.data);
+            if (DEBUG_API) console.log('[API] Product added successfully');
             return { data: response.data };
         } catch (error: any) {
-            console.error('[API] Error adding product:', {
-                error: error,
-                response: error.response,
-                status: error.response?.status,
-                url: this.ENDPOINTS.PRODUCTS,
-                fullUrl: `${this.client.defaults.baseURL}${this.ENDPOINTS.PRODUCTS}`,
-                headers: error.config?.headers
-            });
+            if (DEBUG_API) {
+                console.error('[API] Error adding product:', {
+                    status: error.response?.status,
+                    url: this.ENDPOINTS.PRODUCTS,
+                });
+            }
 
             // Handle specific error cases
             if (error.response?.status === 404) {
@@ -828,10 +922,7 @@ export class Api implements ApiService {
 
     async updateProduct(productId: number, formData: FormData): Promise<ApiResponse<ProductData>> {
         try {
-            console.log('[API] Updating product:', {
-                productId,
-                formDataEntries: Array.from(formData.entries())
-            });
+            if (DEBUG_API) console.log('[API] Updating product:', { productId });
 
             // Get the auth token
             const token = await AsyncStorage.getItem('auth_token');
@@ -848,15 +939,14 @@ export class Api implements ApiService {
                 }
             );
 
-            console.log('[API] Product update response:', response.data);
+            if (DEBUG_API) console.log('[API] Product update OK');
             return { data: response.data };
         } catch (error: any) {
-            console.error('[API] Error updating product:', {
-                error: error,
-                response: error.response,
-                status: error.response?.status,
-                data: error.response?.data
-            });
+            if (DEBUG_API) {
+                console.error('[API] Error updating product:', {
+                    status: error.response?.status,
+                });
+            }
 
             // Handle specific error cases
             if (!error.response) {
@@ -889,13 +979,13 @@ export class Api implements ApiService {
 
     async deleteProduct(id: number): Promise<ApiResponse<void>> {
         try {
-            console.log('Deleting product:', id);
+            if (DEBUG_API) console.log('Deleting product:', id);
             const response = await this.client.delete(this.ENDPOINTS.PRODUCT_DETAILS(id));
             
-            console.log('Delete response:', response.data);
+            if (DEBUG_API) console.log('Delete OK');
             return { data: response.data };
         } catch (error) {
-            console.error('Delete product error:', error);
+            if (DEBUG_API) console.error('Delete product error');
             if (axios.isAxiosError(error)) {
                 return {
                     data: null,
@@ -965,17 +1055,11 @@ export class Api implements ApiService {
             } else {
                 fullUrl = `${baseUrl}/uploads/${imageUrl}`;
             }
-            
-            console.log('Image URL constructed:', {
-                original: imageUrl,
-                baseUrl: baseUrl,
-                fullUrl: fullUrl
-            });
-            
+
             // Return the constructed URL - let the Image component handle loading errors
             return fullUrl;
         } catch (error) {
-            console.error('Error processing image URL:', error);
+            if (__DEV__) console.error('Error processing image URL');
             return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
         }
     }
@@ -1013,20 +1097,26 @@ export class Api implements ApiService {
 
     async validateCoupon(couponCode: string, cartItems: any[]): Promise<ApiResponse<any>> {
         try {
-            console.log('[API] Validating coupon:', {
-                code: couponCode,
-                items: cartItems
-            });
+            if (DEBUG_API) {
+                console.log('[API] Validating coupon:', {
+                    code: couponCode,
+                    items: cartItems
+                });
+            }
 
             const response = await this.post(this.ENDPOINTS.VALIDATE_COUPON, {
                 code: couponCode,
                 products: cartItems
             });
 
-            console.log('[API] Coupon validation response:', response);
+            if (DEBUG_API) {
+                console.log('[API] Coupon validation response:', response);
+            }
             return response;
         } catch (error: any) {
-            console.error('[API] Coupon validation error:', error);
+            if (DEBUG_API) {
+                console.error('[API] Coupon validation error:', error);
+            }
             return {
                 data: null,
                 error: error.response?.data?.error || error.message || 'Failed to validate coupon'
@@ -1036,17 +1126,21 @@ export class Api implements ApiService {
 
     async applyCoupon(couponCode: string, cartItems: any[]): Promise<ApiResponse<any>> {
         try {
-            console.log('[API] Applying coupon:', {
-                code: couponCode,
-                items: cartItems
-            });
+            if (DEBUG_API) {
+                console.log('[API] Applying coupon:', {
+                    code: couponCode,
+                    items: cartItems
+                });
+            }
 
             const response = await this.post(this.ENDPOINTS.APPLY_COUPON, {
                 code: couponCode,
                 cart_items: cartItems
             });
 
-            console.log('[API] Coupon application response:', response);
+            if (DEBUG_API) {
+                console.log('[API] Coupon application response:', response);
+            }
 
             if (!response.data) {
                 throw new Error('No data received from server');
@@ -1059,7 +1153,9 @@ export class Api implements ApiService {
                 }
             };
         } catch (error: any) {
-            console.error('[API] Coupon application error:', error);
+            if (DEBUG_API) {
+                console.error('[API] Coupon application error:', error);
+            }
             return {
                 data: null,
                 error: error.response?.data?.error || error.message || 'Failed to apply coupon'
@@ -1069,40 +1165,87 @@ export class Api implements ApiService {
 
     async getCoupons(): Promise<ApiResponse<any[]>> {
         try {
-            console.log('[API] Fetching coupons from:', this.ENDPOINTS.GET_COUPONS);
-            const response = await this.client.get(this.ENDPOINTS.GET_COUPONS);
-            console.log('[API] Coupons response:', {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-                data: response.data,
-                dataType: typeof response.data,
-                isArray: Array.isArray(response.data)
-            });
-            
-            if (!response.data) {
-                console.log('[API] No data in coupons response');
-                return { data: [] };
+            // Cache hit within 30s
+            const now = Date.now();
+            if (this.couponsCache && now - this.couponsCache.ts < 30000) {
+                return { data: this.couponsCache.data };
+            }
+            // Deduplicate in-flight
+            if (this.couponsInFlight) {
+                return await this.couponsInFlight;
             }
 
-            // Ensure we're returning an array and transform the data if needed
-            let coupons = Array.isArray(response.data) ? response.data : 
-                         Array.isArray(response.data.data) ? response.data.data : [];
-
-            // Transform the coupons to ensure consistent data structure
-            coupons = coupons.map((coupon: any) => ({
-                id: coupon.id,
-                code: coupon.code,
-                description: coupon.description,
-                discount_type: coupon.discount_type.toLowerCase(),
-                discount_value: Number(coupon.discount_value),
-                min_purchase_amount: Number(coupon.min_purchase_amount),
-                end_date: coupon.end_date,
-                is_active: Boolean(coupon.is_active)
-            }));
-            
-            console.log('[API] Processed coupons:', coupons);
-            return { data: coupons };
+            if (DEBUG_API) {
+                console.log('[API] Fetching coupons from:', this.ENDPOINTS.GET_COUPONS);
+            }
+            this.couponsInFlight = this.client.get(this.ENDPOINTS.GET_COUPONS)
+                .then((response) => {
+                    if (DEBUG_API) {
+                        console.log('[API] Coupons response:', {
+                            status: response.status,
+                            statusText: response.statusText,
+                            headers: response.headers,
+                            dataPreview: (() => {
+                                try {
+                                    const str = JSON.stringify(response.data);
+                                    return str.length > 400 ? `${str.slice(0, 400)}… (+${str.length - 400} chars)` : str;
+                                } catch {
+                                    return '[unserializable]';
+                                }
+                            })(),
+                            dataType: typeof response.data,
+                            isArray: Array.isArray(response.data)
+                        });
+                    }
+                    
+                    if (!response.data) {
+                        if (DEBUG_API) {
+                            console.log('[API] No data in coupons response');
+                        }
+                        const res = { data: [] as any[] };
+                        this.couponsCache = { data: res.data, ts: Date.now() };
+                        return res;
+                    }
+        
+                    // Ensure we're returning an array and transform the data if needed
+                    let coupons = Array.isArray(response.data) ? response.data : 
+                                 Array.isArray(response.data.data) ? response.data.data : [];
+        
+                    // Transform the coupons to ensure consistent data structure
+                    coupons = coupons.map((coupon: any) => ({
+                        id: coupon.id,
+                        code: coupon.code,
+                        description: coupon.description,
+                        discount_type: (coupon.discount_type || '').toLowerCase(),
+                        discount_value: Number(coupon.discount_value),
+                        min_purchase_amount: Number(coupon.min_purchase_amount),
+                        end_date: coupon.end_date,
+                        is_active: Boolean(coupon.is_active)
+                    }));
+                    
+                    if (DEBUG_API) {
+                        console.log('[API] Processed coupons count:', Array.isArray(coupons) ? coupons.length : 0);
+                    }
+                    const res = { data: coupons };
+                    this.couponsCache = { data: coupons, ts: Date.now() };
+                    return res;
+                })
+                .catch((error: any) => {
+                    console.error('[API] Error fetching coupons:', {
+                        message: error.message,
+                        status: error.response?.status,
+                        data: error.response?.data,
+                        stack: error.stack
+                    });
+                    return {
+                        data: [],
+                        error: error.response?.data?.error || error.message || 'Failed to fetch coupons'
+                    } as any;
+                })
+                .finally(() => {
+                    this.couponsInFlight = null;
+                });
+            return await this.couponsInFlight;
         } catch (error: any) {
             console.error('[API] Error fetching coupons:', {
                 message: error.message,
@@ -1132,42 +1275,60 @@ export class Api implements ApiService {
 
     async getCartItems(): Promise<any[]> {
         try {
-            console.log('[API] Fetching cart items...');
+            if (DEBUG_API) {
+                console.log('[API] Fetching cart items...');
+            }
             const response = await this.get<any>(this.ENDPOINTS.CART);
             
             if (response.error) {
-                console.error('[API] Error fetching cart:', response.error);
+                if (DEBUG_API) {
+                    console.error('[API] Error fetching cart:', response.error);
+                }
                 return [];
             }
 
             const cartItems = Array.isArray(response.data) ? response.data : [];
-            console.log('[API] Cart items:', cartItems);
+            if (DEBUG_API) {
+                console.log('[API] Cart items:', cartItems);
+            }
             return cartItems;
         } catch (error) {
-            console.error('[API] Error fetching cart items:', error);
+            if (DEBUG_API) {
+                console.error('[API] Error fetching cart items:', error);
+            }
             return [];
         }
     }
 
     async getPaymentMethods(): Promise<any[]> {
         try {
-            console.log('[API] Fetching payment methods from:', this.ENDPOINTS.PAYMENT_METHODS);
+            if (DEBUG_API) {
+                console.log('[API] Fetching payment methods from:', this.ENDPOINTS.PAYMENT_METHODS);
+            }
             const response = await this.get<any[]>(this.ENDPOINTS.PAYMENT_METHODS);
             
             if (response.error) {
-                console.warn('[API] Error fetching payment methods:', response.error);
+                if (DEBUG_API) {
+                    console.warn('[API] Error fetching payment methods:', response.error);
+                }
                 throw new Error(response.error);
             }
             
             if (!response.data) {
-                console.warn('[API] No payment methods data received');
+                if (DEBUG_API) {
+                    console.warn('[API] No payment methods data received');
+                }
                 throw new Error('No payment methods available');
             }
             
-            console.log('[API] Payment methods fetched successfully:', response.data);
+            if (DEBUG_API) {
+                console.log('[API] Payment methods fetched successfully:', response.data);
+            }
             return response.data;
         } catch (error) {
-            console.error('[API] Error in getPaymentMethods:', error);
+            if (DEBUG_API) {
+                console.error('[API] Error in getPaymentMethods:', error);
+            }
             // Return default payment methods as fallback
             const defaultMethods = [
                 {
@@ -1185,7 +1346,9 @@ export class Api implements ApiService {
                     isDefault: false
                 }
             ];
-            console.log('[API] Returning default payment methods');
+            if (DEBUG_API) {
+                console.log('[API] Returning default payment methods');
+            }
             return defaultMethods;
         }
     }
@@ -1225,32 +1388,48 @@ export class Api implements ApiService {
             }
 
             // Log the order data before sending
-            console.log('[API] Creating order with payload:', JSON.stringify(orderData, null, 2));
+            if (DEBUG_API) {
+                try {
+                    console.log('[API] Creating order with payload:', JSON.stringify(orderData, null, 2));
+                } catch {
+                    console.log('[API] Creating order with payload: [unserializable]');
+                }
+            }
 
             const response = await this.post<any>(this.ENDPOINTS.ORDERS, orderData);
 
             if (response.error) {
-                console.error('[API] Order creation failed:', response.error);
+                if (DEBUG_API) {
+                    console.error('[API] Order creation failed:', response.error);
+                }
                 throw new Error(response.error);
             }
 
             if (!response.data) {
-                console.error('[API] No data received from order creation');
+                if (DEBUG_API) {
+                    console.error('[API] No data received from order creation');
+                }
                 throw new Error('Failed to create order: No response data');
             }
 
-            console.log('[API] Order created successfully:', response.data);
+            if (DEBUG_API) {
+                console.log('[API] Order created successfully:', response.data);
+            }
             return response.data;
         } catch (error) {
-            console.error('[API] Error creating order:', error);
+            if (DEBUG_API) {
+                console.error('[API] Error creating order:', error);
+            }
             throw error;
         }
     }
 
     async requestSignupOTP(email: string): Promise<ApiResponse<{ message: string }>> {
         try {
-            console.log('[API] Requesting signup OTP for:', email);
-            console.log('[API] Using base URL:', this.client.defaults.baseURL);
+            if (DEBUG_API) {
+                console.log('[API] Requesting signup OTP for:', email);
+                console.log('[API] Using base URL:', this.client.defaults.baseURL);
+            }
             
             const response = await this.client.post(
                 this.ENDPOINTS.REQUEST_SIGNUP_OTP,
@@ -1263,10 +1442,12 @@ export class Api implements ApiService {
                 }
             );
             
-            console.log('[API] OTP request response:', {
-                status: response.status,
-                data: response.data
-            });
+            if (DEBUG_API) {
+                console.log('[API] OTP request response:', {
+                    status: response.status,
+                    data: response.data
+                });
+            }
             
             return { data: response.data };
         } catch (error: any) {

@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useOrders, Order } from '../OrderContext';
+import { useOrders, Order, OrderSummary } from '../OrderContext';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
@@ -126,7 +126,7 @@ const orderData = {
 export default function OrderDetailsPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { orders, loading, fetchOrders } = useOrders();
+  const { orders: orderSummaries, loading, fetchOrders, getOrderDetails } = useOrders();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   
@@ -137,7 +137,7 @@ export default function OrderDetailsPage() {
   // Use useEffect to fetch orders if not available
   useEffect(() => {
     console.log('[OrderDetailsPage] Initial load - id:', id);
-    console.log('[OrderDetailsPage] Initial orders:', orders);
+    console.log('[OrderDetailsPage] Initial orders:', orderSummaries);
     
     const loadData = async () => {
       await fetchOrders();
@@ -161,16 +161,30 @@ export default function OrderDetailsPage() {
     ]).start();
   }, []);
 
-  // Use useMemo to prevent unnecessary recalculations
-  const order = useMemo(() => {
-    console.log('[OrderDetailsPage] Finding order with id:', id);
-    console.log('[OrderDetailsPage] Available orders:', orders);
+  const orderSummary = useMemo(() => {
+    console.log('[OrderDetailsPage] Finding order summary with id:', id);
+    console.log('[OrderDetailsPage] Available order summaries:', orderSummaries);
     console.log('[OrderDetailsPage] ID type:', typeof id);
-    
-    // Handle both string and object params
+
     const orderId = typeof id === 'object' ? id.toString() : String(id);
-    return orders.find(o => String(o.id) === orderId);
-  }, [id, orders]);
+    return orderSummaries.find(o => String(o.id) === orderId);
+  }, [id, orderSummaries]);
+
+  const order = useMemo(() => {
+    const orderId = typeof id === 'object' ? id.toString() : String(id);
+    const detail = typeof getOrderDetails === 'function' ? getOrderDetails(orderId) : undefined;
+    if (detail) {
+      return detail;
+    }
+    if (orderSummary) {
+      const { itemCount: _itemCount, ...rest } = orderSummary as OrderSummary;
+      return {
+        ...rest,
+        items: [],
+      } as Order;
+    }
+    return undefined;
+  }, [getOrderDetails, id, orderSummary]);
 
   // Add debug logging for order changes
   useEffect(() => {
@@ -178,9 +192,9 @@ export default function OrderDetailsPage() {
       console.log('[OrderDetailsPage] Order found:', order);
     } else {
       console.log('[OrderDetailsPage] Order not found for id:', id);
-      console.log('[OrderDetailsPage] Available order IDs:', orders.map(o => o.id));
+      console.log('[OrderDetailsPage] Available order IDs:', orderSummaries.map(o => o.id));
     }
-  }, [order, id]);
+  }, [order, id, orderSummaries]);
 
   // Memoized format date function
   const formatDate = useMemo(() => (dateString: string) => {

@@ -47,16 +47,17 @@
     "experiments": {
       "typedRoutes": true
     },
-    "packagerOpts": {
-      "config": "metro.config.js"
-    },
     "extra": {
       "router": {
         "origin": false
       },
       "eas": {
         "projectId": "4941458a-d243-4bad-99dd-40258896396b"
-      }
+        },
+        "EXPO_PUBLIC_API_BASE_URL": "https://ayurveda-saranga-backend.vercel.app/api",
+        "EXPO_PUBLIC_WS_URL": "wss://ayurveda-saranga-backend.vercel.app/ws",
+        "EXPO_PUBLIC_USE_LOCAL": "0",
+        "EXPO_PUBLIC_DEBUG_API": "0"
     }
   }
 }

@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useOrders, Order } from '../../OrderContext';
+import { useOrders, Order, OrderSummary } from '../../OrderContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateInvoice } from '../../components/OrderInvoice';
 
@@ -30,7 +30,7 @@ interface OrderItem {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { orders, loading, fetchOrders } = useOrders();
+  const { orders: orderSummaries, loading, fetchOrders, getOrderDetails } = useOrders();
 
   // Add initial fetch and debug logging
   useEffect(() => {
@@ -42,14 +42,14 @@ export default function OrdersPage() {
 
   // Add debug logging for orders changes
   useEffect(() => {
-    console.log('[OrdersPage] Orders updated:', orders);
-  }, [orders]);
+    console.log('[OrdersPage] Orders updated:', orderSummaries);
+  }, [orderSummaries]);
 
   const checkAuthAndOrders = async () => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       console.log('[OrdersPage] Auth token exists:', !!token);
-      console.log('[OrdersPage] Current orders:', orders);
+      console.log('[OrdersPage] Current orders:', orderSummaries);
       
       if (!token) {
         Alert.alert(
@@ -151,7 +151,7 @@ export default function OrdersPage() {
     );
   }
 
-  if (!orders || orders.length === 0) {
+  if (!orderSummaries || orderSummaries.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="bag-outline" size={64} color="#666" />
@@ -200,9 +200,16 @@ export default function OrdersPage() {
           />
         }
       >
-        {(Array.isArray(orders) ? orders : []).map((order: Order) => {
-          if (!order) return null;
-          const orderDate = formatDate(order.created_at);
+        {(Array.isArray(orderSummaries) ? orderSummaries : []).map((orderSummary: OrderSummary) => {
+          if (!orderSummary) return null;
+          const detail = typeof getOrderDetails === 'function' ? getOrderDetails(orderSummary.id) : undefined;
+          const { itemCount: _itemCount, ...summaryRest } = orderSummary;
+          const fallbackOrder: Order = {
+            ...summaryRest,
+            items: (detail && detail.items) ? detail.items : [],
+          };
+          const order = detail ?? fallbackOrder;
+          const orderDate = formatDate(orderSummary.created_at);
           return (
             <TouchableOpacity
               key={order.id || Math.random().toString()}

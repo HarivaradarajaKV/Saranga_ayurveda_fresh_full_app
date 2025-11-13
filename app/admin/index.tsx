@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,12 +7,23 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
-    Animated,
-    Dimensions,
+    SafeAreaView,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiService } from '../services/api';
+import { ErrorBoundary } from '../ErrorBoundary';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Safe import - lazy load only when needed
+function getApiService() {
+    try {
+        const apiModule = require('../services/api');
+        return apiModule.apiService || apiModule.default || null;
+    } catch (error) {
+        console.error('Failed to import apiService:', error);
+        return null;
+    }
+}
 
 interface DashboardStats {
     total_users: number;
@@ -21,30 +32,11 @@ interface DashboardStats {
     total_orders: number;
 }
 
-interface AdminCardProps {
-    title: string;
-    value: number | string;
-    icon: keyof typeof Ionicons.glyphMap;
-    onPress: () => void;
-    color?: string;
-    trend?: 'up' | 'down' | 'neutral';
-    trendValue?: string;
-}
-
-interface QuickActionProps {
-    title: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    onPress: () => void;
-    color: string;
-    description: string;
-}
-
 const ADMIN_ROUTES = {
     PROFILE: '/admin/profile' as const,
     USERS: '/admin/users' as const,
     PRODUCTS: '/admin/products' as const,
     ANALYTICS: '/admin/analytics' as const,
-    NEW_PRODUCT: '/admin/products/new' as const,
     CATEGORIES: '/admin/categories' as const,
     COUPONS: '/admin/coupons' as const,
     COMBOS: '/admin/combos' as const,
@@ -52,187 +44,233 @@ const ADMIN_ROUTES = {
     REVIEWS: '/admin/reviews' as const,
 } as const;
 
-const { width } = Dimensions.get('window');
-
-export default function AdminDashboard() {
+function AdminDashboardInner() {
     const router = useRouter();
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<DashboardStats>({
+        total_users: 0,
+        total_products: 0,
+        total_revenue: 0,
+        total_orders: 0,
+    });
     const [refreshing, setRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-    const [reviewCount, setReviewCount] = useState(0);
-    const [combosCount, setCombosCount] = useState(0);
+    const [error, setError] = useState<string | null>(null);
     
-    // Animation values
-    const fadeAnim = new Animated.Value(0);
-    const slideAnim = new Animated.Value(50);
-    const scaleAnim = new Animated.Value(0.95);
+    const mountedRef = useRef(true);
+    const fetchInProgressRef = useRef(false);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
+        // Prevent multiple simultaneous fetches
+        if (fetchInProgressRef.current || !mountedRef.current) {
+            return;
+        }
+
+        fetchInProgressRef.current = true;
+
         try {
-            const [statsResponse, reviewsResponse, combosResponse] = await Promise.all([
-                apiService.get(apiService.ENDPOINTS.ADMIN_STATS),
-                apiService.get(apiService.ENDPOINTS.ADMIN_REVIEWS).catch(() => ({ data: [] })),
-                apiService.get(apiService.ENDPOINTS.ADMIN_COMBOS_ALL).catch(() => ({ data: [] }))
-            ]);
-
-            if (statsResponse.data) {
-                setStats(statsResponse.data);
-                setLastUpdated(new Date());
+            const service = getApiService();
+            
+            if (!service || typeof service.get !== 'function') {
+                fetchInProgressRef.current = false;
+                return;
             }
 
-            const count = Array.isArray(reviewsResponse.data) ? reviewsResponse.data.length : 0;
-            setReviewCount(count);
+            const endpoints = service.ENDPOINTS || {};
+            const statsEndpoint = endpoints.ADMIN_STATS || '/admin/stats';
 
-            const combos = Array.isArray(combosResponse.data) ? combosResponse.data : [];
-            setCombosCount(combos.length);
+            // Make API call with timeout protection and error wrapping
+            let response: any = null;
+            let timeoutId: ReturnType<typeof setTimeout> | null = null;
+            
+            try {
+                const apiCall = service.get(statsEndpoint);
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    timeoutId = setTimeout(() => {
+                        reject(new Error('Request timeout'));
+                    }, 8000);
+                });
 
-            Animated.parallel([
-                Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-                Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-                Animated.spring(scaleAnim, { toValue: 1, tension: 100, friction: 8, useNativeDriver: true }),
-            ]).start();
-        } catch (error) {
-            console.error('Error fetching stats:', error);
+                response = await Promise.race([apiCall, timeoutPromise]);
+                
+                // Clear timeout if request completed
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            } catch (apiError: any) {
+                // Clear timeout on error
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                
+                // Ignore abort/timeout errors silently
+                if (apiError?.message === 'Request timeout' || apiError?.name === 'AbortError') {
+                    if (mountedRef.current) {
+                        setError('Request timed out. Please try again.');
+                    }
+                } else {
+                    console.error('API call failed:', apiError);
+                }
+                
+                fetchInProgressRef.current = false;
+                return;
+            }
+            
+            if (!mountedRef.current) {
+                fetchInProgressRef.current = false;
+                return;
+            }
+
+            // Handle response - API service returns { data: ... } or { error: ... }
+            if (response && typeof response === 'object') {
+                if (response.error) {
+                    if (mountedRef.current) {
+                        setError(response.error);
+                    }
+                } else if (response.data) {
+                    const statsData = response.data;
+                    if (mountedRef.current && typeof statsData === 'object') {
+                        setStats({
+                            total_users: Number(statsData.total_users || 0) || 0,
+                            total_products: Number(statsData.total_products || 0) || 0,
+                            total_revenue: Number(statsData.total_revenue || 0) || 0,
+                            total_orders: Number(statsData.total_orders || 0) || 0,
+                        });
+                        setError(null);
+                    }
+                }
+            }
+        } catch (err: any) {
+            if (!mountedRef.current) {
+                fetchInProgressRef.current = false;
+                return;
+            }
+            
+            console.error('Error fetching stats:', err);
+            // Don't set error - just silently fail and show zeros
         } finally {
-            setLoading(false);
+            if (mountedRef.current) {
+                fetchInProgressRef.current = false;
+            }
         }
-    };
-
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await fetchStats();
-        setRefreshing(false);
-    };
-
-    useEffect(() => {
-        fetchStats();
     }, []);
 
-    const AdminCard = ({ title, value, icon, onPress, color = "#FF69B4", trend, trendValue }: AdminCardProps) => {
-        const cardScale = new Animated.Value(1);
+    const onRefresh = useCallback(async () => {
+        if (fetchInProgressRef.current || !mountedRef.current) {
+            if (mountedRef.current) {
+                setRefreshing(false);
+            }
+            return;
+        }
         
-        const handlePressIn = () => {
-            Animated.spring(cardScale, {
-                toValue: 0.95,
-                useNativeDriver: true,
-            }).start();
-        };
+        if (mountedRef.current) {
+            setRefreshing(true);
+            setError(null);
+        }
         
-        const handlePressOut = () => {
-            Animated.spring(cardScale, {
-                toValue: 1,
-                useNativeDriver: true,
-            }).start();
-        };
+        try {
+            await fetchStats();
+        } catch (err) {
+            console.error('Refresh error:', err);
+        } finally {
+            if (mountedRef.current) {
+                setRefreshing(false);
+            }
+        }
+    }, [fetchStats]);
 
-        const getTrendIcon = () => {
-            switch (trend) {
-                case 'up': return 'trending-up';
-                case 'down': return 'trending-down';
-                default: return 'remove';
+    useEffect(() => {
+        mountedRef.current = true;
+        let authTimer: ReturnType<typeof setTimeout> | null = null;
+        let statsTimer: ReturnType<typeof setTimeout> | null = null;
+        let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+        
+        // Auth check - non-blocking, delayed
+        authTimer = setTimeout(async () => {
+            if (!mountedRef.current) return;
+            try {
+                const role = await AsyncStorage.getItem('user_role');
+                const token = await AsyncStorage.getItem('auth_token');
+                
+                if (!token || role !== 'admin') {
+                    if (mountedRef.current) {
+                        try {
+                            router.replace('/auth/login');
+                        } catch (e) {
+                            console.error('Navigation error:', e);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Auth check error:', err);
+            }
+        }, 1500);
+        
+        // Fetch stats in background - delayed to ensure component is fully mounted
+        statsTimer = setTimeout(() => {
+            if (mountedRef.current && !fetchInProgressRef.current) {
+                fetchStats().catch((err) => {
+                    console.error('Fetch stats error in useEffect:', err);
+                });
+            }
+        }, 2000);
+
+        return () => {
+            mountedRef.current = false;
+            fetchInProgressRef.current = false;
+            
+            // Clear all timers
+            if (authTimer) {
+                clearTimeout(authTimer);
+                authTimer = null;
+            }
+            if (statsTimer) {
+                clearTimeout(statsTimer);
+                statsTimer = null;
+            }
+            if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+                timeoutTimer = null;
             }
         };
+    }, [fetchStats, router]);
 
-        const getTrendColor = () => {
-            switch (trend) {
-                case 'up': return '#4CAF50';
-                case 'down': return '#F44336';
-                default: return '#666';
-            }
-        };
+    const safeNavigate = useCallback((route: string) => {
+        if (!mountedRef.current) return;
+        try {
+            router.push(route as any);
+        } catch (err) {
+            console.error('Navigation error:', err);
+        }
+    }, [router]);
 
+    const AdminCard = ({ title, value, icon, onPress, color = "#FF69B4" }: {
+        title: string;
+        value: number | string;
+        icon: keyof typeof Ionicons.glyphMap;
+        onPress: () => void;
+        color?: string;
+    }) => {
         return (
-            <Animated.View style={{ transform: [{ scale: cardScale }] }}>
-                <TouchableOpacity 
-                    style={[styles.card, { borderLeftColor: color }]} 
-                    onPress={onPress}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    activeOpacity={0.8}
-                >
-                    <View style={styles.cardHeader}>
-                        <View style={[styles.cardIcon, { backgroundColor: color + '20' }]}>
-                            <Ionicons name={icon} size={24} color={color} />
-                        </View>
-                        {trend && trendValue && (
-                            <View style={styles.trendContainer}>
-                                <Ionicons 
-                                    name={getTrendIcon()} 
-                                    size={16} 
-                                    color={getTrendColor()} 
-                                />
-                                <Text style={[styles.trendText, { color: getTrendColor() }]}>
-                                    {trendValue}
-                                </Text>
-                            </View>
-                        )}
+            <TouchableOpacity 
+                style={[styles.card, { borderLeftColor: color }]} 
+                onPress={onPress}
+                activeOpacity={0.8}
+            >
+                <View style={styles.cardHeader}>
+                    <View style={[styles.cardIcon, { backgroundColor: color + '20' }]}>
+                        <Ionicons name={icon} size={24} color={color} />
                     </View>
-                    <Text style={styles.cardTitle}>{title}</Text>
-                    <Text style={[styles.cardValue, { color: color }]}>{value}</Text>
-                </TouchableOpacity>
-            </Animated.View>
+                </View>
+                <Text style={styles.cardTitle}>{title}</Text>
+                <Text style={[styles.cardValue, { color: color }]}>{value}</Text>
+            </TouchableOpacity>
         );
     };
 
-    const handleAddProduct = () => {
-        router.push('/admin/add-product');
-    };
-
-    const handleManageProducts = () => {
-        router.push('/admin/products');
-    };
-
-    const handleManageCategories = () => {
-        router.push('/admin/categories');
-    };
-
-    const QuickAction = ({ title, icon, onPress, color, description }: QuickActionProps) => {
-        const actionScale = new Animated.Value(1);
-        
-        const handlePressIn = () => {
-            Animated.spring(actionScale, {
-                toValue: 0.95,
-                useNativeDriver: true,
-            }).start();
-        };
-        
-        const handlePressOut = () => {
-            Animated.spring(actionScale, {
-                toValue: 1,
-                useNativeDriver: true,
-            }).start();
-        };
-
-        return (
-            <Animated.View style={{ transform: [{ scale: actionScale }] }}>
-                <TouchableOpacity
-                    style={[styles.quickActionCard, { backgroundColor: color }]}
-                    onPress={onPress}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    activeOpacity={0.8}
-                >
-                    <View style={styles.quickActionIcon}>
-                        <Ionicons name={icon} size={28} color="#fff" />
-                    </View>
-                    <Text style={styles.quickActionTitle}>{title}</Text>
-                    <Text style={styles.quickActionDescription}>{description}</Text>
-                </TouchableOpacity>
-            </Animated.View>
-        );
-    };
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF69B4" />
-            </View>
-        );
-    }
-
+    // Always show UI immediately - never block on API calls
     return (
-        <>
+        <SafeAreaView style={styles.safeArea}>
             <Stack.Screen
                 options={{
                     title: 'Admin Dashboard',
@@ -246,14 +284,7 @@ export default function AdminDashboard() {
                                 <Ionicons name="refresh" size={20} color="#FF69B4" />
                             </TouchableOpacity>
                             <TouchableOpacity
-                                onPress={() => router.push(ADMIN_ROUTES.REVIEWS)}
-                                style={styles.refreshButton}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name="chatbubbles-outline" size={22} color="#FF69B4" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => router.push(ADMIN_ROUTES.PROFILE)}
+                                onPress={() => safeNavigate(ADMIN_ROUTES.PROFILE)}
                                 style={styles.profileButton}
                                 activeOpacity={0.7}
                             >
@@ -270,255 +301,164 @@ export default function AdminDashboard() {
                 }
                 showsVerticalScrollIndicator={false}
             >
-                <Animated.View 
-                    style={[
-                        styles.header,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }]
-                        }
-                    ]}
-                >
-                    <View style={styles.headerContent}>
-                        <Text style={styles.headerTitle}>Dashboard Overview</Text>
-                        <Text style={styles.headerSubtitle}>Welcome to your Saranga Ayurveda admin panel</Text>
-                        <Text style={styles.lastUpdated}>
-                            Last updated: {lastUpdated.toLocaleTimeString()}
-                        </Text>
+                {error && (
+                    <View style={styles.errorBanner}>
+                        <Text style={styles.errorText}>{error}</Text>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setError(null);
+                                fetchStats();
+                            }}
+                            style={styles.retryButtonSmall}
+                        >
+                            <Text style={styles.retryButtonText}>Retry</Text>
+                        </TouchableOpacity>
                     </View>
-                    <View style={styles.headerStats}>
-                        <View style={styles.statBadge}>
-                            <Ionicons name="pulse" size={16} color="#4CAF50" />
-                            <Text style={styles.statBadgeText}>Live</Text>
-                        </View>
-                    </View>
-                </Animated.View>
+                )}
 
-                <Animated.View 
-                    style={[
-                        styles.statsSection,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }]
-                        }
-                    ]}
-                >
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Dashboard Overview</Text>
+                    <Text style={styles.headerSubtitle}>Welcome to your Saranga Ayurveda admin panel</Text>
+                </View>
+
+                <View style={styles.statsSection}>
                     <Text style={styles.sectionTitle}>Key Metrics</Text>
                     <View style={styles.grid}>
                         <AdminCard
                             title="Total Users"
-                            value={stats?.total_users || 0}
+                            value={stats.total_users}
                             icon="people"
                             color="#4CAF50"
-                            trend="up"
-                            trendValue="+12%"
-                            onPress={() => router.push(ADMIN_ROUTES.USERS)}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.USERS)}
                         />
                         <AdminCard
                             title="Products"
-                            value={stats?.total_products || 0}
+                            value={stats.total_products}
                             icon="cube"
                             color="#2196F3"
-                            trend="up"
-                            trendValue="+5%"
-                            onPress={() => router.push(ADMIN_ROUTES.PRODUCTS)}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.PRODUCTS)}
                         />
                         <AdminCard
                             title="Orders"
-                            value={stats?.total_orders || 0}
+                            value={stats.total_orders}
                             icon="receipt"
                             color="#FF9800"
-                            trend="up"
-                            trendValue="+8%"
-                            onPress={() => router.push(ADMIN_ROUTES.ORDERS)}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.ORDERS)}
                         />
                         <AdminCard
                             title="Revenue"
-                            value={`₹${stats?.total_revenue || 0}`}
+                            value={`₹${stats.total_revenue}`}
                             icon="cash"
                             color="#9C27B0"
-                            trend="up"
-                            trendValue="+15%"
-                            onPress={() => router.push(ADMIN_ROUTES.ANALYTICS)}
-                        />
-                        <AdminCard
-                            title="Combos"
-                            value={combosCount}
-                            icon="cube"
-                            color="#8BC34A"
-                            onPress={() => router.push(ADMIN_ROUTES.COMBOS)}
-                        />
-                        <AdminCard
-                            title="Reviews"
-                            value={reviewCount}
-                            icon="chatbubbles-outline"
-                            color="#b0761b"
-                            onPress={() => router.push(ADMIN_ROUTES.REVIEWS)}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.ANALYTICS)}
                         />
                     </View>
-                </Animated.View>
+                </View>
 
-                <Animated.View 
-                    style={[
-                        styles.quickActionsSection,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }]
-                        }
-                    ]}
-                >
+                <View style={styles.quickActionsSection}>
                     <Text style={styles.sectionTitle}>Quick Actions</Text>
                     <View style={styles.quickActionsGrid}>
-                        <QuickAction
-                            title="View Products"
-                            icon="cube"
-                            color="#2196F3"
-                            description="See your product catalog"
-                            onPress={handleManageProducts}
-                        />
-                        <QuickAction
-                            title="Add Product"
-                            icon="add-circle"
-                            color="#FF69B4"
-                            description="Create new product"
-                            onPress={handleAddProduct}
-                        />
-                        <QuickAction
-                            title="Categories"
-                            icon="list"
-                            color="#333"
-                            description="Group products"
-                            onPress={handleManageCategories}
-                        />
-                        <QuickAction
-                            title="Orders"
-                            icon="cart"
-                            color="#333"
-                            description="View order history"
-                            onPress={() => router.push(ADMIN_ROUTES.ORDERS)}
-                        />
-                        <QuickAction
-                            title="Users"
-                            icon="people"
-                            color="#333"
-                            description="View all platform users"
-                            onPress={() => router.push(ADMIN_ROUTES.USERS)}
-                        />
-                        <QuickAction
-                            title="Coupons"
-                            icon="pricetag"
-                            color="#333"
-                            description="All coupon codes"
-                            onPress={() => router.push(ADMIN_ROUTES.COUPONS)}
-                        />
-                        <QuickAction
-                            title="Combos"
-                            icon="cube"
-                            color="#333"
-                            description="Manage combo offers"
-                            onPress={() => router.push(ADMIN_ROUTES.COMBOS)}
-                        />
-                        <QuickAction
-                            title="Reviews"
-                            icon="chatbubbles-outline"
-                            color="#b0761b"
-                            description="Manage reviews"
-                            onPress={() => router.push(ADMIN_ROUTES.REVIEWS)}
-                        />
-                        <QuickAction
-                            title="Support"
-                            icon="help-circle"
-                            color="#694d21"
-                            description="Reach support team"
-                            onPress={() => {}} // You may update navigation here
-                        />
+                        <TouchableOpacity
+                            style={[styles.quickActionCard, { backgroundColor: '#2196F3' }]}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.PRODUCTS)}
+                        >
+                            <Ionicons name="cube" size={28} color="#fff" />
+                            <Text style={styles.quickActionTitle}>Products</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.quickActionCard, { backgroundColor: '#FF69B4' }]}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.CATEGORIES)}
+                        >
+                            <Ionicons name="list" size={28} color="#fff" />
+                            <Text style={styles.quickActionTitle}>Categories</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.quickActionCard, { backgroundColor: '#FF9800' }]}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.ORDERS)}
+                        >
+                            <Ionicons name="cart" size={28} color="#fff" />
+                            <Text style={styles.quickActionTitle}>Orders</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.quickActionCard, { backgroundColor: '#4CAF50' }]}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.USERS)}
+                        >
+                            <Ionicons name="people" size={28} color="#fff" />
+                            <Text style={styles.quickActionTitle}>Users</Text>
+                        </TouchableOpacity>
                     </View>
-                </Animated.View>
-
-                <Animated.View 
-                    style={[
-                        styles.recentActivitySection,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }]
-                        }
-                    ]}
-                >
-                    <Text style={styles.sectionTitle}>Recent Activity</Text>
-                    <View style={styles.activityCard}>
-                        <View style={styles.activityItem}>
-                            <View style={styles.activityIcon}>
-                                <Ionicons name="add" size={16} color="#4CAF50" />
-                            </View>
-                            <View style={styles.activityContent}>
-                                <Text style={styles.activityTitle}>New product added</Text>
-                                <Text style={styles.activityTime}>2 minutes ago</Text>
-                            </View>
-                        </View>
-                        <View style={styles.activityItem}>
-                            <View style={styles.activityIcon}>
-                                <Ionicons name="person-add" size={16} color="#2196F3" />
-                            </View>
-                            <View style={styles.activityContent}>
-                                <Text style={styles.activityTitle}>New user registered</Text>
-                                <Text style={styles.activityTime}>5 minutes ago</Text>
-                            </View>
-                        </View>
-                        <View style={styles.activityItem}>
-                            <View style={styles.activityIcon}>
-                                <Ionicons name="receipt" size={16} color="#FF9800" />
-                            </View>
-                            <View style={styles.activityContent}>
-                                <Text style={styles.activityTitle}>Order completed</Text>
-                                <Text style={styles.activityTime}>10 minutes ago</Text>
-                            </View>
-                        </View>
-                    </View>
-                </Animated.View>
+                </View>
             </ScrollView>
-        </>
+        </SafeAreaView>
+    );
+}
+
+export default function AdminDashboard() {
+    return (
+        <ErrorBoundary>
+            <AdminDashboardInner />
+        </ErrorBoundary>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
     container: {
         flex: 1,
         backgroundColor: '#f8f9fa',
     },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
+    errorBanner: {
+        backgroundColor: '#ffebee',
+        padding: 12,
+        margin: 16,
+        borderRadius: 8,
+        flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f8f9fa',
+        justifyContent: 'space-between',
+    },
+    errorText: {
+        color: '#c62828',
+        fontSize: 14,
+        flex: 1,
+    },
+    retryButtonSmall: {
+        backgroundColor: '#FF69B4',
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 6,
+        marginLeft: 12,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: 'bold',
     },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
         marginRight: 15,
     },
     refreshButton: {
         padding: 8,
         borderRadius: 20,
         backgroundColor: '#f0f0f0',
+        marginLeft: 8,
     },
     profileButton: {
         padding: 8,
         borderRadius: 20,
         backgroundColor: '#f0f0f0',
+        marginLeft: 8,
     },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         padding: 20,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
         marginBottom: 16,
-    },
-    headerContent: {
-        flex: 1,
     },
     headerTitle: {
         fontSize: 24,
@@ -529,28 +469,6 @@ const styles = StyleSheet.create({
     headerSubtitle: {
         fontSize: 14,
         color: '#666',
-        marginBottom: 4,
-    },
-    lastUpdated: {
-        fontSize: 12,
-        color: '#999',
-    },
-    headerStats: {
-        alignItems: 'flex-end',
-    },
-    statBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#e8f5e8',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
-    },
-    statBadgeText: {
-        fontSize: 12,
-        color: '#4CAF50',
-        fontWeight: '500',
     },
     statsSection: {
         paddingHorizontal: 16,
@@ -566,14 +484,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        gap: 12,
     },
     card: {
-        width: (width - 44) / 2,
+        width: '48%',
         backgroundColor: '#fff',
         borderRadius: 16,
         padding: 16,
         borderLeftWidth: 4,
+        marginBottom: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
@@ -593,15 +511,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    trendContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    trendText: {
-        fontSize: 12,
-        fontWeight: '500',
-    },
     cardTitle: {
         fontSize: 14,
         color: '#666',
@@ -620,90 +529,25 @@ const styles = StyleSheet.create({
     quickActionsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        alignItems: 'stretch',
-        justifyContent: 'center',
-        gap: 14,
-        paddingHorizontal: 10,
-        marginTop: 8,
+        justifyContent: 'space-between',
     },
     quickActionCard: {
-        flexBasis: '45%', // 4 in a row on small screens
-        maxWidth: '45%',
-        marginBottom: 16,
-        minHeight: 110,
-        backgroundColor: '#fff',
-        borderRadius: 18,
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    quickActionIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
+        width: '48%',
+        padding: 20,
+        borderRadius: 16,
         alignItems: 'center',
         marginBottom: 12,
-    },
-    quickActionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#363636',
-        marginBottom: 4,
-        textAlign: 'center',
-    },
-    quickActionDescription: {
-        fontSize: 12,
-        color: '#666',
-        textAlign: 'center',
-    },
-    recentActivitySection: {
-        paddingHorizontal: 16,
-        marginBottom: 24,
-    },
-    activityCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
     },
-    activityItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+    quickActionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginTop: 12,
+        textAlign: 'center',
     },
-    activityIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#f8f9fa',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    activityContent: {
-        flex: 1,
-    },
-    activityTitle: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#1a1a1a',
-        marginBottom: 2,
-    },
-    activityTime: {
-        fontSize: 12,
-        color: '#666',
-    },
-}); 
+});

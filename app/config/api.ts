@@ -14,6 +14,10 @@ import {
     Address 
 } from '../types/api';
 
+// Debug gating to avoid log storms in development
+const DEBUG_API = __DEV__ && String((Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_DEBUG_API || (process.env as any)?.EXPO_PUBLIC_DEBUG_API || '').trim() === '1';
+const ENABLE_WS = String((Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_ENABLE_WS || (process.env as any)?.EXPO_PUBLIC_ENABLE_WS || '').trim() === '1';
+
 // Define types for image handling
 interface ImageData {
     uri: string;
@@ -23,7 +27,7 @@ interface ImageData {
 
 // WebSocket connection and handlers
 let ws: WebSocket | null = null;
-let reconnectTimeout: NodeJS.Timeout | null = null;
+let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 const wsSubscribers = new Set<(data: any) => void>();
 
 // Initialize WebSocket connection
@@ -35,14 +39,14 @@ const initWebSocket = async (userId: string | null) => {
         const wsUrl = DEV_CONFIG.getWsUrl();
         
         if (ws?.readyState === WebSocket.OPEN) {
-            console.log('[WebSocket] Already connected');
+            if (DEBUG_API) console.log('[WebSocket] Already connected');
             return;
         }
 
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-            console.log('[WebSocket] Connected');
+            if (DEBUG_API) console.log('[WebSocket] Connected');
             // Authenticate the WebSocket connection
             if (userId) {
                 ws?.send(JSON.stringify({
@@ -65,26 +69,26 @@ const initWebSocket = async (userId: string | null) => {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log('[WebSocket] Received message:', data);
+                if (DEBUG_API) console.log('[WebSocket] Received message:', data);
                 // Notify all subscribers
                 wsSubscribers.forEach(callback => callback(data));
             } catch (error) {
-                console.error('[WebSocket] Message parse error:', error);
+                if (DEBUG_API) console.error('[WebSocket] Message parse error:', error);
             }
         };
 
         ws.onclose = () => {
-            console.log('[WebSocket] Disconnected');
+            if (DEBUG_API) console.log('[WebSocket] Disconnected');
             // Attempt to reconnect after 5 seconds
             if (reconnectTimeout) clearTimeout(reconnectTimeout);
             reconnectTimeout = setTimeout(() => initWebSocket(userId), 5000);
         };
 
         ws.onerror = (error) => {
-            console.error('[WebSocket] Error:', error);
+            if (DEBUG_API) console.error('[WebSocket] Error:', error);
         };
     } catch (error) {
-        console.error('[WebSocket] Setup error:', error);
+        if (DEBUG_API) console.error('[WebSocket] Setup error:', error);
     }
 };
 
@@ -109,11 +113,11 @@ const sendUpdate = (userId: string, action: string, payload: any) => {
 // Get the local IP address from Expo Constants
 const getLocalIpAddress = () => {
   try {
-    console.log('[API Config] Getting local IP address');
+    if (DEBUG_API) console.log('[API Config] Getting local IP address');
     
     // For web platform
     if (Platform.OS === 'web') {
-      console.log('[API Config] Using localhost for web platform');
+      if (DEBUG_API) console.log('[API Config] Using localhost for web platform');
       return 'localhost';
     }
     
@@ -122,40 +126,59 @@ const getLocalIpAddress = () => {
       // Try to get IP from Expo manifest
       if (Constants.manifest2?.extra?.expoGo?.debuggerHost) {
         const ip = Constants.manifest2.extra.expoGo.debuggerHost.split(':')[0];
-        console.log('[API Config] Using Expo debuggerHost IP:', ip);
+        if (DEBUG_API) console.log('[API Config] Using Expo debuggerHost IP:', ip);
         return ip;
       }
 
       // Try to get IP from hostUri
       if (Constants.manifest2?.hostUri) {
         const ip = Constants.manifest2.hostUri.split(':')[0];
-        console.log('[API Config] Using Expo hostUri IP:', ip);
+        if (DEBUG_API) console.log('[API Config] Using Expo hostUri IP:', ip);
         return ip;
       }
     }
     
     // Final fallback to localhost
-    console.log('[API Config] Using localhost as fallback');
+    if (DEBUG_API) console.log('[API Config] Using localhost as fallback');
     return 'localhost';
     
   } catch (error) {
-    console.error('[API Config] Error getting IP address:', error);
+    if (DEBUG_API) console.error('[API Config] Error getting IP address:', error);
     return 'localhost';
   }
 };
 
-// Get base URL using the dev config
+// Get base URL using local mode when enabled, with dynamic LAN IP
 export const getBaseUrl = () => {
-    const apiUrl = DEV_CONFIG.getApiUrl();
-    console.log('[API Config] Using API URL:', apiUrl);
-    return apiUrl;
+    try {
+        // @ts-ignore - Expo injects public env at build/runtime
+        const useLocalEnv = (process.env.EXPO_PUBLIC_USE_LOCAL as string | undefined)
+            || (Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_USE_LOCAL
+            || (Constants.manifest?.extra as any)?.EXPO_PUBLIC_USE_LOCAL;
+
+        // If EXPO_PUBLIC_USE_LOCAL === '1', prefer dynamic local IP
+        if (String(useLocalEnv).trim() === '1') {
+            const ip = getLocalIpAddress();
+            const url = `http://${ip}:5001/api`;
+            if (DEBUG_API) console.log('[API Config] Local mode enabled. Using dynamic local API URL:', url);
+            return url;
+        }
+
+        // Fallback to DEV_CONFIG (which itself defaults to LOCAL in dev)
+        const apiUrl = DEV_CONFIG.getApiUrl();
+        if (DEBUG_API) console.log('[API Config] Using API URL from DEV_CONFIG:', apiUrl);
+        return apiUrl;
+    } catch (error) {
+        if (DEBUG_API) console.error('[API Config] Failed to resolve base URL, falling back to DEV_CONFIG:', error);
+        return DEV_CONFIG.getApiUrl();
+    }
 };
 
 // Test if the API is reachable
 export const testApiReachable = async () => {
     try {
         const url = getBaseUrl();
-        console.log('[API Config] Testing connection to:', url);
+        if (DEBUG_API) console.log('[API Config] Testing connection to:', url);
         
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased timeout to 10 seconds
@@ -171,21 +194,23 @@ export const testApiReachable = async () => {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-            console.error('[API Config] API health check failed:', response.status, response.statusText);
+            if (DEBUG_API) console.error('[API Config] API health check failed:', response.status, response.statusText);
             return false;
         }
         
-        console.log('[API Config] API is reachable at:', url);
+        if (DEBUG_API) console.log('[API Config] API is reachable at:', url);
         return true;
     } catch (error) {
-        console.error('[API Config] API is not reachable:', error);
-        console.log('[API Config] Make sure your local backend is running on 192.168.31.143:5001');
+        if (DEBUG_API) {
+            console.error('[API Config] API is not reachable:', error);
+            console.log('[API Config] Make sure your local backend is running and reachable from the device.');
+        }
         return false;
     }
 };
 
 const DEV_API_URL = getBaseUrl();
-console.log('[API Config] API Base URL:', DEV_API_URL);
+if (DEBUG_API) console.log('[API Config] API Base URL:', DEV_API_URL);
 
 export const API_BASE_URL = getBaseUrl();
 
@@ -255,7 +280,6 @@ export const API_CONFIG = {
       ADMIN_USERS: '/admin/users',
       ADMIN_CATEGORIES: '/admin/categories',
       ADMIN_CATEGORY: (id: number) => `/admin/categories/${id}`,
-      ADMIN_REVIEW: (id: number) => `/admin/reviews/${id}`,
       
       // Address endpoints
       ADDRESSES: '/addresses',
@@ -313,17 +337,31 @@ export const checkNetworkConnection = async (retries = 3, delay = 1000) => {
 
             clearTimeout(timeoutId);
             if (response.ok) {
-                console.log('[API] Network connection successful');
+                if (DEBUG_API) console.log('[API] Network connection successful');
                 return true;
             }
         } catch (error) {
-            console.error(`[API] Network check attempt ${i + 1} failed:`, error);
+            if (DEBUG_API) console.error(`[API] Network check attempt ${i + 1} failed:`, error);
             if (i < retries - 1) {
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
     }
     return false;
+};
+
+// Cache network checks to avoid running them on every request
+let lastNetworkCheckTimestamp = 0;
+let lastNetworkCheckResult = true;
+const NETWORK_CHECK_TTL_MS = 10000; // 10 seconds
+const checkNetworkConnectionCached = async (): Promise<boolean> => {
+    const now = Date.now();
+    if (now - lastNetworkCheckTimestamp < NETWORK_CHECK_TTL_MS) {
+        return lastNetworkCheckResult;
+    }
+    lastNetworkCheckResult = await checkNetworkConnection(2, 800);
+    lastNetworkCheckTimestamp = now;
+    return lastNetworkCheckResult;
 };
 
 export class Api implements ApiService {
@@ -349,56 +387,86 @@ export class Api implements ApiService {
         this.client.interceptors.request.use(
             async (config) => {
                 try {
-                    // Check network connection
-                    const isConnected = await checkNetworkConnection();
+                    // Check network connection (cached) to reduce overhead
+                    const isConnected = await checkNetworkConnectionCached();
                     if (!isConnected) {
                         throw new Error('Cannot connect to server. Please check your network connection.');
                     }
 
-                    // Log request details
-                    console.log('[API] Request:', {
-                        method: config.method,
-                        url: config.url,
-                        baseURL: config.baseURL
-                    });
+                    // Lightweight request log (avoid large payloads)
+                    if (DEBUG_API) {
+                        console.log('[API] Request:', {
+                            method: config.method,
+                            url: config.url,
+                            baseURL: config.baseURL
+                        });
+                    }
 
                     return config;
                 } catch (error) {
-                    console.error('[API] Request preparation failed:', error);
+                    if (DEBUG_API) {
+                        console.error('[API] Request preparation failed:', error);
+                    }
                     return Promise.reject(error);
                 }
             },
             (error) => {
-                console.error('[API] Request Error:', error);
+                if (DEBUG_API) {
+                    console.error('[API] Request Error:', error);
+                }
                 return Promise.reject(error);
             }
         );
 
-        // Add response interceptor for debugging
+        // Add response interceptor for debugging (avoid logging large payloads)
         this.client.interceptors.response.use(
             (response) => {
-                console.log('[API] Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    data: response.data,
-                    headers: response.headers
-                });
+                if (DEBUG_API) {
+                    const dataPreview = (() => {
+                        try {
+                            const str = typeof response.data === 'string'
+                                ? response.data
+                                : JSON.stringify(response.data);
+                            return str.length > 200 ? `${str.slice(0, 200)}… (+${str.length - 200} chars)` : str;
+                        } catch {
+                            return '[unserializable]';
+                        }
+                    })();
+                    console.log('[API] Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        // Preview only to prevent memory spikes
+                        dataPreview,
+                        // Do not log headers entirely; they can be large
+                    });
+                }
                 return response;
             },
             (error) => {
-                console.error('[API] Response Error:', {
-                    message: error.message,
-                    code: error.code,
-                    response: error.response?.data,
-                    status: error.response?.status,
-                    headers: error.response?.headers,
-                    config: {
-                        url: error.config?.url,
-                        method: error.config?.method,
-                        baseURL: error.config?.baseURL,
-                        headers: error.config?.headers
+                if (DEBUG_API) {
+                    let responsePreview = '[no response]';
+                    try {
+                        if (error.response?.data) {
+                            const str = typeof error.response.data === 'string'
+                                ? error.response.data
+                                : JSON.stringify(error.response.data);
+                            responsePreview = str.length > 200 ? `${str.slice(0, 200)}… (+${str.length - 200} chars)` : str;
+                        }
+                    } catch {
+                        responsePreview = '[unserializable]';
                     }
-                });
+                    console.error('[API] Response Error:', {
+                        message: error.message,
+                        code: error.code,
+                        status: error.response?.status,
+                        responsePreview,
+                        config: {
+                            url: error.config?.url,
+                            method: error.config?.method,
+                            baseURL: error.config?.baseURL,
+                        }
+                    });
+                }
                 return Promise.reject(error);
             }
         );
@@ -406,8 +474,10 @@ export class Api implements ApiService {
         // Initialize user ID from storage
         this.initializeUserId();
 
-        // Subscribe to WebSocket updates
-        subscribeToUpdates(this.handleWebSocketUpdate);
+        // Subscribe to WebSocket updates (opt-in only)
+        if (ENABLE_WS) {
+            subscribeToUpdates(this.handleWebSocketUpdate);
+        }
     }
 
     private async initializeUserId() {
@@ -417,8 +487,10 @@ export class Api implements ApiService {
                 const user = JSON.parse(userData);
                 if (user && user.id) {
                     this.userId = user.id;
-                    // Initialize WebSocket connection
-                    await initWebSocket(this.userId);
+                    // Initialize WebSocket connection only when enabled
+                    if (ENABLE_WS) {
+                        await initWebSocket(this.userId);
+                    }
                 }
             }
         } catch (error) {
@@ -849,17 +921,11 @@ export class Api implements ApiService {
             } else {
                 fullUrl = `${baseUrl}/uploads/${imageUrl}`;
             }
-            
-            console.log('Image URL constructed:', {
-                original: imageUrl,
-                baseUrl: baseUrl,
-                fullUrl: fullUrl
-            });
-            
+
             // Return the constructed URL - let the Image component handle loading errors
             return fullUrl;
         } catch (error) {
-            console.error('Error processing image URL:', error);
+            if (DEBUG_API) console.error('Error processing image URL:', error);
             return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
         }
     }

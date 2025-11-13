@@ -3,13 +3,16 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
+    FlatList,
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
     Alert,
+    SafeAreaView,
+    Platform,
 } from 'react-native';
 import { Stack } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
 import { UserDetailsModal } from './components/UserDetailsModal';
@@ -44,6 +47,31 @@ export default function AdminUsers() {
     const [refreshing, setRefreshing] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [visibleCount, setVisibleCount] = useState<number>(24);
+    const isMountedRef = React.useRef(true);
+    const visibleUsers = React.useMemo(() => users.slice(0, visibleCount), [users, visibleCount]);
+    const loadMore = React.useCallback(() => setVisibleCount((prev) => prev + 18), []);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            // Ensure modal is closed on unmount
+            try {
+                setModalVisible(false);
+            } catch {}
+        };
+    }, []);
+
+    // Also close modal quickly on blur to prevent stacking UI/memory
+    useFocusEffect(
+        React.useCallback(() => {
+            return () => {
+                try { setModalVisible(false); } catch {}
+                try { setSelectedUser(null); } catch {}
+            };
+        }, [])
+    );
 
     const fetchUsers = async () => {
         try {
@@ -129,14 +157,18 @@ export default function AdminUsers() {
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF69B4" />
-            </View>
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FF69B4" />
+                </View>
+            </SafeAreaView>
         );
     }
 
+    
+
     return (
-        <>
+        <SafeAreaView style={styles.safeArea}>
             <Stack.Screen 
                 options={{
                     title: 'Users',
@@ -147,15 +179,13 @@ export default function AdminUsers() {
                     ),
                 }}
             />
-            <ScrollView 
+            <FlatList
                 style={styles.container}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-            >
-                {users.map((user) => (
+                contentContainerStyle={styles.scrollContent}
+                data={visibleUsers}
+                keyExtractor={(u) => String(u.id)}
+                renderItem={({ item: user }) => (
                     <TouchableOpacity 
-                        key={user.id} 
                         style={styles.userCard}
                         onPress={() => handleUserPress(user)}
                         activeOpacity={0.7}
@@ -229,30 +259,52 @@ export default function AdminUsers() {
                             )}
                         </View>
                     </TouchableOpacity>
-                ))}
-            </ScrollView>
+                )}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                showsVerticalScrollIndicator={true}
+                removeClippedSubviews
+                initialNumToRender={12}
+                maxToRenderPerBatch={12}
+                windowSize={7}
+                updateCellsBatchingPeriod={50}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 24 }}>No users found</Text>}
+            />
 
             <UserDetailsModal
                 user={selectedUser}
                 visible={modalVisible}
                 onClose={handleCloseModal}
             />
-        </>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+    },
+    scrollContent: {
+        paddingBottom: Platform.OS === 'ios' ? 100 : 120, // Extra padding to ensure content is accessible above navigation buttons
+        flexGrow: 1,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#f5f5f5',
     },
     headerButton: {
-        marginRight: 15,
+        marginRight: Platform.OS === 'ios' ? 15 : 12,
+        padding: 4,
     },
     userCard: {
         backgroundColor: '#fff',
@@ -328,12 +380,14 @@ const styles = StyleSheet.create({
     actionButtons: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        gap: 8,
+        flexWrap: 'wrap',
     },
     actionButton: {
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
+        marginLeft: 8,
+        marginTop: 4,
     },
     actionButtonText: {
         color: '#fff',

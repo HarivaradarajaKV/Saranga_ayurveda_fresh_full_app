@@ -13,11 +13,11 @@ import {
   Keyboard,
   Animated,
   StatusBar,
-  SafeAreaView,
   FlatList,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ProductCard from './components/ProductCard';
 import { apiService } from './services/api';
 import { useWishlist } from './WishlistContext';
@@ -27,9 +27,38 @@ import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = Platform.OS === 'ios' ? 120 : 100;
-const ITEM_WIDTH = (width - 48) / 2;
+// Calculate responsive card width accounting for padding and margins
+// Grid padding: 12px on each side, 6px margin between cards
+const GRID_PADDING = 12;
+const CARD_SPACING = 6; // Space between cards
+const ITEM_WIDTH = (width - (GRID_PADDING * 2) - CARD_SPACING) / 2;
 
 const AnimatedScrollView = Animated.createAnimatedComponent(Animated.ScrollView);
+
+const mergeProducts = (
+  existing: Product[],
+  incoming: Product[],
+  shouldAppend: boolean
+) => {
+  if (shouldAppend) {
+    const productsById = new Map<number, Product>();
+    existing.forEach(product => {
+      productsById.set(product.id, product);
+    });
+    incoming.forEach(product => {
+      productsById.set(product.id, product);
+    });
+    return Array.from(productsById.values());
+  }
+
+  const uniqueProducts = new Map<number, Product>();
+  incoming.forEach(product => {
+    if (!uniqueProducts.has(product.id)) {
+      uniqueProducts.set(product.id, product);
+    }
+  });
+  return Array.from(uniqueProducts.values());
+};
 
 interface Product {
   id: number;
@@ -65,6 +94,26 @@ export default function AllProductsPage() {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { addItem } = useCart();
   const scrollY = useRef(new Animated.Value(0)).current;
+  
+  // Get responsive dimensions
+  const [screenData, setScreenData] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenData(window);
+    });
+    return () => {
+      if (subscription && typeof subscription.remove === 'function') {
+        subscription.remove();
+      }
+    };
+  }, []);
+  
+  // Calculate responsive card width
+  const currentWidth = screenData.width;
+  const responsiveGridPadding = currentWidth < 360 ? 8 : GRID_PADDING;
+  const responsiveCardSpacing = currentWidth < 360 ? 4 : CARD_SPACING;
+  const responsiveItemWidth = (currentWidth - (responsiveGridPadding * 2) - responsiveCardSpacing) / 2;
 
   useEffect(() => {
     checkAuth();
@@ -149,11 +198,9 @@ export default function AllProductsPage() {
         // Update hasMore based on whether we received less items than requested
         setHasMore(productsData.length === 20);
         
-        if (shouldAppend) {
-          setProducts(prev => [...prev, ...productsData]);
-        } else {
-          setProducts(productsData);
-        }
+        setProducts(prev =>
+          mergeProducts(prev, productsData, shouldAppend)
+        );
       } else {
         if (!shouldAppend) {
           setProducts([]);
@@ -191,7 +238,7 @@ export default function AllProductsPage() {
   const renderHeader = () => null;
 
   const renderItem = ({ item }: { item: Product }) => (
-    <View style={styles.productCardContainer}>
+    <View style={[styles.productCardContainer, { width: responsiveItemWidth }]}>
       <TouchableOpacity
         onPress={() => handleProductPress(item)}
         style={styles.productTouchable}
@@ -223,8 +270,8 @@ export default function AllProductsPage() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor="#694d21" translucent={false} />
       <Stack.Screen 
         options={{
           title: title as string || 'All Products',
@@ -232,6 +279,7 @@ export default function AllProductsPage() {
           headerStyle: { backgroundColor: '#694d21' }, // match app theme
           headerTitleStyle: { color: '#fff', fontWeight: 'bold', fontSize: 19 },
           headerTintColor: '#fff', // makes back arrow white for contrast
+          statusBarTranslucent: false,
         }}
       />
       {products.length === 0 && !loading ? (
@@ -245,7 +293,11 @@ export default function AllProductsPage() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           numColumns={2}
-          contentContainerStyle={styles.productGrid}
+          contentContainerStyle={[
+            styles.productGrid,
+            { paddingHorizontal: responsiveGridPadding }
+          ]}
+          columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={false}
           initialNumToRender={6}
@@ -323,12 +375,14 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   productGrid: {
-    padding: 8,
+    paddingVertical: 8,
+    paddingBottom: 16,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
   },
   productCardContainer: {
-    flex: 1,
-    margin: 8,
-    maxWidth: '50%',
+    marginBottom: 12,
     backgroundColor: colors.card,
     borderRadius: 16,
     shadowColor: colors.shadow,

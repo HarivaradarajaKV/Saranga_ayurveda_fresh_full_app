@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,52 +11,122 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { Buffer } from 'buffer';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
+  const isMountedRef = React.useRef(true);
 
-  useEffect(() => {
-    checkAdminAuth();
-  }, []);
-
-  const checkAdminAuth = async () => {
+  const checkAdminAuth = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       const role = await AsyncStorage.getItem('user_role');
       const token = await AsyncStorage.getItem('auth_token');
       
       if (!token || role !== 'admin') {
-        Alert.alert('Unauthorized', 'You need to be an admin to access this page');
-        router.replace('/auth/login');
+        if (isMountedRef.current) {
+          // Use setTimeout to prevent navigation during render
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              Alert.alert('Unauthorized', 'You need to be an admin to access this page');
+              try {
+                router.replace('/auth/login');
+              } catch (navError) {
+                console.error('Navigation error:', navError);
+              }
+            }
+          }, 100);
+        }
         return;
       }
 
-      // Get user name from token
-      if (token) {
-        const tokenData = JSON.parse(atob(token.split('.')[1]));
-        setUserName(tokenData.name || 'Admin');
+      // Get user name from token - using safe Base64 decode (no atob in RN)
+      if (token && isMountedRef.current) {
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payloadPart = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const jsonString = Buffer.from(payloadPart, 'base64').toString('utf8');
+            const tokenData = JSON.parse(jsonString);
+            if (isMountedRef.current) {
+              setUserName(tokenData?.name || 'Admin');
+            }
+          } else if (isMountedRef.current) {
+            setUserName('Admin');
+          }
+        } catch (parseError) {
+          console.error('Error parsing token:', parseError);
+          if (isMountedRef.current) setUserName('Admin');
+        }
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      router.replace('/auth/login');
+      if (isMountedRef.current) {
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            try {
+              router.replace('/auth/login');
+            } catch (navError) {
+              console.error('Navigation error in catch:', navError);
+            }
+          }
+        }, 100);
+      }
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    // Delay auth check to prevent navigation during initial render
+    // Layout already handles auth, so this is just for user name
+    const timer = setTimeout(() => {
+      checkAdminAuth().catch((error) => {
+        console.error('Auth check initialization error:', error);
+      });
+    }, 300);
+    
+    return () => {
+      clearTimeout(timer);
+      isMountedRef.current = false;
+    };
+  }, [checkAdminAuth]);
 
   const handleLogout = async () => {
+    if (!isMountedRef.current) return;
     try {
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_role');
-      router.replace('/auth/login');
+      if (isMountedRef.current) {
+        try {
+          router.replace('/auth/login');
+        } catch (navError) {
+          console.error('Navigation error during logout:', navError);
+        }
+      }
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   const navigateTo = (route: '/admin/products' | '/admin/categories' | '/admin/orders' | '/admin/users' | '/admin/coupons' | '/admin/combos' | '/admin/settings' | '/admin/add-product') => {
-    if (route === '/admin/add-product') {
-      router.push({ pathname: '/admin/products', params: { showAddForm: 'true' } });
-    } else {
-      router.push(route);
+    if (!isMountedRef.current) return;
+    try {
+      if (!router || typeof router.push !== 'function') {
+        console.error('Router not available');
+        return;
+      }
+      if (route === '/admin/add-product') {
+        router.push({ pathname: '/admin/products', params: { showAddForm: 'true' } });
+      } else {
+        router.push(route);
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'Failed to navigate. Please try again.');
+      }
     }
   };
 
@@ -141,7 +211,15 @@ export default function AdminDashboard() {
 
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => router.push('/admin/reviews')}
+              onPress={() => {
+                try {
+                  if (router && typeof router.push === 'function') {
+                    router.push('/admin/reviews');
+                  }
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }}
             >
               <Ionicons name="chatbubbles-outline" size={32} color="#1a1a1a" />
               <Text style={styles.menuText}>Reviews</Text>

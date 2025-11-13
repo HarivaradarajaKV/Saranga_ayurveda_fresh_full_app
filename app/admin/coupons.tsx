@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,18 @@ import {
   Switch,
   Modal,
   Platform,
+  FlatList,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { apiService } from '../services/api';
+import { ErrorBoundary } from '../ErrorBoundary';
+import { useFocusEffect } from '@react-navigation/native';
+
+const CACHE_TTL = 15000; // Reduced to 15 seconds to free memory faster
+let couponsCache: { data: Coupon[]; ts: number } | null = null;
+const PAGE_SIZE = 5; // Reduced from 12 to minimize initial memory footprint
 
 interface Coupon {
   id: number;
@@ -47,7 +54,7 @@ interface CouponFormData {
   product_ids: number[];
 }
 
-export default function CouponsPage() {
+function CouponsPageInner() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -65,27 +72,128 @@ export default function CouponsPage() {
     usage_limit: null,
     product_ids: [],
   });
+  const mountedRef = React.useRef(true);
+  const fetchInProgressRef = React.useRef(false);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
-    fetchCoupons();
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      fetchInProgressRef.current = false;
+      
+      // Cancel all pending API requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      
+      // Aggressive cleanup: clear all state to free memory
+      try {
+        setCoupons([]);
+        setVisibleCount(PAGE_SIZE);
+        setShowAddModal(false);
+        setLoading(false);
+      } catch {}
+    };
   }, []);
 
-  const fetchCoupons = async () => {
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!mountedRef.current) return;
+      const now = Date.now();
+
+      if (couponsCache && now - couponsCache.ts < CACHE_TTL) {
+        setCoupons(couponsCache.data);
+        setVisibleCount(Math.min(PAGE_SIZE, couponsCache.data.length || PAGE_SIZE));
+        setLoading(false);
+      } else {
+        fetchCoupons();
+      }
+
+      return () => {
+        if (!mountedRef.current) return;
+        setCoupons([]);
+        setVisibleCount(PAGE_SIZE);
+        setShowAddModal(false);
+        setLoading(false);
+      };
+    }, [fetchCoupons])
+  );
+
+  const fetchCoupons = React.useCallback(async (force = false) => {
+    if (!mountedRef.current) return;
+    const now = Date.now();
+    if (!force && couponsCache && now - couponsCache.ts < CACHE_TTL) {
+      if (mountedRef.current) {
+        setCoupons(couponsCache.data);
+        setVisibleCount(Math.min(PAGE_SIZE, couponsCache.data.length || PAGE_SIZE));
+        setLoading(false);
+      }
+      return;
+    }
+    if (fetchInProgressRef.current) return;
+    
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
+    fetchInProgressRef.current = true;
     try {
-      setLoading(true);
-      const response = await apiService.getCoupons();
-      if (response.error) {
+      if (mountedRef.current) setLoading(true);
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 30000)
+      );
+      
+      const response = await Promise.race([
+        apiService.getCoupons(),
+        timeoutPromise
+      ]) as any;
+      
+      if (!mountedRef.current || abortControllerRef.current?.signal.aborted) return;
+      
+      if (response && response.error) {
         throw new Error(response.error);
       }
-      setCoupons(response.data || []);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch coupons');
+      
+      if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        const couponsData = Array.isArray(response?.data) ? response.data : [];
+        couponsCache = { data: couponsData, ts: Date.now() };
+        setCoupons(couponsData);
+        setVisibleCount(Math.min(PAGE_SIZE, couponsData.length || PAGE_SIZE));
+      }
+    } catch (error: any) {
+      if (error?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        return; // Request was cancelled, ignore
+      }
+      console.error('Error fetching coupons:', error);
+      if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        const errorMessage = error?.message || 'Failed to fetch coupons';
+        if (!errorMessage.includes('timeout')) {
+          try {
+            Alert.alert('Error', errorMessage);
+          } catch (alertError) {
+            console.error('Error showing alert:', alertError);
+          }
+        }
+        couponsCache = null;
+        setCoupons([]);
+        setVisibleCount(PAGE_SIZE);
+      }
     } finally {
-      setLoading(false);
+      fetchInProgressRef.current = false;
+      if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   const handleAddCoupon = async () => {
+    if (!mountedRef.current) return;
     try {
       if (!validateForm()) return;
 
@@ -99,27 +207,40 @@ export default function CouponsPage() {
         throw new Error(response.error);
       }
 
-      Alert.alert('Success', 'Coupon created successfully');
-      setShowAddModal(false);
-      resetForm();
-      fetchCoupons();
+      if (mountedRef.current) {
+        Alert.alert('Success', 'Coupon created successfully');
+        setShowAddModal(false);
+        resetForm();
+        couponsCache = null;
+        fetchCoupons(true);
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to create coupon');
+      console.error('Error creating coupon:', error);
+      if (mountedRef.current) {
+        Alert.alert('Error', 'Failed to create coupon');
+      }
     }
   };
 
-  const handleDeleteCoupon = async (id: number) => {
+  const handleDeleteCoupon = React.useCallback(async (id: number) => {
+    if (!mountedRef.current) return;
     try {
       const response = await apiService.deleteCoupon(id);
       if (response.error) {
         throw new Error(response.error);
       }
-      Alert.alert('Success', 'Coupon deleted successfully');
-      fetchCoupons();
+      if (mountedRef.current) {
+        Alert.alert('Success', 'Coupon deleted successfully');
+        couponsCache = null;
+        fetchCoupons(true);
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete coupon');
+      console.error('Error deleting coupon:', error);
+      if (mountedRef.current) {
+        Alert.alert('Error', 'Failed to delete coupon');
+      }
     }
-  };
+  }, [fetchCoupons]);
 
   const validateForm = () => {
     if (!formData.code) {
@@ -152,53 +273,92 @@ export default function CouponsPage() {
     });
   };
 
-  const renderCouponCard = (coupon: Coupon) => (
-    <View key={coupon.id} style={styles.couponCard}>
-      <View style={styles.couponHeader}>
-        <Text style={styles.couponCode}>{coupon.code}</Text>
-        <TouchableOpacity
-          onPress={() => {
-            Alert.alert(
-              'Delete Coupon',
-              'Are you sure you want to delete this coupon?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', onPress: () => handleDeleteCoupon(coupon.id), style: 'destructive' },
-              ]
-            );
-          }}
-        >
-          <Ionicons name="trash-outline" size={24} color="#ff4444" />
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.couponDescription}>{coupon.description}</Text>
-      <View style={styles.couponDetails}>
-        <Text style={styles.detailText}>
-          Discount: {coupon.discount_value}
-          {coupon.discount_type === 'percentage' ? '%' : ' ₹'}
-        </Text>
-        <Text style={styles.detailText}>
-          Min Purchase: ₹{coupon.min_purchase_amount}
-        </Text>
-        {coupon.max_discount_amount && (
+  const renderCouponCard = React.useCallback((coupon: Coupon) => {
+    if (!coupon || !coupon.id) return null;
+    
+    const safeEndDate = coupon.end_date ? new Date(coupon.end_date) : new Date();
+    const isValidDate = !isNaN(safeEndDate.getTime());
+    
+    return (
+      <View style={styles.couponCard}>
+        <View style={styles.couponHeader}>
+          <Text style={styles.couponCode}>{coupon.code || 'N/A'}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (mountedRef.current) {
+                Alert.alert(
+                  'Delete Coupon',
+                  'Are you sure you want to delete this coupon?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', onPress: () => handleDeleteCoupon(coupon.id), style: 'destructive' },
+                  ]
+                );
+              }
+            }}
+          >
+            <Ionicons name="trash-outline" size={24} color="#ff4444" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.couponDescription}>{coupon.description || 'No description'}</Text>
+        <View style={styles.couponDetails}>
           <Text style={styles.detailText}>
-            Max Discount: ₹{coupon.max_discount_amount}
+            Discount: {Number(coupon.discount_value || 0)}
+            {coupon.discount_type === 'percentage' ? '%' : ' ₹'}
           </Text>
-        )}
+          <Text style={styles.detailText}>
+            Min Purchase: ₹{Number(coupon.min_purchase_amount || 0).toFixed(2)}
+          </Text>
+          {coupon.max_discount_amount && (
+            <Text style={styles.detailText}>
+              Max Discount: ₹{Number(coupon.max_discount_amount).toFixed(2)}
+            </Text>
+          )}
+        </View>
+        <View style={styles.couponFooter}>
+          <Text style={styles.validityText}>
+            Valid till: {isValidDate ? safeEndDate.toLocaleDateString() : 'N/A'}
+          </Text>
+          <Text style={[
+            styles.statusText,
+            { color: coupon.is_active ? '#28a745' : '#dc3545' }
+          ]}>
+            {coupon.is_active ? 'Active' : 'Inactive'}
+          </Text>
+        </View>
       </View>
-      <View style={styles.couponFooter}>
-        <Text style={styles.validityText}>
-          Valid till: {new Date(coupon.end_date).toLocaleDateString()}
-        </Text>
-        <Text style={[
-          styles.statusText,
-          { color: coupon.is_active ? '#28a745' : '#dc3545' }
-        ]}>
-          {coupon.is_active ? 'Active' : 'Inactive'}
-        </Text>
-      </View>
-    </View>
+    );
+  }, [handleDeleteCoupon]);
+
+  const visibleCoupons = React.useMemo(() => {
+    if (!Array.isArray(coupons)) return [];
+    return coupons.slice(0, visibleCount);
+  }, [coupons, visibleCount]);
+
+  const hasMoreCoupons = React.useMemo(() => {
+    if (!Array.isArray(coupons)) return false;
+    return visibleCount < coupons.length;
+  }, [coupons, visibleCount]);
+
+  const loadMoreCoupons = React.useCallback(() => {
+    if (!Array.isArray(coupons)) return;
+    if (visibleCount >= coupons.length) return;
+    setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, coupons.length));
+  }, [coupons, visibleCount]);
+
+  const renderCouponItem = React.useCallback(
+    ({ item }: { item: Coupon }) => renderCouponCard(item),
+    [renderCouponCard]
   );
+
+  const listFooterComponent = React.useMemo(() => {
+    if (!hasMoreCoupons) return null;
+    return (
+      <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreCoupons}>
+        <Text style={styles.loadMoreText}>Load more</Text>
+      </TouchableOpacity>
+    );
+  }, [hasMoreCoupons, loadMoreCoupons]);
 
   return (
     <>
@@ -220,9 +380,27 @@ export default function CouponsPage() {
         {loading ? (
           <ActivityIndicator size="large" color="#0066CC" />
         ) : (
-          <ScrollView style={styles.couponList}>
-            {coupons.map(renderCouponCard)}
-          </ScrollView>
+          <FlatList
+            data={visibleCoupons}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderCouponItem}
+            style={styles.couponList}
+            contentContainerStyle={styles.couponListContent}
+            showsVerticalScrollIndicator
+            onEndReached={loadMoreCoupons}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={listFooterComponent}
+            ListEmptyComponent={
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: '#666', fontSize: 16 }}>No coupons found</Text>
+              </View>
+            }
+            initialNumToRender={2}
+            maxToRenderPerBatch={2}
+            windowSize={2}
+            removeClippedSubviews={false}
+            updateCellsBatchingPeriod={200}
+          />
         )}
 
         <Modal
@@ -364,12 +542,14 @@ export default function CouponsPage() {
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
-                      setShowDatePicker(Platform.OS === 'ios');
-                      if (selectedDate) {
-                        setFormData({
-                          ...formData,
-                          [datePickerMode === 'start' ? 'start_date' : 'end_date']: selectedDate,
-                        });
+                      if (mountedRef.current) {
+                        setShowDatePicker(Platform.OS === 'ios');
+                        if (selectedDate && mountedRef.current) {
+                          setFormData({
+                            ...formData,
+                            [datePickerMode === 'start' ? 'start_date' : 'end_date']: selectedDate,
+                          });
+                        }
                       }
                     }}
                   />
@@ -413,6 +593,25 @@ export default function CouponsPage() {
   );
 }
 
+export default function CouponsPage() {
+  try {
+    return (
+      <ErrorBoundary>
+        <CouponsPageInner />
+      </ErrorBoundary>
+    );
+  } catch (error) {
+    console.error('Fatal error in CouponsPage:', error);
+    return (
+      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ color: '#ff4444', fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+          An error occurred. Please restart the app.
+        </Text>
+      </View>
+    );
+  }
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -435,6 +634,9 @@ const styles = StyleSheet.create({
   },
   couponList: {
     flex: 1,
+  },
+  couponListContent: {
+    paddingBottom: 24,
   },
   couponCard: {
     backgroundColor: '#fff',
@@ -482,6 +684,18 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  loadMoreButton: {
+    alignSelf: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: '#007AFF',
+  },
+  loadMoreText: {
+    color: '#fff',
     fontWeight: '600',
   },
   modalContainer: {

@@ -13,11 +13,26 @@ export default function AuthLayout() {
     const checkExistingAuth = async () => {
         try {
             const token = await AsyncStorage.getItem('auth_token');
+            const userRole = await AsyncStorage.getItem('user_role');
+            
             if (token) {
-                // Check if user is admin
-                const decodedToken = JSON.parse(atob(token.split('.')[1]));
-                if (decodedToken.role === 'admin') {
-                    router.replace('/admin');
+                // Use stored role if available, otherwise decode from token
+                let role = userRole;
+                if (!role) {
+                    try {
+                        const decodedToken = JSON.parse(atob(token.split('.')[1]));
+                        role = decodedToken.role;
+                        // Store role for future use
+                        if (role) {
+                            await AsyncStorage.setItem('user_role', role);
+                        }
+                    } catch (decodeError) {
+                        console.error('Error decoding token:', decodeError);
+                    }
+                }
+                
+                if (role === 'admin') {
+                    router.replace('/admin/dashboard');
                 } else {
                     router.replace('/(tabs)');
                 }

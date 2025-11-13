@@ -77,14 +77,19 @@ interface RawOrderData {
   payment_method_display?: string;
 }
 
+export type OrderSummary = Omit<Order, 'items'> & {
+  itemCount: number;
+};
+
 interface OrderContextType {
-  orders: Order[];
+  orders: OrderSummary[];
   loading: boolean;
   createOrder: (orderData: Partial<Order>) => Promise<Order>;
   fetchOrders: () => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   getOrderById: (id: string) => Order | undefined;
   deleteOrder: (orderId: string) => Promise<void>;
+  getOrderDetails: (id: string) => Order | undefined;
 }
 
 const OrderContext = createContext<OrderContextType>({
@@ -95,6 +100,7 @@ const OrderContext = createContext<OrderContextType>({
   updateOrderStatus: async () => { throw new Error('Not implemented') },
   getOrderById: () => undefined,
   deleteOrder: async () => { throw new Error('Not implemented') },
+  getOrderDetails: () => undefined,
 });
 
 const ORDERS_CACHE_KEY = 'orders_cache';
@@ -111,13 +117,53 @@ const statusMapping: Record<OrderStatus, string> = {
 };
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
+  const mountedRef = React.useRef(true);
+  const fetchInProgressRef = React.useRef(false);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const orderDetailsRef = React.useRef<Map<string, Order>>(new Map());
+
+  const summarizeOrder = React.useCallback((order: Order): OrderSummary => {
+    const { items, ...rest } = order;
+    return {
+      ...rest,
+      itemCount: Array.isArray(items) ? items.length : 0,
+    };
+  }, []);
+
+  const setOrdersState = React.useCallback((ordersData: Order[]) => {
+    const detailsMap = new Map<string, Order>();
+    ordersData.forEach(order => {
+      detailsMap.set(order.id, order);
+    });
+    orderDetailsRef.current = detailsMap;
+    if (mountedRef.current) {
+      setOrders(ordersData.map(summarizeOrder));
+    }
+  }, [summarizeOrder]);
+
+  const clearOrdersState = React.useCallback(() => {
+    orderDetailsRef.current.clear();
+    if (mountedRef.current) {
+      setOrders([]);
+    }
+  }, []);
 
   // Load cached orders on mount
   useEffect(() => {
+    mountedRef.current = true;
     loadCachedOrders();
+    return () => {
+      mountedRef.current = false;
+      // Cancel any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      fetchInProgressRef.current = false;
+    };
   }, []);
 
   const loadCachedOrders = async () => {
@@ -126,8 +172,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (cachedData) {
         const { orders: cachedOrders, timestamp } = JSON.parse(cachedData);
         if (Date.now() - timestamp < CACHE_EXPIRY) {
-          setOrders(cachedOrders);
-          setLastFetch(timestamp);
+          if (mountedRef.current) {
+            const limitedOrders = Array.isArray(cachedOrders) ? cachedOrders as Order[] : [];
+            setOrdersState(limitedOrders);
+            setLastFetch(timestamp);
+          }
           return true;
         }
       }
@@ -151,8 +200,29 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const fetchOrders = async () => {
+    // Prevent multiple simultaneous fetches
+    if (fetchInProgressRef.current) {
+      console.log('[OrderContext] Fetch already in progress, skipping...');
+      return;
+    }
+
+    // Return cached orders if they're still valid (within 30 seconds)
+    const now = Date.now();
+    if (now - lastFetch < 30000 && orders.length > 0 && mountedRef.current) {
+      console.log('[OrderContext] Using cached orders');
+      return;
+    }
+
+    fetchInProgressRef.current = true;
+
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     try {
-      setLoading(true);
+      if (mountedRef.current) setLoading(true);
       
       // Get auth data
       const [token, userRole] = await Promise.all([
@@ -176,13 +246,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (!response.data) {
         console.warn('[OrderContext] No orders data received');
-        setOrders([]);
+        if (mountedRef.current) clearOrdersState();
         return;
       }
 
-      console.log('[OrderContext] Orders data received:', response.data);
+      // Avoid huge console logs that can cause memory spikes on large payloads
+      // Process ALL orders - no limit to ensure all orders from database are loaded
+      const ordersToProcess = Array.isArray(response.data) ? response.data : [];
 
-      const processedOrders = response.data.map((order: RawOrderData) => {
+      const processedOrders = ordersToProcess.map((order: RawOrderData) => {
         // Extract shipping address from flattened fields
         const sanitize = (v: any) => {
           if (v === null || v === undefined) return '';
@@ -227,23 +299,37 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
       });
 
-      setOrders(processedOrders);
-      await saveOrdersToCache(processedOrders);
-    } catch (error) {
+      if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        setOrdersState(processedOrders);
+        setLastFetch(Date.now());
+        await saveOrdersToCache(processedOrders);
+      }
+    } catch (error: any) {
+      // Don't log or alert if request was aborted
+      if (error?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        console.log('[OrderContext] Request was cancelled');
+        return;
+      }
       console.error('Error fetching orders:', error);
-      Alert.alert('Error', 'Failed to fetch orders');
+      try {
+        if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
+          Alert.alert('Error', 'Failed to fetch orders');
+        }
+      } catch {}
     } finally {
-      setLoading(false);
+      fetchInProgressRef.current = false;
+      if (mountedRef.current) setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
-  const getOrderById = (id: string): Order | undefined => {
-    return orders.find(order => order.id === id);
-  };
+  const getOrderById = React.useCallback((id: string): Order | undefined => {
+    return orderDetailsRef.current.get(id);
+  }, []);
 
   const createOrder = async (orderData: Partial<Order>): Promise<Order> => {
     try {
-      setLoading(true);
+      if (mountedRef.current) setLoading(true);
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) {
         throw new Error('Authentication required');
@@ -251,10 +337,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const response = await apiService.post('/orders', orderData);
       if (response.data && response.data.order) {
-        const newOrder = response.data.order;
-        const updatedOrders = [...orders, newOrder];
-        setOrders(updatedOrders);
-        await saveOrdersToCache(updatedOrders);
+        const newOrder = response.data.order as Order;
+        orderDetailsRef.current.set(newOrder.id, newOrder);
+        if (mountedRef.current) {
+          setOrders(prev => [...prev, summarizeOrder(newOrder)]);
+          await saveOrdersToCache(Array.from(orderDetailsRef.current.values()));
+        }
         return newOrder;
       }
       throw new Error('Failed to create order');
@@ -262,13 +350,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error creating order:', error);
       throw error;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
   const deleteOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      if (mountedRef.current) setLoading(true);
       const token = await AsyncStorage.getItem('auth_token');
       const isAdmin = await AsyncStorage.getItem('is_admin') === 'true';
       
@@ -280,14 +368,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const response = await apiService.delete(endpoint);
       
       if (response.data && response.data.success) {
-        const updatedOrders = orders.filter(order => order.id !== orderId);
-        setOrders(updatedOrders);
-        await saveOrdersToCache(updatedOrders);
+        orderDetailsRef.current.delete(orderId);
+        if (mountedRef.current) {
+          setOrders(prev => prev.filter(order => order.id !== orderId));
+          await saveOrdersToCache(Array.from(orderDetailsRef.current.values()));
+        }
         
         // Send notification to user about order deletion
         if (isAdmin) {
           await apiService.post('/notifications', {
-            user_id: orders.find(o => o.id === orderId)?.user_id,
+            user_id: orderDetailsRef.current.get(orderId)?.user_id,
             title: 'Order Cancelled',
             message: `Your order #${orderId} has been cancelled by the administrator.`,
             type: 'ORDER_DELETED'
@@ -298,7 +388,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error deleting order:', error);
       throw error;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -307,25 +397,40 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const response = await apiService.updateOrderStatus(orderId, status);
 
       if (response.error) {
-        Alert.alert('Error', response.error);
+        try {
+          if (mountedRef.current) Alert.alert('Error', response.error);
+        } catch {}
         return;
       }
 
       // Update the local orders state
-      setOrders(prevOrders =>
-        prevOrders.map(order =>
-          order.id === orderId ? { ...order, status } : order
-        )
-      );
+      if (mountedRef.current) {
+        setOrders(prevOrders =>
+          prevOrders.map(order =>
+            order.id === orderId ? { ...order, status } : order
+          )
+        );
+        const existing = orderDetailsRef.current.get(orderId);
+        if (existing) {
+          orderDetailsRef.current.set(orderId, { ...existing, status });
+        }
+        await saveOrdersToCache(Array.from(orderDetailsRef.current.values()));
+      }
 
       // Show success message
-      Alert.alert('Success', 'Order status updated successfully');
+      try {
+        if (mountedRef.current) Alert.alert('Success', 'Order status updated successfully');
+      } catch {}
     } catch (error) {
       console.error('[OrderContext] Error updating order status:', error);
-      Alert.alert(
-        'Error',
-        'Unable to update order status. Please try again later.'
-      );
+      try {
+        if (mountedRef.current) {
+          Alert.alert(
+            'Error',
+            'Unable to update order status. Please try again later.'
+          );
+        }
+      } catch {}
     }
   };
 
@@ -388,6 +493,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updateOrderStatus,
     getOrderById,
     deleteOrder,
+    getOrderDetails: (id: string) => orderDetailsRef.current.get(id),
   };
 
   return (

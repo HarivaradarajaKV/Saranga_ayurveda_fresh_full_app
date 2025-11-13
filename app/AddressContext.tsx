@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { apiService } from './services/api';
@@ -35,28 +35,28 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
+  const hasInitializedRef = useRef(false);
+  const fetchInProgressRef = useRef(false);
 
-  // Load cached addresses and check auth status on mount
+  // Load cached addresses and check auth status on mount - ONLY ONCE
   useEffect(() => {
+    // Prevent multiple initializations
+    if (hasInitializedRef.current) {
+      return;
+    }
+
     const initAddresses = async () => {
+      hasInitializedRef.current = true;
       const cached = await loadCachedAddresses();
       if (!cached) {
         await checkAuthAndFetchAddresses();
       }
     };
+    
     initAddresses();
-
-    // Watch for auth token changes
-    const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (token && addresses.length === 0) {
-        console.log('[AddressContext] Auth token found, fetching addresses...');
-        await fetchAddresses();
-      }
-    };
-
-    const authCheckInterval = setInterval(checkAuth, 2000); // Check every 2 seconds
-    return () => clearInterval(authCheckInterval);
+    
+    // NO setInterval - we only fetch once on mount
+    // If addresses need to be refreshed, components should call fetchAddresses() explicitly
   }, []);
 
   const loadCachedAddresses = async () => {
@@ -105,11 +105,19 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const fetchAddresses = async () => {
+    // Prevent multiple simultaneous fetches
+    if (fetchInProgressRef.current) {
+      console.log('[AddressContext] Fetch already in progress, skipping...');
+      return;
+    }
+
     // Return cached addresses if they're still valid
     if (Date.now() - lastFetch < CACHE_EXPIRY && addresses.length > 0) {
       console.log('[AddressContext] Using cached addresses');
       return;
     }
+
+    fetchInProgressRef.current = true;
 
     try {
       setLoading(true);
@@ -125,12 +133,15 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         console.log('[AddressContext] No addresses found');
         setAddresses([]);
+        setLastFetch(Date.now()); // Update lastFetch even for empty results to prevent repeated calls
       }
     } catch (error) {
       console.error('[AddressContext] Error fetching addresses:', error);
       setAddresses([]);
+      setLastFetch(Date.now()); // Update lastFetch on error to prevent repeated calls
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
   };
 

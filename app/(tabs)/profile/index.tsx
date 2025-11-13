@@ -158,6 +158,7 @@ export default function ProfilePage() {
         throw new Error(response.error);
       }
       await AsyncStorage.removeItem('auth_token');
+      await AsyncStorage.removeItem('user_role');
       setIsLoggedIn(false);
       router.replace('/auth/login');
     } catch (error) {

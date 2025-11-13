@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     ScrollView,
+    FlatList,
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
@@ -13,8 +14,10 @@ import {
     Modal,
     Dimensions,
     Platform,
+    SafeAreaView,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../services/api';
@@ -63,13 +66,100 @@ interface NewProductForm {
     offer_percentage: number;
 }
 
-export default function AdminProducts({ initialShowAddForm = false }: AdminProductsProps) {
+// App theme colors
+const themeColors = {
+    primary: '#FF69B4',
+    primaryDark: '#e55a9e',
+    secondary: '#694d21',
+    background: '#f8f9fa',
+    card: '#fff',
+    text: '#1a1a1a',
+    textSecondary: '#666',
+    textTertiary: '#999',
+    border: '#e0e0e0',
+    success: '#27ae60',
+    error: '#e74c3c',
+    shadow: 'rgba(0, 0, 0, 0.1)',
+};
+
+// Inner component with all logic
+function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) {
     const router = useRouter();
     const params = useLocalSearchParams();
+    
+    // Track if component is mounted to prevent state updates after unmount
+    const isMountedRef = React.useRef(true);
+    
+    // Track all timers for proper cleanup
+    const timersRef = React.useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+    const animationFramesRef = React.useRef<Set<number>>(new Set());
+    
     const { categories, mainCategories, subCategories, loading: categoriesLoading } = useCategories();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    
+    // Get window width safely with error handling
+    const [windowWidth, setWindowWidth] = useState(() => {
+        try {
+            return Dimensions.get('window').width;
+        } catch (error) {
+            console.error('Error getting window width:', error);
+            return 375; // Default mobile width
+        }
+    });
+    
+    // Safe setTimeout wrapper that tracks timers
+    const safeSetTimeout = React.useCallback((callback: () => void, delay: number) => {
+        const timerId = setTimeout(() => {
+            timersRef.current.delete(timerId);
+            if (isMountedRef.current) {
+                callback();
+            }
+        }, delay);
+        timersRef.current.add(timerId);
+        return timerId;
+    }, []);
+    
+    // Safe requestAnimationFrame wrapper that tracks frames
+    const safeRequestAnimationFrame = React.useCallback((callback: () => void) => {
+        const frameId = requestAnimationFrame(() => {
+            animationFramesRef.current.delete(frameId);
+            if (isMountedRef.current) {
+                callback();
+            }
+        });
+        animationFramesRef.current.add(frameId);
+        return frameId;
+    }, []);
+    
+    // Update window width on dimension change
+    useEffect(() => {
+        if (!isMountedRef.current) return;
+        
+        try {
+            const subscription = Dimensions.addEventListener('change', ({ window }) => {
+                if (isMountedRef.current && window?.width) {
+                    setWindowWidth(window.width);
+                }
+            });
+            return () => {
+                if (subscription?.remove) {
+                    subscription.remove();
+                }
+            };
+        } catch (error) {
+            console.error('Error setting up dimensions listener:', error);
+        }
+    }, []);
+    
+    const isMobile = windowWidth < 768;
+    const fetchAbortControllerRef = React.useRef<AbortController | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    
+    // Limit initial render to prevent memory crashes (Expo Go limitation)
+    const INITIAL_RENDER_LIMIT = 24;
+    const [displayLimit, setDisplayLimit] = useState(INITIAL_RENDER_LIMIT);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null);
     const [showAddForm, setShowAddForm] = useState(initialShowAddForm || params.showAddForm === 'true');
@@ -101,17 +191,46 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
     const [selectedProductForDetails, setSelectedProductForDetails] = useState<Product | null>(null);
     const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
-    const fetchProducts = async () => {
+    const fetchProducts = React.useCallback(async () => {
+        if (!isMountedRef.current) return;
+        
+        // Cancel any previous fetch
+        if (fetchAbortControllerRef.current) {
+            fetchAbortControllerRef.current.abort();
+        }
+        
+        // Create new abort controller for this fetch
+        fetchAbortControllerRef.current = new AbortController();
+        
         try {
-            setLoading(true);
+            if (isMountedRef.current) {
+                // Use safe setTimeout to defer state update to prevent render blocking
+                safeSetTimeout(() => {
+                    if (isMountedRef.current) {
+                        try {
+                            setLoading(true);
+                        } catch (e) {
+                            console.error('Error setting loading state:', e);
+                        }
+                    }
+                }, 0);
+            }
+            
             const response = await apiService.get(apiService.ENDPOINTS.ADMIN_PRODUCTS);
+            
+            // Check if component is still mounted and request wasn't aborted
+            if (!isMountedRef.current || fetchAbortControllerRef.current?.signal.aborted) {
+                return;
+            }
             
             if (response.error) {
                 throw new Error(response.error);
             }
 
             // Transform the data to ensure all required fields are present
-            const transformedProducts = (response.data?.products || []).map((product: any) => {
+            // Limit to prevent memory crashes with large datasets
+            const allProducts = response.data?.products || [];
+            const transformedProducts = allProducts.slice(0, 150).map((product: any) => {
                 return {
                     ...product,
                     created_at: product.created_at || new Date().toISOString(),
@@ -119,24 +238,196 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                 };
             });
 
-            setProducts(transformedProducts);
-        } catch (error) {
+            // Defer state update to prevent crashes during rapid navigation
+            // Use safe requestAnimationFrame for better performance
+            if (isMountedRef.current) {
+                safeRequestAnimationFrame(() => {
+                    if (isMountedRef.current && !fetchAbortControllerRef.current?.signal.aborted) {
+                        try {
+                            setProducts(transformedProducts);
+                            setDisplayLimit(INITIAL_RENDER_LIMIT); // Reset display limit
+                            setError(null); // Clear any previous errors
+                        } catch (e) {
+                            console.error('Error setting products:', e);
+                            setError('Failed to load products. Please try again.');
+                        }
+                    }
+                });
+            }
+        } catch (error: any) {
+            // Ignore abort errors
+            if (error?.name === 'AbortError' || fetchAbortControllerRef.current?.signal.aborted) {
+                return;
+            }
+            
             console.error('Error fetching products:', error);
-            setProducts([]);
+            
+            if (isMountedRef.current && !fetchAbortControllerRef.current?.signal.aborted) {
+                safeSetTimeout(() => {
+                    if (isMountedRef.current) {
+                        try {
+                            setProducts([]);
+                        } catch (e) {
+                            console.error('Error setting empty products:', e);
+                        }
+                    }
+                }, 0);
+            }
         } finally {
-            setLoading(false);
+            if (isMountedRef.current && !fetchAbortControllerRef.current?.signal.aborted) {
+                safeSetTimeout(() => {
+                    if (isMountedRef.current) {
+                        try {
+                            setLoading(false);
+                        } catch (e) {
+                            console.error('Error setting loading false:', e);
+                        }
+                    }
+                }, 0);
+            }
         }
-    };
+    }, [safeSetTimeout, safeRequestAnimationFrame]);
 
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await fetchProducts();
-        setRefreshing(false);
-    };
+    const onRefresh = React.useCallback(async () => {
+        if (!isMountedRef.current) return;
+        
+        try {
+            safeSetTimeout(() => {
+                if (isMountedRef.current) {
+                    try {
+                        setRefreshing(true);
+                    } catch (e) {
+                        console.error('Error setting refreshing:', e);
+                    }
+                }
+            }, 0);
+            
+            await fetchProducts();
+        } catch (error) {
+            console.error('Error in refresh:', error);
+        } finally {
+            if (isMountedRef.current) {
+                safeSetTimeout(() => {
+                    if (isMountedRef.current) {
+                        try {
+                            setRefreshing(false);
+                        } catch (e) {
+                            console.error('Error setting refreshing false:', e);
+                        }
+                    }
+                }, 0);
+            }
+        }
+    }, [fetchProducts, safeSetTimeout]);
 
     useEffect(() => {
-        fetchProducts();
-    }, []);
+        isMountedRef.current = true;
+        
+        // Add delay to prevent rapid navigation crashes
+        const initTimer = safeSetTimeout(() => {
+            if (isMountedRef.current) {
+                fetchProducts().catch((error) => {
+                    console.error('Initial fetch error:', error);
+                });
+            }
+        }, 100);
+        
+        // Cleanup function
+        return () => {
+            // Clear all pending timers
+            timersRef.current.forEach(timer => clearTimeout(timer));
+            timersRef.current.clear();
+            
+            // Cancel all pending animation frames
+            animationFramesRef.current.forEach(frameId => cancelAnimationFrame(frameId));
+            animationFramesRef.current.clear();
+            
+            isMountedRef.current = false;
+            
+            // Abort any pending fetch
+            if (fetchAbortControllerRef.current) {
+                fetchAbortControllerRef.current.abort();
+                fetchAbortControllerRef.current = null;
+            }
+
+            // Ensure heavy modals are closed and image data cleared to prevent leaks
+            try {
+                setIsImageViewerVisible(false);
+                setSelectedImageUrls([]);
+                setShowEditModal(false);
+                setSelectedProduct(null);
+                setShowProductDetailsModal(false);
+                setSelectedProductForDetails(null);
+            } catch (cleanupError) {
+                console.error('Cleanup error on unmount:', cleanupError);
+            }
+        };
+    }, [fetchProducts, safeSetTimeout]);
+
+    // Also clean up aggressively on blur to avoid memory build-up when navigating back and forth
+    useFocusEffect(
+        React.useCallback(() => {
+            // onFocus: no-op
+            return () => {
+                // onBlur: perform the same cleanup as unmount
+                try {
+                    timersRef.current.forEach(timer => clearTimeout(timer));
+                    timersRef.current.clear();
+                } catch {}
+                try {
+                    animationFramesRef.current.forEach(frameId => cancelAnimationFrame(frameId));
+                    animationFramesRef.current.clear();
+                } catch {}
+                try {
+                    if (fetchAbortControllerRef.current) {
+                        fetchAbortControllerRef.current.abort();
+                        fetchAbortControllerRef.current = null;
+                    }
+                } catch {}
+                try {
+                    setIsImageViewerVisible(false);
+                    setSelectedImageUrls([]);
+                    setShowEditModal(false);
+                    setSelectedProduct(null);
+                    setShowProductDetailsModal(false);
+                    setSelectedProductForDetails(null);
+                } catch {}
+            };
+        }, [])
+    );
+
+    // Prevent rapid navigation crashes - add debounce for navigation
+    const navigationDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Reset mount state when component re-mounts (navigation back)
+    useEffect(() => {
+        // Clear any pending debounce
+        if (navigationDebounceRef.current) {
+            clearTimeout(navigationDebounceRef.current);
+        }
+        
+        // Set mount state
+        isMountedRef.current = true;
+        
+        // Debounce: prevent rapid navigation crashes
+        navigationDebounceRef.current = safeSetTimeout(() => {
+            if (isMountedRef.current) {
+                // Only fetch if products list is empty and not already loading
+                if (products.length === 0 && !loading) {
+                    fetchProducts().catch((error) => {
+                        console.error('Navigation back fetch error:', error);
+                    });
+                }
+            }
+        }, 300);
+        
+        return () => {
+            if (navigationDebounceRef.current) {
+                clearTimeout(navigationDebounceRef.current);
+                navigationDebounceRef.current = null;
+            }
+        };
+    }, [safeSetTimeout]); // Include safeSetTimeout in deps
 
     // Filter and sort products
     useEffect(() => {
@@ -182,8 +473,28 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
             }
         });
 
-        setFilteredProducts(filtered);
-    }, [products, searchQuery, sortBy, sortOrder]);
+        // Limit displayed products to prevent memory crashes
+        const limitedFiltered = filtered.slice(0, displayLimit);
+        
+        if (isMountedRef.current) {
+            safeRequestAnimationFrame(() => {
+                if (isMountedRef.current) {
+                    try {
+                        setFilteredProducts(limitedFiltered);
+                    } catch (e) {
+                        console.error('Error setting filtered products:', e);
+                    }
+                }
+            });
+        }
+    }, [products, searchQuery, sortBy, sortOrder, displayLimit, safeRequestAnimationFrame]);
+    
+    // Load more products when scrolling
+    const loadMoreProducts = React.useCallback(() => {
+        if (isMountedRef.current && filteredProducts.length < products.length) {
+            setDisplayLimit(prev => Math.min(prev + 20, products.length));
+        }
+    }, [filteredProducts.length, products.length]);
 
     const handleImagePick = async (index: number) => {
         try {
@@ -335,22 +646,26 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                 throw new Error(response.error);
             }
 
-            await fetchProducts();
-            setNewProduct({
-                name: '',
-                description: '',
-                price: 0,
-                category: '',
-                stock_quantity: 0,
-                usage_instructions: '',
-                size: '',
-                benefits: '',
-                ingredients: '',
-                product_details: '',
-                offer_percentage: 0
-            });
-            setSelectedImages([]);
-            setShowAddForm(false);
+            if (isMountedRef.current) {
+                await fetchProducts();
+                if (isMountedRef.current) {
+                    setNewProduct({
+                        name: '',
+                        description: '',
+                        price: 0,
+                        category: '',
+                        stock_quantity: 0,
+                        usage_instructions: '',
+                        size: '',
+                        benefits: '',
+                        ingredients: '',
+                        product_details: '',
+                        offer_percentage: 0
+                    });
+                    setSelectedImages([]);
+                    setShowAddForm(false);
+                }
+            }
             
             Alert.alert('Success', 'Product added successfully', [
                 {
@@ -442,27 +757,34 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
             }
 
             // Update the products list with the edited product
-            const updatedProduct = { ...selectedProduct, ...response.data };
+            if (!response.data) {
+                throw new Error('No data received from server');
+            }
+            
+            const productData = response.data;
+            const updatedProduct = { ...selectedProduct, ...productData };
             console.log('Updated product data:', updatedProduct);
-            console.log('Response data:', response.data);
+            console.log('Response data:', productData);
             console.log('Image URLs in response:', {
-                image_url: response.data.image_url,
-                image_url2: response.data.image_url2,
-                image_url3: response.data.image_url3
+                image_url: productData.image_url,
+                image_url2: productData.image_url2,
+                image_url3: productData.image_url3
             });
             
             // Force update the products list
-            setProducts(prevProducts => 
-                prevProducts.map(p => 
-                    p.id === selectedProduct.id ? {
-                        ...p,
-                        ...response.data,
-                        image_url: response.data.image_url,
-                        image_url2: response.data.image_url2,
-                        image_url3: response.data.image_url3
-                    } : p
-                )
-            );
+            if (isMountedRef.current) {
+                setProducts(prevProducts => 
+                    prevProducts.map(p => 
+                        p.id === selectedProduct.id ? {
+                            ...p,
+                            ...productData,
+                            image_url: productData.image_url || p.image_url || '',
+                            image_url2: productData.image_url2 || p.image_url2 || '',
+                            image_url3: productData.image_url3 || p.image_url3 || ''
+                        } as Product : p
+                    )
+                );
+            }
 
             // Update the selectedProductForDetails if it's the same product
             if (selectedProductForDetails && selectedProductForDetails.id === selectedProduct.id) {
@@ -482,13 +804,19 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
             setImageRefreshKey(prev => prev + 1);
             
             // Force immediate refresh of the products list
-            setTimeout(() => {
-                fetchProducts();
+            safeSetTimeout(() => {
+                if (isMountedRef.current) {
+                    fetchProducts().catch((error) => {
+                        console.error('Error refetching products:', error);
+                    });
+                }
             }, 100);
             
             // Additional refresh after a longer delay to ensure images are updated
-            setTimeout(() => {
-                setImageRefreshKey(prev => prev + 1);
+            safeSetTimeout(() => {
+                if (isMountedRef.current) {
+                    setImageRefreshKey(prev => prev + 1);
+                }
             }, 1000);
             
             Alert.alert('Success', 'Product updated successfully');
@@ -512,8 +840,8 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
     const renderImage = (imageUrl: string | undefined, index: number) => {
         if (!imageUrl) return null;
         
-        // Add cache busting parameter to force refresh
-        const cacheBuster = `?v=${Date.now()}&t=${Math.random()}&refresh=true`;
+        // Stable cache busting tied to imageRefreshKey only (prevents constant reloads)
+        const cacheBuster = `?k=${imageRefreshKey}`;
         const fullUrl = apiService.getFullImageUrl(imageUrl) + cacheBuster;
         
         return (
@@ -526,15 +854,18 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                         console.log('Image load error for:', imageUrl);
                     }}
                     resizeMode="cover"
+                    progressiveRenderingEnabled
                 />
             </TouchableOpacity>
         );
     };
 
+        const cardWidthStyle = (windowWidth && windowWidth >= 768) ? styles.productCardTablet : null;
+
         return (
             <TouchableOpacity 
                 key={product.id} 
-                style={styles.productCard}
+                style={[styles.productCard, cardWidthStyle]}
                 onPress={() => handleProductCardPress(product)}
             >
                 <View style={styles.productImageContainer}>
@@ -571,6 +902,10 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
         );
     };
 
+    // Calculate bottom padding for navigation bar - safe approach without useSafeAreaInsets
+    // Use Platform check similar to categories screen
+    const scrollContentPadding = Platform.OS === 'ios' ? 100 : 120; // Extra padding for navigation
+
     return (
         <>
             <Stack.Screen
@@ -586,6 +921,7 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                 }}
             />
 
+            <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
                 {showAddForm ? (
                     <AddProductForm
@@ -666,18 +1002,24 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                         </TouchableOpacity>
                     </View>
 
-                <ScrollView
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                        />
-                    }
-                >
+                {/* Removed outer ScrollView to avoid nesting with FlatList */}
+                    {error && (
+                        <View style={styles.errorBanner}>
+                            <Text style={styles.errorBannerText}>{error}</Text>
+                            <TouchableOpacity onPress={() => {
+                                if (isMountedRef.current) {
+                                    setError(null);
+                                    fetchProducts().catch(e => console.error('Retry error:', e));
+                                }
+                            }}>
+                                <Text style={styles.errorBannerRetry}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                     {loading ? (
                         <ActivityIndicator style={styles.loader} size="large" color="#FF69B4" />
                     ) : filteredProducts.length === 0 ? (
-                        <View style={styles.emptyState}>
+                        <View style={[styles.emptyState, { paddingBottom: scrollContentPadding }]}>
                             <Ionicons name="cube-outline" size={64} color="#ccc" />
                             <Text style={styles.emptyStateText}>
                                 {searchQuery ? 'No products match your search' : 'No products found'}
@@ -699,13 +1041,36 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                             )}
                         </View>
                     ) : (
-                        <View style={styles.productGrid}>
-                            {filteredProducts.map((product, index) => renderProductCard(product, index))}
-                        </View>
+                        <FlatList
+                            data={filteredProducts}
+                            keyExtractor={(item) => String(item.id)}
+                            numColumns={windowWidth >= 768 ? 3 : 2}
+                            renderItem={({ item, index }) => renderProductCard(item, index)}
+                            contentContainerStyle={[styles.productGrid, { paddingBottom: scrollContentPadding }]}
+                            columnWrapperStyle={{ justifyContent: 'space-between' }}
+                            removeClippedSubviews
+                            initialNumToRender={8}
+                            maxToRenderPerBatch={8}
+                            windowSize={5}
+                            updateCellsBatchingPeriod={80}
+                            onEndReached={loadMoreProducts}
+                            onEndReachedThreshold={0.5}
+                            refreshControl={
+                                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                            }
+                            ListFooterComponent={filteredProducts.length < products.length ? (
+                                <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#FF69B4" />
+                                </View>
+                            ) : null}
+                            showsVerticalScrollIndicator={false}
+                        />
                     )}
-                </ScrollView>
+                
                 </>
                 )}
+            </View>
+            </SafeAreaView>
 
                 {/* Category Modal */}
                 <Modal
@@ -734,6 +1099,11 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                         onCancel={() => setIsImageViewerVisible(false)}
                         enableSwipeDown
                         onSwipeDown={() => setIsImageViewerVisible(false)}
+                        enablePreload={false}
+                        saveToLocalByLongPress={false}
+                        renderIndicator={(currentIndex?: number, allSize?: number) => (
+                            <View />
+                        )}
                     />
                 </Modal>
 
@@ -844,9 +1214,10 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                                                 >
                                                     <Image
                                                         key={`${selectedProductForDetails.id}-${index}-${imageRefreshKey}`}
-                                                        source={{ uri: apiService.getFullImageUrl(imageUrl) + `?v=${Date.now()}&t=${Math.random()}&refresh=true` }}
+                                                        source={{ uri: apiService.getFullImageUrl(imageUrl) + `?k=${imageRefreshKey}` }}
                                                         style={styles.productDetailsImage}
                                                         resizeMode="cover"
+                                                        progressiveRenderingEnabled
                                                         onError={() => {
                                                             console.log('Product details image load error for:', imageUrl);
                                                         }}
@@ -970,20 +1341,27 @@ export default function AdminProducts({ initialShowAddForm = false }: AdminProdu
                         </View>
                     )}
                 </Modal>
-            </View>
         </>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: themeColors.background,
+    },
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: themeColors.background,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
     },
     searchContainer: {
         flexDirection: 'row',
         padding: 12,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: themeColors.background,
         alignItems: 'center',
         gap: 8,
     },
@@ -991,12 +1369,17 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        backgroundColor: themeColors.card,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
+        borderColor: themeColors.border,
+        shadowColor: themeColors.shadow,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
     },
     searchIcon: {
         marginRight: 8,
@@ -1004,7 +1387,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 16,
-        color: '#1a1a1a',
+        color: themeColors.text,
     },
     filterContainer: {
         flexDirection: 'row',
@@ -1012,61 +1395,76 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     filterButton: {
-        padding: 8,
-        backgroundColor: '#fff',
-        borderRadius: 8,
+        padding: 10,
+        backgroundColor: themeColors.card,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
+        borderColor: themeColors.border,
+        shadowColor: themeColors.shadow,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
     },
     sortButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        backgroundColor: '#fff',
-        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        backgroundColor: themeColors.card,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
-        gap: 4,
+        borderColor: themeColors.border,
+        gap: 6,
+        shadowColor: themeColors.shadow,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
     },
     sortButtonText: {
         fontSize: 14,
-        color: '#FF69B4',
-        fontWeight: '500',
+        color: themeColors.primary,
+        fontWeight: '600',
     },
     productsCountContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#f8f9fa',
+        paddingVertical: 14,
+        backgroundColor: themeColors.card,
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        borderBottomColor: themeColors.border,
         minHeight: 60,
+        shadowColor: themeColors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     productsCountInfo: {
         flex: 1,
     },
     productsCount: {
         fontSize: 16,
-        color: '#333',
+        color: themeColors.text,
         fontWeight: '600',
         marginBottom: 2,
     },
     productsCountSubtext: {
         fontSize: 12,
-        color: '#666',
+        color: themeColors.textSecondary,
         fontStyle: 'italic',
     },
     addProductButton: {
-        backgroundColor: '#FF69B4',
+        backgroundColor: themeColors.primary,
         borderRadius: 12,
-        elevation: 3,
-        shadowColor: '#FF69B4',
-        shadowOffset: { width: 0, height: 2 },
+        elevation: 4,
+        shadowColor: themeColors.primary,
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowRadius: 5,
         minWidth: 120,
     },
     addProductButtonContent: {
@@ -1083,16 +1481,21 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     clearSearchButton: {
-        backgroundColor: '#FF69B4',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 8,
+        backgroundColor: themeColors.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 10,
         marginTop: 12,
+        shadowColor: themeColors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     clearSearchButtonText: {
         color: '#fff',
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 15,
+        fontWeight: '600',
         textAlign: 'center',
     },
     modalOverlay: {
@@ -1102,11 +1505,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     sortModal: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        width: '80%',
-        maxWidth: 300,
+        backgroundColor: themeColors.card,
+        borderRadius: 16,
+        padding: 24,
+        width: '85%',
+        maxWidth: 320,
+        shadowColor: themeColors.shadow,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 8,
     },
     sortModalHeader: {
         flexDirection: 'row',
@@ -1115,69 +1523,75 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     sortModalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1a1a1a',
+        fontSize: 20,
+        fontWeight: '700',
+        color: themeColors.text,
     },
     sortOptions: {
-        gap: 8,
+        gap: 10,
     },
     sortOption: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        backgroundColor: '#f8f9fa',
+        paddingVertical: 14,
+        paddingHorizontal: 18,
+        borderRadius: 12,
+        backgroundColor: themeColors.background,
+        borderWidth: 1,
+        borderColor: themeColors.border,
     },
     sortOptionSelected: {
-        backgroundColor: '#FF69B4',
+        backgroundColor: themeColors.primary,
+        borderColor: themeColors.primary,
     },
     sortOptionText: {
         fontSize: 16,
-        color: '#1a1a1a',
+        color: themeColors.text,
+        fontWeight: '500',
     },
     sortOptionTextSelected: {
         color: '#fff',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     productGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        padding: 8,
-        justifyContent: 'space-between',
+	        padding: 12,
     },
     productCard: {
-        width: '48%',
-        backgroundColor: '#fff',
-        borderRadius: 12,
+        width: '48%', // Mobile default (2 columns)
+        backgroundColor: themeColors.card,
+        borderRadius: 16,
         marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowColor: themeColors.shadow,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 4,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: themeColors.border,
+    },
+    productCardTablet: {
+        width: '31%', // Tablet/Desktop (3 columns)
     },
     productImageContainer: {
-        height: 150,
-        backgroundColor: '#f5f5f5',
+        height: 160,
+        backgroundColor: themeColors.background,
     },
     productImage: {
         width: '100%',
-        height: 150,
+        height: 160,
         resizeMode: 'cover',
     },
     productCardContent: {
-        padding: 8,
+        padding: 12,
     },
     productCardName: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
-        color: '#1a1a1a',
-        marginBottom: 4,
-        lineHeight: 18,
+        color: themeColors.text,
+        marginBottom: 6,
+        lineHeight: 20,
     },
     productCardPrice: {
         flexDirection: 'row',
@@ -1187,50 +1601,61 @@ const styles = StyleSheet.create({
     },
     productCardOriginalPrice: {
         fontSize: 12,
-        color: '#999',
+        color: themeColors.textTertiary,
         textDecorationLine: 'line-through',
     },
     productCardDiscountedPrice: {
-        fontSize: 14,
-        color: '#FF69B4',
-        fontWeight: '600',
+        fontSize: 15,
+        color: themeColors.primary,
+        fontWeight: '700',
     },
     productCardPriceText: {
-        fontSize: 14,
-        color: '#FF69B4',
-        fontWeight: '600',
+        fontSize: 15,
+        color: themeColors.primary,
+        fontWeight: '700',
     },
     productCardCategory: {
         fontSize: 12,
-        color: '#666',
-        marginBottom: 2,
+        color: themeColors.textSecondary,
+        marginBottom: 4,
+        fontWeight: '500',
     },
     productCardStock: {
         fontSize: 11,
-        color: '#999',
+        color: themeColors.textTertiary,
+        fontWeight: '500',
     },
     emptyState: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 20,
+        padding: 40,
+        minHeight: 300,
     },
     emptyStateText: {
         fontSize: 16,
-        color: '#666',
-        marginTop: 12,
-        marginBottom: 20,
+        color: themeColors.textSecondary,
+        marginTop: 16,
+        marginBottom: 24,
+        textAlign: 'center',
+        fontWeight: '500',
     },
     addFirstButton: {
-        backgroundColor: '#FF69B4',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 8,
+        backgroundColor: themeColors.primary,
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        borderRadius: 12,
+        shadowColor: themeColors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 4,
     },
     addFirstButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     loader: {
         marginTop: 20,
@@ -1402,4 +1827,102 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
     },
+    loadMoreButton: {
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        backgroundColor: themeColors.primary,
+        borderRadius: 12,
+        alignItems: 'center',
+        shadowColor: themeColors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 4,
+    },
+    loadMoreButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    },
+    errorBanner: {
+        backgroundColor: '#ffebee',
+        padding: 14,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ffcdd2',
+    },
+    errorBannerText: {
+        color: themeColors.error,
+        fontSize: 14,
+        flex: 1,
+        fontWeight: '500',
+    },
+    errorBannerRetry: {
+        color: themeColors.primary,
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginLeft: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
 });
+
+// Error Boundary Wrapper
+export default function AdminProducts({ initialShowAddForm = false }: AdminProductsProps) {
+    const [hasError, setHasError] = useState(false);
+    const [errorInfo, setErrorInfo] = useState<string | null>(null);
+
+    if (hasError) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#f8f9fa' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ff4444', marginBottom: 10, textAlign: 'center' }}>
+                    Products Screen Error
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', marginBottom: 20, textAlign: 'center' }}>
+                    {errorInfo || 'An unexpected error occurred'}
+                </Text>
+                <TouchableOpacity
+                    style={{ backgroundColor: '#FF69B4', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+                    onPress={() => {
+                        setHasError(false);
+                        setErrorInfo(null);
+                    }}
+                >
+                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Retry</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    // Wrap in try-catch to prevent crashes (do NOT set state during render)
+    try {
+        return <AdminProductsInner initialShowAddForm={initialShowAddForm} />;
+    } catch (error: any) {
+        console.error('AdminProducts render error:', error);
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#f8f9fa' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ff4444', marginBottom: 10, textAlign: 'center' }}>
+                    Products Screen Error
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', marginBottom: 20, textAlign: 'center' }}>
+                    {error?.message || 'An unexpected error occurred'}
+                </Text>
+                <TouchableOpacity
+                    style={{ backgroundColor: '#FF69B4', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+                    onPress={() => {}}
+                >
+                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Retry</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+}

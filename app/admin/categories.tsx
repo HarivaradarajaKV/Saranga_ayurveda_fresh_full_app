@@ -3,22 +3,25 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
+    FlatList,
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
     TextInput,
     Alert,
+    SafeAreaView,
+    Platform,
+    Dimensions,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
+import { Category as ApiCategory } from '../types/api';
 
-interface Category {
-    id: number;
-    name: string;
-    description: string;
-    product_count: number;
+const { height: screenHeight } = Dimensions.get('window');
+
+// Extend the API Category type to include created_at for admin use
+interface Category extends Omit<ApiCategory, 'image_url' | 'parent_id' | 'parent_name'> {
     created_at: string;
 }
 
@@ -33,7 +36,18 @@ export default function AdminCategories() {
         try {
             const response = await apiService.getAdminCategories();
             if (response.data && Array.isArray(response.data)) {
-                setCategories(response.data as Category[]);
+                // Map API categories to include created_at, using current date as fallback if missing
+                const mappedCategories: Category[] = response.data.map((cat: unknown) => {
+                    const apiCat = cat as ApiCategory & { created_at?: string };
+                    return {
+                        id: apiCat.id,
+                        name: apiCat.name,
+                        description: apiCat.description || '',
+                        product_count: apiCat.product_count || 0,
+                        created_at: apiCat.created_at || new Date().toISOString(),
+                    } as Category;
+                });
+                setCategories(mappedCategories);
             }
         } catch (error) {
             console.error('Error fetching categories:', error);
@@ -123,7 +137,7 @@ export default function AdminCategories() {
     }
 
     return (
-        <>
+        <SafeAreaView style={styles.safeArea}>
             <Stack.Screen 
                 options={{
                     title: 'Categories',
@@ -137,121 +151,143 @@ export default function AdminCategories() {
                     ),
                 }}
             />
-            <ScrollView 
+            <FlatList
                 style={styles.container}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-            >
-                <View style={styles.addCategorySection}>
-                    <Text style={styles.sectionTitle}>Add New Category</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Category Name"
-                        value={newCategory.name}
-                        onChangeText={(text) => setNewCategory(prev => ({ ...prev, name: text }))}
-                    />
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        placeholder="Description"
-                        value={newCategory.description}
-                        onChangeText={(text) => setNewCategory(prev => ({ ...prev, description: text }))}
-                        multiline
-                    />
-                    <TouchableOpacity 
-                        style={styles.addButton}
-                        onPress={handleAddCategory}
-                    >
-                        <Text style={styles.addButtonText}>Add Category</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.categoriesSection}>
-                    <Text style={styles.sectionTitle}>All Categories</Text>
-                    {categories.map((category) => (
-                        <View key={category.id} style={styles.categoryCard}>
-                            {editingCategory?.id === category.id ? (
-                                <View style={styles.editForm}>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={editingCategory.name}
-                                        onChangeText={(text) => 
-                                            setEditingCategory(prev => prev ? { ...prev, name: text } : null)
-                                        }
-                                    />
-                                    <TextInput
-                                        style={[styles.input, styles.textArea]}
-                                        value={editingCategory.description}
-                                        onChangeText={(text) => 
-                                            setEditingCategory(prev => prev ? { ...prev, description: text } : null)
-                                        }
-                                        multiline
-                                    />
-                                    <View style={styles.editActions}>
+                contentContainerStyle={styles.scrollContent}
+                data={categories}
+                keyExtractor={(c) => String(c.id)}
+                renderItem={({ item: category }) => (
+                    <View style={styles.categoryCard}>
+                        {editingCategory?.id === category.id ? (
+                            <View style={styles.editForm}>
+                                <TextInput
+                                    style={styles.input}
+                                    value={editingCategory.name}
+                                    onChangeText={(text) => 
+                                        setEditingCategory(prev => prev ? { ...prev, name: text } : null)
+                                    }
+                                />
+                                <TextInput
+                                    style={[styles.input, styles.textArea]}
+                                    value={editingCategory.description}
+                                    onChangeText={(text) => 
+                                        setEditingCategory(prev => prev ? { ...prev, description: text } : null)
+                                    }
+                                    multiline
+                                />
+                                <View style={styles.editActions}>
+                                    <TouchableOpacity 
+                                        style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+                                        onPress={handleUpdateCategory}
+                                    >
+                                        <Text style={styles.actionButtonText}>Save</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.actionButton, { backgroundColor: '#666' }]}
+                                        onPress={() => setEditingCategory(null)}
+                                    >
+                                        <Text style={styles.actionButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                                <View style={styles.categoryHeader}>
+                                    <Text style={styles.categoryName}>{category.name}</Text>
+                                    <View style={styles.categoryActions}>
                                         <TouchableOpacity 
-                                            style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-                                            onPress={handleUpdateCategory}
+                                            onPress={() => setEditingCategory(category)}
+                                            style={styles.iconButton}
                                         >
-                                            <Text style={styles.actionButtonText}>Save</Text>
+                                            <Ionicons name="create" size={20} color="#666" />
                                         </TouchableOpacity>
                                         <TouchableOpacity 
-                                            style={[styles.actionButton, { backgroundColor: '#666' }]}
-                                            onPress={() => setEditingCategory(null)}
+                                            onPress={() => handleDeleteCategory(category.id)}
+                                            style={styles.iconButton}
                                         >
-                                            <Text style={styles.actionButtonText}>Cancel</Text>
+                                            <Ionicons name="trash" size={20} color="#DC143C" />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
-                            ) : (
-                                <>
-                                    <View style={styles.categoryHeader}>
-                                        <Text style={styles.categoryName}>{category.name}</Text>
-                                        <View style={styles.categoryActions}>
-                                            <TouchableOpacity 
-                                                onPress={() => setEditingCategory(category)}
-                                                style={styles.iconButton}
-                                            >
-                                                <Ionicons name="create" size={20} color="#666" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity 
-                                                onPress={() => handleDeleteCategory(category.id)}
-                                                style={styles.iconButton}
-                                            >
-                                                <Ionicons name="trash" size={20} color="#DC143C" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                    <Text style={styles.categoryDescription}>{category.description}</Text>
-                                    <View style={styles.categoryStats}>
-                                        <Text style={styles.productCount}>
-                                            {category.product_count} Products
-                                        </Text>
-                                        <Text style={styles.dateCreated}>
-                                            Created: {new Date(category.created_at).toLocaleDateString()}
-                                        </Text>
-                                    </View>
-                                </>
-                            )}
+                                <Text style={styles.categoryDescription}>{category.description}</Text>
+                                <View style={styles.categoryStats}>
+                                    <Text style={styles.productCount}>
+                                        {category.product_count} Products
+                                    </Text>
+                                    <Text style={styles.dateCreated}>
+                                        Created: {new Date(category.created_at).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                            </>
+                        )}
+                    </View>
+                )}
+                ListHeaderComponent={
+                    <View>
+                        <View style={styles.addCategorySection}>
+                            <Text style={styles.sectionTitle}>Add New Category</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Category Name"
+                                value={newCategory.name}
+                                onChangeText={(text) => setNewCategory(prev => ({ ...prev, name: text }))}
+                            />
+                            <TextInput
+                                style={[styles.input, styles.textArea]}
+                                placeholder="Description"
+                                value={newCategory.description}
+                                onChangeText={(text) => setNewCategory(prev => ({ ...prev, description: text }))}
+                                multiline
+                            />
+                            <TouchableOpacity 
+                                style={styles.addButton}
+                                onPress={handleAddCategory}
+                            >
+                                <Text style={styles.addButtonText}>Add Category</Text>
+                            </TouchableOpacity>
                         </View>
-                    ))}
-                </View>
-            </ScrollView>
-        </>
+                        <View style={styles.categoriesSection}>
+                            <Text style={styles.sectionTitle}>All Categories</Text>
+                        </View>
+                    </View>
+                }
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                showsVerticalScrollIndicator={true}
+                removeClippedSubviews
+                initialNumToRender={12}
+                maxToRenderPerBatch={12}
+                windowSize={7}
+                updateCellsBatchingPeriod={50}
+                ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 24 }}>No categories found</Text>}
+            />
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+    },
+    scrollContent: {
+        paddingBottom: Platform.OS === 'ios' ? 100 : 120, // Extra padding to ensure content is accessible above navigation buttons
+        flexGrow: 1,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#f5f5f5',
     },
     headerButton: {
-        marginRight: 15,
+        marginRight: Platform.OS === 'ios' ? 15 : 12,
+        padding: 4,
     },
     addCategorySection: {
         backgroundColor: '#fff',
@@ -320,7 +356,7 @@ const styles = StyleSheet.create({
     },
     categoryActions: {
         flexDirection: 'row',
-        gap: 8,
+        alignItems: 'center',
     },
     iconButton: {
         padding: 8,
@@ -345,18 +381,18 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     editForm: {
-        gap: 8,
+        // Spacing handled by marginBottom in child elements
     },
     editActions: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        gap: 8,
         marginTop: 8,
     },
     actionButton: {
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
+        marginLeft: 8,
     },
     actionButtonText: {
         color: '#fff',

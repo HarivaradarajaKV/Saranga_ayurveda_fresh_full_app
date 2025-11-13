@@ -9,6 +9,9 @@ import {
     Alert,
     Image,
     Modal,
+    Dimensions,
+    Platform,
+    SafeAreaView,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +19,8 @@ import { apiService } from '../../services/api';
 import EditProductForm from '../components/EditProductForm';
 import { ProductReview } from '../../types/reviews';
 import { ExpandableDescription } from '../../components/ExpandableDescription';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface Product {
     id: number;
@@ -170,7 +175,7 @@ export default function AdminProductDetails() {
     }
 
     return (
-        <>
+        <SafeAreaView style={styles.safeArea}>
             <Stack.Screen
                 options={{
                     title: 'Product Details',
@@ -192,7 +197,11 @@ export default function AdminProductDetails() {
                     ),
                 }}
             />
-            <ScrollView style={styles.container}>
+            <ScrollView 
+                style={styles.container}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.imageContainer}>
                     {product.image_url && (
                         <Image
@@ -269,12 +278,12 @@ export default function AdminProductDetails() {
                 </View>
 
                 {/* --- REVIEWS SECTION START --- */}
-                <View style={{ height: 1, backgroundColor: '#e8d3b9', marginTop: 32, marginBottom: 16, width: '100%' }} />
-                <View style={[styles.reviewsSection, { marginTop: 0, elevation: 1, borderRadius: 10, borderWidth: 1, borderColor: '#efd8bb', paddingTop: 16, backgroundColor: '#fffbe9' }]}> 
+                <View style={styles.reviewsDivider} />
+                <View style={styles.reviewsSection}> 
                     <View style={styles.reviewsHeader}>
-                        <Text style={[styles.reviewsTitle, { color: '#b0761b', fontWeight: 'bold', letterSpacing: 0.2 }]}>User Reviews</Text>
+                        <Text style={styles.reviewsTitle}>User Reviews</Text>
                         <View style={styles.reviewsMeta}>
-                            <Ionicons name="chatbubbles-outline" size={18} color="#694d21" />
+                            <Ionicons name="chatbubbles-outline" size={screenWidth < 360 ? 16 : 18} color="#694d21" />
                             <Text style={styles.reviewsCount}>{reviews?.length || 0}</Text>
                         </View>
                     </View>
@@ -316,14 +325,21 @@ export default function AdminProductDetails() {
                     onCancel={() => setShowEditModal(false)}
                 />
             </Modal>
-        </>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
     container: {
         flex: 1,
         backgroundColor: '#fff',
+    },
+    scrollContent: {
+        paddingBottom: 20,
     },
     loadingContainer: {
         flex: 1,
@@ -343,44 +359,51 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     headerButton: {
-        marginLeft: 15,
+        marginLeft: Platform.OS === 'ios' ? 15 : 12,
+        padding: 4,
     },
     imageContainer: {
         width: '100%',
-        height: 350,
+        height: screenWidth * 0.75, // Responsive height based on screen width
+        maxHeight: 400,
+        minHeight: 250,
         backgroundColor: '#f5f5f5',
     },
     image: {
         width: '100%',
         height: '100%',
+        resizeMode: 'cover',
     },
     detailsContainer: {
-        padding: 16,
+        paddingHorizontal: screenWidth < 360 ? 12 : 16,
+        paddingVertical: 16,
     },
     productName: {
-        fontSize: 24,
+        fontSize: screenWidth < 360 ? 20 : 24,
         fontWeight: 'bold',
         color: '#1a1a1a',
         marginBottom: 8,
+        lineHeight: screenWidth < 360 ? 26 : 30,
     },
     priceContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        flexWrap: 'wrap',
         marginBottom: 16,
     },
     price: {
-        fontSize: 20,
+        fontSize: screenWidth < 360 ? 18 : 20,
         fontWeight: 'bold',
         color: '#FF69B4',
     },
     originalPrice: {
-        fontSize: 16,
+        fontSize: screenWidth < 360 ? 14 : 16,
         color: '#666',
         textDecorationLine: 'line-through',
         marginLeft: 8,
     },
     discount: {
-        fontSize: 14,
+        fontSize: screenWidth < 360 ? 12 : 14,
         color: '#4CAF50',
         marginLeft: 8,
     },
@@ -388,99 +411,119 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: screenWidth < 360 ? 16 : 18,
         fontWeight: '600',
         color: '#1a1a1a',
         marginBottom: 8,
     },
     infoText: {
-        fontSize: 16,
+        fontSize: screenWidth < 360 ? 14 : 16,
         color: '#666',
         marginBottom: 4,
     },
     description: {
-        fontSize: 16,
+        fontSize: screenWidth < 360 ? 14 : 16,
         color: '#666',
-        lineHeight: 24,
+        lineHeight: screenWidth < 360 ? 20 : 24,
     },
-  reviewsSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  reviewsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  reviewsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  reviewsMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  reviewsCount: {
-    fontSize: 14,
-    color: '#694d21',
-    marginLeft: 6,
-  },
-  reviewsLoadingContainer: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reviewsList: {
-    gap: 12,
-  },
-  reviewRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    backgroundColor: '#faf7f2',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#f0e6da',
-  },
-  reviewInfo: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  reviewUser: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  reviewDate: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
-  },
-  reviewComment: {
-    fontSize: 14,
-    color: '#333',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  deleteReviewButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e74c3c',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noReviewsText: {
-    color: '#666',
-    fontSize: 14,
-    paddingVertical: 8,
-  },
+    reviewsDivider: {
+        height: 1,
+        backgroundColor: '#e8d3b9',
+        marginTop: 32,
+        marginBottom: 16,
+        width: '100%',
+    },
+    reviewsSection: {
+        marginTop: 0,
+        marginHorizontal: screenWidth < 360 ? 12 : 16,
+        paddingHorizontal: screenWidth < 360 ? 12 : 16,
+        paddingTop: 16,
+        paddingBottom: 16,
+        backgroundColor: '#fffbe9',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#efd8bb',
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    reviewsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+        flexWrap: 'wrap',
+    },
+    reviewsTitle: {
+        fontSize: screenWidth < 360 ? 16 : 18,
+        fontWeight: 'bold',
+        color: '#b0761b',
+        letterSpacing: 0.2,
+    },
+    reviewsMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    reviewsCount: {
+        fontSize: screenWidth < 360 ? 13 : 14,
+        color: '#694d21',
+        marginLeft: 4,
+        fontWeight: '500',
+    },
+    reviewsLoadingContainer: {
+        paddingVertical: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewsList: {
+        // Gap handled by marginBottom in reviewRow
+    },
+    reviewRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        backgroundColor: '#faf7f2',
+        borderRadius: 12,
+        padding: screenWidth < 360 ? 10 : 12,
+        borderWidth: 1,
+        borderColor: '#f0e6da',
+        marginBottom: 12,
+    },
+    reviewInfo: {
+        flex: 1,
+        paddingRight: screenWidth < 360 ? 8 : 12,
+        minWidth: 0, // Allows text to wrap properly
+    },
+    reviewUser: {
+        fontSize: screenWidth < 360 ? 14 : 15,
+        fontWeight: '600',
+        color: '#1a1a1a',
+    },
+    reviewDate: {
+        fontSize: screenWidth < 360 ? 11 : 12,
+        color: '#8E8E93',
+        marginTop: 2,
+    },
+    reviewComment: {
+        fontSize: screenWidth < 360 ? 13 : 14,
+        color: '#333',
+        marginTop: 8,
+        lineHeight: screenWidth < 360 ? 18 : 20,
+    },
+    deleteReviewButton: {
+        width: screenWidth < 360 ? 32 : 36,
+        height: screenWidth < 360 ? 32 : 36,
+        borderRadius: screenWidth < 360 ? 16 : 18,
+        backgroundColor: '#e74c3c',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    noReviewsText: {
+        color: '#666',
+        fontSize: screenWidth < 360 ? 13 : 14,
+        paddingVertical: 8,
+        textAlign: 'center',
+    },
 }); 

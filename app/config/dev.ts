@@ -2,9 +2,9 @@
 import Constants from 'expo-constants';
 
 export const DEV_CONFIG = {
-    // Local backend configuration - using your specific IP
-    LOCAL_API_BASE_URL: 'http://192.168.31.143:5001/api',
-    LOCAL_WS_URL: 'ws://192.168.31.143:5001',
+    // Local backend configuration - default template; actual IP resolved dynamically
+    LOCAL_API_BASE_URL: 'http://localhost:5001/api',
+    LOCAL_WS_URL: 'ws://localhost:5001',
     
     // Production configuration (fallback)
     PROD_API_BASE_URL: 'https://ayurveda-saranga-backend.vercel.app/api',
@@ -12,6 +12,27 @@ export const DEV_CONFIG = {
     
     // Development mode flag
     IS_DEV: __DEV__,
+    
+    // Resolve LAN IP from Expo to avoid hard-coded addresses
+    resolveLocalBaseUrls: () => {
+        try {
+            // Try Expo manifest2 first
+            // @ts-ignore - manifest2 may not exist in all environments
+            const host = Constants.manifest2?.extra?.expoGo?.debuggerHost
+                // @ts-ignore
+                || Constants.manifest2?.hostUri
+                // @ts-ignore - older Expo
+                || Constants.manifest?.hostUri
+                // @ts-ignore
+                || (Constants.expoConfig as any)?.hostUri;
+            const ip = typeof host === 'string' ? host.split(':')[0] : 'localhost';
+            const api = `http://${ip}:5001/api`;
+            const ws = `ws://${ip}:5001`;
+            return { api, ws };
+        } catch {
+            return { api: DEV_CONFIG.LOCAL_API_BASE_URL, ws: DEV_CONFIG.LOCAL_WS_URL };
+        }
+    },
     
     // Get the appropriate URLs based on environment
     getApiUrl: () => {
@@ -30,13 +51,16 @@ export const DEV_CONFIG = {
             (Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_USE_LOCAL ||
             (Constants.manifest?.extra as any)?.EXPO_PUBLIC_USE_LOCAL;
         if (String(useLocal).trim() === '1') {
-            console.log('[DEV_CONFIG] Using explicit LOCAL API override:', DEV_CONFIG.LOCAL_API_BASE_URL);
-            return DEV_CONFIG.LOCAL_API_BASE_URL;
+            const { api } = DEV_CONFIG.resolveLocalBaseUrls();
+            console.log('[DEV_CONFIG] Using explicit LOCAL API override:', api);
+            return api;
         }
-        // Default to PROD API (Vercel) to ensure production connectivity during development as well
-        console.log('[DEV_CONFIG] Using default PROD API:', DEV_CONFIG.PROD_API_BASE_URL);
-        // return DEV_CONFIG.LOCAL_API_BASE_URL;
-        return DEV_CONFIG.PROD_API_BASE_URL;
+        // Default to LOCAL API for development
+        {
+            const { api } = DEV_CONFIG.resolveLocalBaseUrls();
+            console.log('[DEV_CONFIG] Using default LOCAL API:', api);
+            return api;
+        }
     },
     getWsUrl: () => {
         // Prefer public env or extra for WS if provided
@@ -54,11 +78,16 @@ export const DEV_CONFIG = {
             (Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_USE_LOCAL ||
             (Constants.manifest?.extra as any)?.EXPO_PUBLIC_USE_LOCAL;
         if (String(useLocal).trim() === '1') {
-            console.log('[DEV_CONFIG] Using explicit LOCAL WS override:', DEV_CONFIG.LOCAL_WS_URL);
-            return DEV_CONFIG.LOCAL_WS_URL;
+            const { ws } = DEV_CONFIG.resolveLocalBaseUrls();
+            console.log('[DEV_CONFIG] Using explicit LOCAL WS override:', ws);
+            return ws;
         }
-        console.log('[DEV_CONFIG] Using default PROD WS:', DEV_CONFIG.PROD_WS_URL);
-        return DEV_CONFIG.PROD_WS_URL;
+        // Default to LOCAL WS for development
+        {
+            const { ws } = DEV_CONFIG.resolveLocalBaseUrls();
+            console.log('[DEV_CONFIG] Using default LOCAL WS:', ws);
+            return ws;
+        }
     },
 };
 
