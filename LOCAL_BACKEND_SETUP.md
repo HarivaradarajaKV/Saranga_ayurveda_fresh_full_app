@@ -1,26 +1,24 @@
 # Local Backend Development Setup
 
 ## Overview
-The app is now configured to connect to your local backend for development instead of the Vercel deployment.
+Flip a single flag inside `app/config/dev.ts` to choose whether the client talks to your local Node server or the deployed Vercel backend—no other code changes required.
 
 ## Configuration Changes Made
 
 ### 1. API Configuration (`app/config/api.ts`)
-- Updated `getBaseUrl()` to use local backend in development mode
-- Modified WebSocket connection to use local WebSocket server
-- Added dynamic URL switching based on `__DEV__` flag
+- `getBaseUrl()` now reads a simple toggle value and logs which backend is active
+- WebSocket helpers reuse the same toggle, so both HTTP and WS stay in sync automatically
 
 ### 2. Development Configuration (`app/config/dev.ts`)
-- Created centralized dev configuration
-- Easy switching between local and production URLs
-- Configurable API and WebSocket endpoints
+- Adds `const USE_LOCAL_BACKEND = false;` – set it to `true` whenever you want to hit your local server
+- Retains automatic LAN-IP discovery for Expo Go sessions when using the local backend
 
 ## Backend Setup Instructions
 
 ### 1. Start Your Local Backend
 Make sure your backend server is running on:
-- **API Server**: `http://localhost:5000/api`
-- **WebSocket Server**: `ws://localhost:5001` (optional)
+- **API Server**: `http://localhost:5001/api`
+- **WebSocket Server**: `ws://localhost:5001`
 
 ### 2. Backend Requirements
 Your local backend should have:
@@ -36,21 +34,15 @@ node test-api-config.js
 
 ## Switching Between Environments
 
-### Development Mode (Local Backend)
-- Automatically enabled when `__DEV__` is true
-- Uses `http://localhost:5000/api`
-- WebSocket: `ws://localhost:5001`
-
-### Production Mode (Vercel)
-- Automatically enabled when `__DEV__` is false
-- Uses `https://ayurveda-saranga-backend.vercel.app/api`
-- WebSocket: `wss://ayurveda-saranga-backend.vercel.app/ws`
+1. Open `app/config/dev.ts`
+2. Set `const USE_LOCAL_BACKEND = true;` to use your LAN/local backend (remember to start the server)
+3. Set it back to `false` to hit the hosted Vercel backend (no local server needed)
 
 ## Troubleshooting
 
 ### Connection Issues
 1. **Backend not running**: Start your backend server
-2. **Wrong port**: Update `DEV_CONFIG` in `app/config/dev.ts`
+2. **Wrong port**: Update the port values in `app/config/dev.ts` (`resolveLocalBaseUrls`)
 3. **CORS errors**: Ensure your backend allows requests from Expo
 4. **Network issues**: Check if localhost is accessible
 

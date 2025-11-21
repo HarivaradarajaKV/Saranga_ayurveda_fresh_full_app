@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import axios, { AxiosInstance } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -110,64 +109,17 @@ const sendUpdate = (userId: string, action: string, payload: any) => {
     }
 };
 
-// Get the local IP address from Expo Constants
-const getLocalIpAddress = () => {
-  try {
-    if (DEBUG_API) console.log('[API Config] Getting local IP address');
-    
-    // For web platform
-    if (Platform.OS === 'web') {
-      if (DEBUG_API) console.log('[API Config] Using localhost for web platform');
-      return 'localhost';
-    }
-    
-    // For Expo Go
-    if (__DEV__) {
-      // Try to get IP from Expo manifest
-      if (Constants.manifest2?.extra?.expoGo?.debuggerHost) {
-        const ip = Constants.manifest2.extra.expoGo.debuggerHost.split(':')[0];
-        if (DEBUG_API) console.log('[API Config] Using Expo debuggerHost IP:', ip);
-        return ip;
-      }
-
-      // Try to get IP from hostUri
-      if (Constants.manifest2?.hostUri) {
-        const ip = Constants.manifest2.hostUri.split(':')[0];
-        if (DEBUG_API) console.log('[API Config] Using Expo hostUri IP:', ip);
-        return ip;
-      }
-    }
-    
-    // Final fallback to localhost
-    if (DEBUG_API) console.log('[API Config] Using localhost as fallback');
-    return 'localhost';
-    
-  } catch (error) {
-    if (DEBUG_API) console.error('[API Config] Error getting IP address:', error);
-    return 'localhost';
-  }
-};
-
 // Get base URL using local mode when enabled, with dynamic LAN IP
 export const getBaseUrl = () => {
     try {
-        // @ts-ignore - Expo injects public env at build/runtime
-        const useLocalEnv = (process.env.EXPO_PUBLIC_USE_LOCAL as string | undefined)
-            || (Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_USE_LOCAL
-            || (Constants.manifest?.extra as any)?.EXPO_PUBLIC_USE_LOCAL;
-
-        // If EXPO_PUBLIC_USE_LOCAL === '1', prefer dynamic local IP
-        if (String(useLocalEnv).trim() === '1') {
-            const ip = getLocalIpAddress();
-            const url = `http://${ip}:5001/api`;
-            if (DEBUG_API) console.log('[API Config] Local mode enabled. Using dynamic local API URL:', url);
-            return url;
+        const backend = DEV_CONFIG.getActiveBackend();
+        if (DEBUG_API) {
+            console.log('[API Config] Active backend:', {
+                target: backend.name,
+                api: backend.api,
+            });
         }
-
-        // Fallback to DEV_CONFIG (which itself defaults to LOCAL in dev)
-        const apiUrl = DEV_CONFIG.getApiUrl();
-        if (DEBUG_API) console.log('[API Config] Using API URL from DEV_CONFIG:', apiUrl);
-        return apiUrl;
+        return backend.api;
     } catch (error) {
         if (DEBUG_API) console.error('[API Config] Failed to resolve base URL, falling back to DEV_CONFIG:', error);
         return DEV_CONFIG.getApiUrl();
