@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiService } from '../../app/services/api';
+import { OptimizedImage } from '../../app/components/OptimizedImage';
 
 interface Product {
   id: number;
@@ -88,9 +89,13 @@ export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> =
             style={styles.productCard}
             onPress={() => handleProductPress(product)}
           >
-            <Image 
-              source={{ uri: apiService.getFullImageUrl(product.image_url) }} 
-              style={styles.productImage} 
+            <OptimizedImage
+              source={{ uri: apiService.getFullImageUrl(product.image_url) }}
+              style={styles.productImage}
+              placeholderColor="#f8f9fa"
+              showLoader={true}
+              priority="low"
+              resizeMode="cover"
             />
             <View style={styles.productInfo}>
               <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>

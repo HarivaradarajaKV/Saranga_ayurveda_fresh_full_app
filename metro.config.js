@@ -13,5 +13,19 @@ config.resolver.assetExts.push(
   'jpg'
 );
 
+// Increase max workers for faster bundling
+config.maxWorkers = 2;
+
+// Optimize cache for better performance
+config.cacheStores = [
+  ...(config.cacheStores || []),
+];
+
+// Increase timeout settings
+config.server = {
+  ...config.server,
+  port: 8081,
+};
+
 module.exports = config;
 

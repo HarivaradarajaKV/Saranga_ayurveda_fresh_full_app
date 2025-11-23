@@ -24,6 +24,7 @@ import { apiService } from '../services/api';
 import ProductReviews from '../components/ProductReviews';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ExpandableDescription } from '../components/ExpandableDescription';
+import { OptimizedImage } from '../components/OptimizedImage';
 import {
   ProductSize,
   Benefits,
@@ -34,6 +35,7 @@ import {
   FrequentlyBoughtTogether,
   ProductDescription
 } from '../../components/product';
+import { imagePreloader } from '../utils/imagePreloader';
 
 interface Product {
   id: number;
@@ -122,6 +124,19 @@ export default function ProductPage() {
     loadProductData();
     fetchReviews();
   }, []);
+
+  // Preload next images when current image index changes
+  useEffect(() => {
+    if (productData) {
+      const imageUrls = [
+        productData.image_url,
+        productData.image_url2,
+        productData.image_url3
+      ].filter(Boolean).map(url => apiService.getFullImageUrl(url));
+      
+      imagePreloader.preloadCarouselImages(imageUrls, currentImageIndex);
+    }
+  }, [currentImageIndex, productData]);
 
   const checkAuth = async () => {
     try {
@@ -500,10 +515,13 @@ export default function ProductPage() {
               style={styles.imageWrapper}
               activeOpacity={0.9}
             >
-              <Image 
-                source={{ uri: imageErrors[0] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url) }} 
+              <OptimizedImage
+                source={{ uri: apiService.getFullImageUrl(productData.image_url) }}
                 style={styles.productImage}
                 resizeMode="contain"
+                placeholderColor="#f8f9fa"
+                showLoader={true}
+                priority="high"
                 onError={() => handleImageError(0)}
               />
               <View style={styles.imageOverlay}>
@@ -516,10 +534,13 @@ export default function ProductPage() {
                 style={styles.imageWrapper}
                 activeOpacity={0.9}
               >
-                <Image 
-                  source={{ uri: imageErrors[1] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url2) }} 
+                <OptimizedImage
+                  source={{ uri: apiService.getFullImageUrl(productData.image_url2) }}
                   style={styles.productImage}
                   resizeMode="contain"
+                  placeholderColor="#f8f9fa"
+                  showLoader={true}
+                  priority="normal"
                   onError={() => handleImageError(1)}
                 />
                 <View style={styles.imageOverlay}>
@@ -533,10 +554,13 @@ export default function ProductPage() {
                 style={styles.imageWrapper}
                 activeOpacity={0.9}
               >
-                <Image 
-                  source={{ uri: imageErrors[2] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url3) }} 
+                <OptimizedImage
+                  source={{ uri: apiService.getFullImageUrl(productData.image_url3) }}
                   style={styles.productImage}
                   resizeMode="contain"
+                  placeholderColor="#f8f9fa"
+                  showLoader={true}
+                  priority="normal"
                   onError={() => handleImageError(2)}
                 />
                 <View style={styles.imageOverlay}>

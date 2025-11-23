@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -15,6 +14,7 @@ import { useWishlist } from '../WishlistContext';
 import { useCart, CartItem } from '../CartContext';
 import { apiService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { OptimizedImage } from './OptimizedImage';
 
 const { width } = Dimensions.get('window');
 
@@ -50,7 +50,6 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
   const { addItem, getCartItems } = useCart();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const inWishlist = isInWishlist(product.id);
-  const [imageError, setImageError] = useState(false);
   const [isWishlistProcessing, setIsWishlistProcessing] = useState(false);
   const [isCartProcessing, setIsCartProcessing] = useState(false);
   const [lastTapTimestamp, setLastTapTimestamp] = useState(0);
@@ -274,14 +273,16 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
         style={styles.cardTouchable}
       >
         <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: imageError ? 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image' : imageUrl }} 
+          <OptimizedImage
+            source={{ uri: imageUrl }}
             style={styles.image}
-            onError={() => {
-              console.log('Image failed to load:', imageUrl);
-              setImageError(true);
+            placeholderColor="#f8f9fa"
+            showLoader={true}
+            priority="normal"
+            resizeMode="cover"
+            onError={(error) => {
+              console.log('Image failed to load:', imageUrl, error);
             }}
-            onLoad={() => setImageError(false)}
           />
           {hasOffer && (
             <Animated.View style={styles.offerBadge}>

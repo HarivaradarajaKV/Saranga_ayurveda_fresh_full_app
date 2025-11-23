@@ -11,8 +11,6 @@ import { CategoryProvider } from './CategoryContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import AddressProvider from './AddressContext';
 import { OrderProvider } from './OrderContext';
-import { customScreenAnimation } from './navigation/CustomScreenAnimation';
-import { TransitionPresets } from '@react-navigation/stack';
 import { ErrorBoundary } from './ErrorBoundary';
 import './globalErrorHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -90,16 +88,21 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (error) throw error;
+    if (error) {
+      console.error('Font loading error:', error);
+      // Don't throw error, just log it and continue without the font
+    }
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded || error) {
+      // Hide splash screen even if font loading failed
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, error]);
 
-  if (!loaded) {
+  // Show loading state only if fonts are still loading and no error
+  if (!loaded && !error) {
     return null;
   }
 

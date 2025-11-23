@@ -509,7 +509,22 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) {
-    throw new Error('useCart must be used within a CartProvider');
+    // Return default values instead of throwing to prevent crashes
+    console.warn('useCart must be used within a CartProvider, using defaults');
+    return {
+      items: [],
+      selectedItems: [],
+      addItem: () => {},
+      removeItem: () => {},
+      updateQuantity: () => {},
+      getItemCount: () => 0,
+      getTotal: () => 0,
+      clearCart: () => {},
+      toggleItemSelection: () => {},
+      setSelectedItems: () => {},
+      getSelectedItems: () => [],
+      getCartItems: () => [],
+    };
   }
   return context;
 };

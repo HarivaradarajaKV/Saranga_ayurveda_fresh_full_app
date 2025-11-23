@@ -3,9 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.1",
   "scripts": {
-    "start": "npx expo start",
+    "start": "npx expo start --clear",
     "start-default": "npx expo start",
-    "dev": "npx expo start --dev",
+    "start:lan": "npx expo start --clear --lan",
+    "start:tunnel": "npx expo start --clear --tunnel",
+    "dev": "npx expo start --dev --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "migrate-sdk54": "node ./scripts/migrate-to-sdk54.js",
     "verify-sdk54": "node ./scripts/verify-sdk54.js",

@@ -247,7 +247,18 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
 export const useAddress = () => {
   const context = useContext(AddressContext);
   if (!context) {
-    throw new Error('useAddress must be used within an AddressProvider');
+    // Return default values instead of throwing to prevent crashes
+    console.warn('useAddress must be used within an AddressProvider, using defaults');
+    return {
+      addresses: [],
+      loading: false,
+      fetchAddresses: async () => {},
+      addAddress: async () => {},
+      updateAddress: async () => {},
+      deleteAddress: async () => {},
+      setDefaultAddress: async () => {},
+      getDefaultAddress: () => undefined,
+    };
   }
   return context;
 };

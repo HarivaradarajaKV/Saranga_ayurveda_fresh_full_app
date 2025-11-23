@@ -505,8 +505,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 export const useOrders = () => {
   const context = useContext(OrderContext);
+  // OrderContext already has default values, but return safe defaults if somehow undefined
   if (!context) {
-    throw new Error('useOrders must be used within an OrderProvider');
+    console.warn('useOrders context is undefined, using defaults');
+    return {
+      orders: [],
+      loading: false,
+      createOrder: async () => { throw new Error('OrderProvider not available') },
+      fetchOrders: async () => {},
+      updateOrderStatus: async () => {},
+      getOrderById: () => undefined,
+      deleteOrder: async () => {},
+      getOrderDetails: () => undefined,
+    };
   }
   return context;
 }; 

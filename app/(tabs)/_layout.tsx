@@ -17,8 +17,8 @@ export const useBottomTabBarHeight = () => {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { wishlist = [] } = useWishlist() || {};
-  const { getItemCount = () => 0 } = useCart() || {};
+  const { wishlist = [] } = useWishlist();
+  const { getItemCount = () => 0 } = useCart();
 
   return (
     <Tabs

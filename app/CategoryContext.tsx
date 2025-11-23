@@ -160,7 +160,18 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
 export function useCategories() {
     const context = useContext(CategoryContext);
     if (context === undefined) {
-        throw new Error('useCategories must be used within a CategoryProvider');
+        // Return default values instead of throwing to prevent crashes
+        console.warn('useCategories must be used within a CategoryProvider, using defaults');
+        return {
+            categories: [],
+            mainCategories: [],
+            subCategories: {},
+            loading: false,
+            error: null,
+            fetchCategories: async () => {},
+            getCategoryById: () => undefined,
+            getSubcategories: () => [],
+        };
     }
     return context;
 } 

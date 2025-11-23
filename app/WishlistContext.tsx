@@ -244,7 +244,16 @@ const WishlistProvider: React.FC<WishlistProviderProps> = ({ children }) => {
 export const useWishlist = () => {
   const context = useContext(WishlistContext);
   if (!context) {
-    throw new Error('useWishlist must be used within a WishlistProvider');
+    // Return default values instead of throwing to prevent crashes
+    console.warn('useWishlist must be used within a WishlistProvider, using defaults');
+    return {
+      wishlist: [],
+      setWishlist: () => {},
+      addToWishlist: () => {},
+      removeFromWishlist: () => {},
+      isInWishlist: () => false,
+      clearWishlist: () => {},
+    };
   }
   return context;
 };

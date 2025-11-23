@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProductCard from './components/ProductCard';
 import { apiService } from './services/api';
 import { useWishlist } from './WishlistContext';
@@ -25,13 +25,11 @@ import { useCart } from './CartContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 
-const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = Platform.OS === 'ios' ? 120 : 100;
 // Calculate responsive card width accounting for padding and margins
 // Grid padding: 12px on each side, 6px margin between cards
 const GRID_PADDING = 12;
 const CARD_SPACING = 6; // Space between cards
-const ITEM_WIDTH = (width - (GRID_PADDING * 2) - CARD_SPACING) / 2;
 
 const AnimatedScrollView = Animated.createAnimatedComponent(Animated.ScrollView);
 
@@ -94,9 +92,14 @@ export default function AllProductsPage() {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { addItem } = useCart();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
   
   // Get responsive dimensions
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
+  
+  // Calculate header height with status bar for production builds
+  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0;
+  const headerBaseHeight = Platform.OS === 'ios' ? 44 : 56;
   
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -270,18 +273,52 @@ export default function AllProductsPage() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor="#694d21" translucent={false} />
+    <View style={styles.container}>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="#694d21" 
+        translucent={false}
+      />
+      {/* Custom header that properly accounts for status bar - positioned absolutely at top */}
+      <View style={[
+        styles.customHeader,
+        {
+          top: 0,
+          left: 0,
+          right: 0,
+          position: 'absolute',
+          zIndex: 1000,
+          ...(Platform.OS === 'android' && statusBarHeight > 0 && {
+            paddingTop: statusBarHeight,
+            height: headerBaseHeight + statusBarHeight,
+          })
+        }
+      ]}>
+        <TouchableOpacity 
+          onPress={() => router.back()}
+          style={styles.headerBackButton}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{title as string || 'All Products'}</Text>
+        <View style={styles.headerRight} />
+      </View>
       <Stack.Screen 
         options={{
-          title: title as string || 'All Products',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#694d21' }, // match app theme
-          headerTitleStyle: { color: '#fff', fontWeight: 'bold', fontSize: 19 },
-          headerTintColor: '#fff', // makes back arrow white for contrast
-          statusBarTranslucent: false,
+          headerShown: false,
         }}
       />
+      <SafeAreaView 
+        style={[
+          styles.safeArea,
+          {
+            paddingTop: Platform.OS === 'android' && statusBarHeight > 0 
+              ? headerBaseHeight + statusBarHeight 
+              : headerBaseHeight,
+          }
+        ]} 
+        edges={['left', 'right', 'bottom']}
+      >
       {products.length === 0 && !loading ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="cube-outline" size={64} color="#8E8E93" />
@@ -295,7 +332,10 @@ export default function AllProductsPage() {
           numColumns={2}
           contentContainerStyle={[
             styles.productGrid,
-            { paddingHorizontal: responsiveGridPadding }
+            { 
+              paddingHorizontal: responsiveGridPadding,
+              paddingBottom: Math.max(insets.bottom, 16)
+            }
           ]}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
@@ -322,7 +362,8 @@ export default function AllProductsPage() {
           }
         />
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -340,6 +381,56 @@ const colors = {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  wrapper: {
+    flex: 1,
+  },
+  statusBarSpacer: {
+    backgroundColor: '#694d21',
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  customHeader: {
+    backgroundColor: '#694d21',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: Platform.OS === 'ios' ? 44 : 56,
+    ...Platform.select({
+      android: {
+        elevation: 4,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+    }),
+  },
+  headerBackButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 19,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginHorizontal: 16,
+  },
+  headerRight: {
+    width: 40,
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: colors.background,
   },
