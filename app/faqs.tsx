@@ -38,7 +38,7 @@ export default function FAQsScreen() {
         </View>
         <FAQItem q="How long is shipping?" a="Orders typically ship within 2-5 business days." />
         <FAQItem q="Can I return a product?" a="Yes, within 7 days of delivery in unused condition." />
-        <FAQItem q="How do I contact support?" a="Email us at paysarangaayurveda@gmail.com." />
+        <FAQItem q="How do I contact support?" a="Email us at sarangaconsumershelp@gmail.com." />
       </ScrollView>
     </>
   );

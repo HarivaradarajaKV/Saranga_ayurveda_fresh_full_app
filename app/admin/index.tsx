@@ -42,6 +42,7 @@ const ADMIN_ROUTES = {
     COMBOS: '/admin/combos' as const,
     ORDERS: '/admin/orders' as const,
     REVIEWS: '/admin/reviews' as const,
+    GST: '/admin/gst' as const,
 } as const;
 
 function AdminDashboardInner() {
@@ -385,6 +386,13 @@ function AdminDashboardInner() {
                         >
                             <Ionicons name="people" size={28} color="#fff" />
                             <Text style={styles.quickActionTitle}>Users</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.quickActionCard, { backgroundColor: '#9C27B0' }]}
+                            onPress={() => safeNavigate(ADMIN_ROUTES.GST)}
+                        >
+                            <Ionicons name="receipt" size={28} color="#fff" />
+                            <Text style={styles.quickActionTitle}>GST</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

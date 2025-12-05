@@ -18,8 +18,37 @@ export const generateInvoice = async (order: Order) => {
     const discountAmount = Number(order.discount_amount || 0);
     const deliveryCharge = Number(order.delivery_charge || 0);
     // Compute payable from components to ensure consistency across screens
-    const itemsSubtotal = (order.items || []).reduce((sum, item) => sum + Number(item.price_at_time || 0) * Number(item.quantity || 0), 0);
-    const totalAmount = itemsSubtotal - discountAmount + deliveryCharge;
+    const itemsBreakdown = (order.items || []).map(item => {
+      const qty = Number(item.quantity || 0);
+      const grossUnit = Number(item.price_at_time || 0); // GST-inclusive unit price
+      const gstPct = Number(item.gst_percentage || 0);
+      const explicitGstUnit = qty > 0 ? Number(item.gst_amount || 0) / qty : 0;
+      // Prefer stored gst_amount; otherwise derive from percentage assuming price includes GST
+      const derivedGstUnit = gstPct > 0 ? grossUnit - (grossUnit / (1 + gstPct / 100)) : 0;
+      const gstPerUnit = explicitGstUnit || derivedGstUnit;
+      const netUnit = grossUnit - gstPerUnit; // price before GST
+      const gstLine = gstPerUnit * qty;
+      const lineTotal = grossUnit * qty; // includes GST
+      return {
+        ...item,
+        qty,
+        grossUnit,
+        gstPct,
+        gstPerUnit,
+        gstLine,
+        netUnit,
+        lineTotal,
+      };
+    });
+    const itemsSubtotal = itemsBreakdown.reduce((sum, item) => sum + item.lineTotal, 0);
+    // GST is already included in product price; keep it for display only
+    const gstAmount = (() => {
+      if (order.gst_amount !== undefined && order.gst_amount !== null) return Number(order.gst_amount);
+      return itemsBreakdown.reduce((sum, item) => sum + item.gstLine, 0);
+    })();
+    const subtotalAfterDiscount = itemsSubtotal - discountAmount;
+    // Do NOT add gstAmount again; prices are GST-inclusive
+    const totalAmount = subtotalAfterDiscount + deliveryCharge;
 
     const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
 
@@ -136,6 +165,15 @@ export const generateInvoice = async (order: Order) => {
                   <td class="right" style="color:#28a745">- ${formatPrice(discountAmount)}</td>
                 </tr>` : ''}
                 <tr>
+                  <td class="muted">Subtotal (after discount)</td>
+                  <td class="right">${formatPrice(subtotalAfterDiscount)}</td>
+                </tr>
+                ${gstAmount > 0 ? `
+                <tr>
+                  <td class="muted">GST (included in item prices)</td>
+                  <td class="right">${formatPrice(gstAmount)}</td>
+                </tr>` : ''}
+                <tr>
                   <td class="muted">Delivery Charges</td>
                   <td class="right">${formatPrice(deliveryCharge)}</td>
                 </tr>
@@ -159,17 +197,19 @@ export const generateInvoice = async (order: Order) => {
                 <tr>
                   <th>Product</th>
                   <th class="right">Qty</th>
-                  <th class="right">Price</th>
-                  <th class="right">Total</th>
+                  <th class="right">Price (excl. GST)</th>
+                  <th class="right">GST</th>
+                  <th class="right">Total (incl. GST)</th>
                 </tr>
               </thead>
               <tbody>
-                ${(order.items || []).map(item => `
+                ${itemsBreakdown.map(item => `
                   <tr>
-                    <td><strong>${item.product_name}</strong>${item.variant ? ` <span class="muted">(${item.variant})</span>` : ''}</td>
-                    <td class="right">${Number(item.quantity || 0)}</td>
-                    <td class="right">${formatPrice(Number(item.price_at_time || 0))}</td>
-                    <td class="right">${formatPrice(Number(item.price_at_time || 0) * Number(item.quantity || 0))}</td>
+                    <td><strong>${item.product_name}</strong>${item.variant ? ` <span class="muted">(${item.variant})</span>` : ''}${item.gstPct ? `<div class="muted">GST: ${item.gstPct.toFixed(2)}% (${formatPrice(item.gstLine)})</div>` : ''}</td>
+                    <td class="right">${item.qty}</td>
+                    <td class="right">${formatPrice(item.netUnit)}<div class="muted">per unit</div></td>
+                    <td class="right">${formatPrice(item.gstLine)}<div class="muted">${item.gstPct.toFixed(2)}%</div></td>
+                    <td class="right">${formatPrice(item.lineTotal)}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -181,7 +221,7 @@ export const generateInvoice = async (order: Order) => {
             <p>We hope you enjoy your Ayurvedic products.</p>
             <div class="contact-info">
               <p>For any queries, please contact us:</p>
-              <p>📧 paysarangaayurveda@gmail.com | 📱 +91-XXXXXXXXXX</p>
+              <p>📧 sarangaconsumershelp@gmail.com | 📱 +91-9008145980</p>
               <p>www.sarangaayurveda.com</p>
             </div>
           </div>

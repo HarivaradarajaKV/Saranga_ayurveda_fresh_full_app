@@ -24,6 +24,7 @@ export interface Order {
   updated_at: string;
   discount_amount?: number;
   delivery_charge?: number;
+  gst_amount?: number;
 }
 
 interface OrderItem {
@@ -36,6 +37,8 @@ interface OrderItem {
   category?: string;
   description?: string;
   offer_percentage?: number;
+  gst_percentage?: number;
+  gst_amount?: number;
 }
 
 interface RawOrderData {
@@ -73,8 +76,11 @@ interface RawOrderData {
     category?: string;
     description?: string;
     offer_percentage?: number;
+    gst_percentage?: number;
+    gst_amount?: number;
   }>;
   payment_method_display?: string;
+  gst_amount?: number;
 }
 
 export type OrderSummary = Omit<Order, 'items'> & {
@@ -254,7 +260,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Process ALL orders - no limit to ensure all orders from database are loaded
       const ordersToProcess = Array.isArray(response.data) ? response.data : [];
 
-      const processedOrders = ordersToProcess.map((order: RawOrderData) => {
+        const processedOrders = ordersToProcess.map((order: RawOrderData) => {
         // Extract shipping address from flattened fields
         const sanitize = (v: any) => {
           if (v === null || v === undefined) return '';
@@ -283,10 +289,24 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const paymentMethodDisplay = order.payment_method_display || 
           (order.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment');
 
+        const normalizedItems = (order.items || []).map((itm: any) => ({
+          product_id: itm.product_id,
+          product_name: itm.product_name,
+          quantity: itm.quantity,
+          price_at_time: itm.price_at_time,
+          variant: itm.variant,
+          image_url: itm.image_url,
+          category: itm.category,
+          description: itm.description,
+          offer_percentage: itm.offer_percentage,
+          gst_percentage: Number(itm.gst_percentage || 0),
+          gst_amount: Number(itm.gst_amount || 0),
+        }));
+
         return {
           id: order.id.toString(),
           user_id: order.user_id.toString(),
-          items: order.items || [],
+          items: normalizedItems,
           total_amount: Number(order.total_amount) || 0,
           payment_method: order.payment_method?.toLowerCase() || 'online',
           payment_method_display: paymentMethodDisplay,
@@ -295,7 +315,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           created_at: order.created_at || new Date().toISOString(),
           updated_at: order.updated_at || new Date().toISOString(),
           discount_amount: Number(order.discount_amount) || 0,
-          delivery_charge: Number(order.delivery_charge) || 0
+          delivery_charge: Number(order.delivery_charge) || 0,
+          gst_amount: Number(order.gst_amount) || 0
         };
       });
 

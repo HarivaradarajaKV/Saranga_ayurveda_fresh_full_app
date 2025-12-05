@@ -10,9 +10,9 @@ import {
   Platform,
   Animated,
   Keyboard,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ interface Message {
 
 export default function LiveChatPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -37,16 +38,45 @@ export default function LiveChatPage() {
   ]);
   const scrollViewRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const inputPositionAnim = useRef(new Animated.Value(0)).current;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => setKeyboardVisible(true)
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => {
+        const height = event.endCoordinates.height;
+        setKeyboardVisible(true);
+        setKeyboardHeight(height);
+        // Animate input position for Android
+        if (Platform.OS === 'android') {
+          Animated.timing(inputPositionAnim, {
+            toValue: height,
+            duration: 250,
+            useNativeDriver: false,
+          }).start();
+        }
+        // Scroll to bottom when keyboard appears
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
     );
     const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => setKeyboardVisible(false)
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+        setKeyboardHeight(0);
+        // Animate input position back for Android
+        if (Platform.OS === 'android') {
+          Animated.timing(inputPositionAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: false,
+          }).start();
+        }
+      }
     );
 
     Animated.timing(fadeAnim, {
@@ -116,23 +146,23 @@ export default function LiveChatPage() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <Stack.Screen 
+        options={{
+          title: 'Live Chat Support',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+          },
+          headerShadowVisible: false,
+        }}
+      />
+      
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <Stack.Screen 
-          options={{
-            title: 'Live Chat Support',
-            headerShown: true,
-            headerStyle: {
-              backgroundColor: '#fff',
-            },
-            headerShadowVisible: false,
-          }}
-        />
-        
         <Animated.View style={[styles.statusBar, { opacity: fadeAnim }]}>
           <LinearGradient
             colors={['#FFF0F5', '#FFE4E1']}
@@ -150,6 +180,7 @@ export default function LiveChatPage() {
             contentContainerStyle={styles.chatContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             {messages.map((msg) => (
               <Animated.View
@@ -181,18 +212,38 @@ export default function LiveChatPage() {
             ))}
           </ScrollView>
 
-          <View style={styles.inputContainer}>
+          <Animated.View style={[
+            styles.inputContainer,
+            Platform.OS === 'android' && {
+              marginBottom: inputPositionAnim
+            },
+            { 
+              paddingBottom: Math.max(insets.bottom, 10)
+            }
+          ]}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
                 value={message}
-                onChangeText={setMessage}
+                onChangeText={(text) => {
+                  setMessage(text);
+                  // Scroll to bottom when typing
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 100);
+                }}
                 placeholder="Type your message..."
                 placeholderTextColor="#999"
                 multiline
                 maxLength={500}
                 returnKeyType="send"
                 onSubmitEditing={sendMessage}
+                onFocus={() => {
+                  // Scroll to bottom when input is focused
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 300);
+                }}
               />
               <TouchableOpacity 
                 style={styles.sendButton}
@@ -207,7 +258,7 @@ export default function LiveChatPage() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -256,14 +307,13 @@ const styles = StyleSheet.create({
   },
   chatContent: {
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 90 : 70,
+    paddingBottom: 120,
   },
   inputContainer: {
     width: '100%',
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 0,
   },
   inputWrapper: {
     flexDirection: 'row',

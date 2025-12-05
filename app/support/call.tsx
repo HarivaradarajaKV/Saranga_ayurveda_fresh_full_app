@@ -24,7 +24,7 @@ const supportContacts: SupportContact[] = [
     id: 1,
     title: 'Customer Support',
     description: 'For general inquiries and product information',
-    number: '+91 8762342917',
+    number: '+91 9008145980',
     icon: 'headset',
     availability: '24/7',
   },

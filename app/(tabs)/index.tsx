@@ -3799,10 +3799,8 @@ const Page = () => {
               {/* Social Links */}
               <View style={styles.footerSocialContainer}>
                 {[
-                  { icon: 'logo-instagram', color: '#E1306C', url: 'https://instagram.com/curio_spry_official' },
-                  { icon: 'logo-facebook', color: '#4267B2', url: 'https://facebook.com/yourcompany' },
-                  { icon: 'logo-youtube', color: '#FF0000', url: 'https://youtube.com/yourcompany' },
-                  { icon: 'logo-twitter', color: '#1DA1F2', url: 'https://twitter.com/yourcompany' }
+                  { icon: 'logo-instagram', color: '#E1306C', url: 'https://www.instagram.com/saranga_ayurveda' },
+                  { icon: 'logo-whatsapp', color: '#25D366', url: 'https://whatsapp.com/channel/0029Vb76UKxL2ATwk9Z5Sd1z' }
                 ].map((social, index) => (
                   <TouchableOpacity
                     key={social.icon}

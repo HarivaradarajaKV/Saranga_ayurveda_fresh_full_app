@@ -105,6 +105,8 @@ const CheckoutPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [subtotal, setSubtotal] = useState(0);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
+  const [gstMap, setGstMap] = useState<Record<number, number>>({});
+  const [gstAmount, setGstAmount] = useState(0);
   const [total, setTotal] = useState(0);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -211,6 +213,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     loadCheckoutData();
     fetchAvailableCoupons();
+    fetchProductGstRates();
   }, []);
 
   useEffect(() => {
@@ -276,6 +279,22 @@ const CheckoutPage = () => {
     } catch (error) {
       console.error('Error fetching addresses:', error);
       throw error;
+    }
+  };
+
+  const fetchProductGstRates = async () => {
+    try {
+      const response = await apiService.get('/gst/products');
+      if (response.data && Array.isArray(response.data)) {
+        const map: Record<number, number> = {};
+        response.data.forEach((item: any) => {
+          map[Number(item.product_id)] = Number(item.percentage || 0);
+        });
+        setGstMap(map);
+      }
+    } catch (error) {
+      console.error('Error fetching product GST rates:', error);
+      setGstMap({});
     }
   };
 
@@ -421,12 +440,31 @@ const CheckoutPage = () => {
 
     setSubtotal(itemsTotal);
     
+    // Calculate subtotal after discount
+    const subtotalAfterDiscount = itemsTotal - discount;
+    
+    // Calculate GST per product (after discount allocation). Since discount may be coupon-level,
+    // we apply GST on finalPrice (already includes product-level offers) without reducing further.
+    let gstTotal = 0;
+    for (const item of selectedCartItems) {
+      const gstPct = gstMap[item.id] || 0;
+      // Use same finalPrice logic as above
+      let finalPrice: number;
+      if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+        finalPrice = item.combo_discounted_price;
+      } else {
+        finalPrice = Number(item.price) * (1 - (item.offer_percentage / 100));
+      }
+      gstTotal += finalPrice * item.quantity * (gstPct / 100);
+    }
+    setGstAmount(gstTotal);
+    
     // Calculate delivery charge (free for orders above 999)
     const delivery = itemsTotal > 999 ? 0 : 99;
     setDeliveryCharge(delivery);
     
-    // Apply discount and set total
-    const finalTotal = itemsTotal - discount + delivery;
+    // Apply discount, GST, and delivery to get final total
+    const finalTotal = subtotalAfterDiscount + gstTotal + delivery;
     setTotal(finalTotal);
   };
 
@@ -499,7 +537,7 @@ const CheckoutPage = () => {
         if (response.data?.order && response.data.order.id) {
           await clearCart();
           
-          router.push({
+          router.replace({
             pathname: "/orders/[id]",
             params: { 
               id: String(response.data.order.id),
@@ -580,7 +618,7 @@ const CheckoutPage = () => {
       }
       
       // Always navigate to success page
-      router.push({
+      router.replace({
         pathname: "/orders/[id]",
         params: { 
           id: String(currentOrderId),
@@ -954,6 +992,20 @@ const CheckoutPage = () => {
                   <Text style={styles.priceLabel}>Discount</Text>
                   <Text style={[styles.priceValue, styles.discountText]}>
                     -₹{discountAmount.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Subtotal (after discount)</Text>
+                <Text style={styles.priceValue}>
+                  ₹{(subtotal - discountAmount).toFixed(2)}
+                </Text>
+              </View>
+              {gstAmount > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>GST (per product rates)</Text>
+                  <Text style={styles.priceValue}>
+                    ₹{gstAmount.toFixed(2)}
                   </Text>
                 </View>
               )}

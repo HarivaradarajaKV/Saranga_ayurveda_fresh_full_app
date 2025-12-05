@@ -203,6 +203,14 @@ export default function AdminDashboard() {
 
             <TouchableOpacity
               style={styles.menuItem}
+              onPress={() => navigateTo('/admin/gst')}
+            >
+              <Ionicons name="receipt-outline" size={32} color="#1a1a1a" />
+              <Text style={styles.menuText}>GST Management</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => navigateTo('/admin/combos')}
             >
               <Ionicons name="cube-outline" size={32} color="#1a1a1a" />

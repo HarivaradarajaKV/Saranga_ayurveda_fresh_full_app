@@ -20,10 +20,10 @@ export default function ContactScreen() {
           <View style={styles.card}>
             <Ionicons name="mail-outline" size={22} color="#694d21" />
             <Text style={styles.cardTitle}>Email</Text>
-            <Text style={styles.cardValue}>paysarangaayurveda@gmail.com</Text>
+            <Text style={styles.cardValue}>sarangaconsumershelp@gmail.com</Text>
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={() => Linking.openURL('mailto:paysarangaayurveda@gmail.com')}
+              onPress={() => Linking.openURL('mailto:sarangaconsumershelp@gmail.com')}
               activeOpacity={0.8}
             >
               <Text style={styles.primaryButtonText}>Send Email</Text>
@@ -32,10 +32,10 @@ export default function ContactScreen() {
           <View style={styles.card}>
             <Ionicons name="call-outline" size={22} color="#694d21" />
             <Text style={styles.cardTitle}>Phone</Text>
-            <Text style={styles.cardValue}>+91 8762342917</Text>
+            <Text style={styles.cardValue}>+91 9008145980</Text>
             <TouchableOpacity
               style={styles.secondaryButton}
-              onPress={() => Linking.openURL('tel:+918762342917')}
+              onPress={() => Linking.openURL('tel:+919008145980')}
               activeOpacity={0.8}
             >
               <Text style={styles.secondaryButtonText}>Call Now</Text>
