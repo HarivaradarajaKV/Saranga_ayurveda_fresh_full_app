@@ -25,6 +25,12 @@ export interface Order {
   discount_amount?: number;
   delivery_charge?: number;
   gst_amount?: number;
+  shipment_status?: string;
+  shiprocket_order_id?: string;
+  shiprocket_shipment_id?: string;
+  awb_number?: string;
+  courier_name?: string;
+  courier_id?: string;
 }
 
 interface OrderItem {
@@ -81,6 +87,12 @@ interface RawOrderData {
   }>;
   payment_method_display?: string;
   gst_amount?: number;
+  shipment_status?: string;
+  shiprocket_order_id?: string;
+  shiprocket_shipment_id?: string;
+  awb_number?: string;
+  courier_name?: string;
+  courier_id?: string;
 }
 
 export type OrderSummary = Omit<Order, 'items'> & {
@@ -229,15 +241,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       if (mountedRef.current) setLoading(true);
-      
+
       // Get auth data
       const [token, userRole] = await Promise.all([
         AsyncStorage.getItem('auth_token'),
         AsyncStorage.getItem('user_role')
       ]);
-      
+
       const isAdmin = userRole === 'admin';
-      
+
       if (!token) {
         throw new Error('Authentication required');
       }
@@ -245,7 +257,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Use different endpoint for admin
       const endpoint = isAdmin ? apiService.ENDPOINTS.ADMIN_ORDERS : apiService.ENDPOINTS.ORDERS;
       const response = await apiService.get(endpoint);
-      
+
       if (response.error) {
         throw new Error(response.error);
       }
@@ -260,7 +272,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Process ALL orders - no limit to ensure all orders from database are loaded
       const ordersToProcess = Array.isArray(response.data) ? response.data : [];
 
-        const processedOrders = ordersToProcess.map((order: RawOrderData) => {
+      const processedOrders = ordersToProcess.map((order: RawOrderData) => {
         // Extract shipping address from flattened fields
         const sanitize = (v: any) => {
           if (v === null || v === undefined) return '';
@@ -281,12 +293,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         // Ensure status is lowercase and valid
         const normalizedStatus = order.status?.toLowerCase() || 'pending';
-        const validStatus = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].includes(normalizedStatus) 
-          ? normalizedStatus 
+        const validStatus = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].includes(normalizedStatus)
+          ? normalizedStatus
           : 'pending';
 
         // Use the payment_method_display from backend
-        const paymentMethodDisplay = order.payment_method_display || 
+        const paymentMethodDisplay = order.payment_method_display ||
           (order.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment');
 
         const normalizedItems = (order.items || []).map((itm: any) => ({
@@ -316,7 +328,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           updated_at: order.updated_at || new Date().toISOString(),
           discount_amount: Number(order.discount_amount) || 0,
           delivery_charge: Number(order.delivery_charge) || 0,
-          gst_amount: Number(order.gst_amount) || 0
+          gst_amount: Number(order.gst_amount) || 0,
+          shipment_status: (order as any).shipment_status,
+          shiprocket_order_id: (order as any).shiprocket_order_id,
+          shiprocket_shipment_id: (order as any).shiprocket_shipment_id,
+          awb_number: (order as any).awb_number,
+          courier_name: (order as any).courier_name,
+          courier_id: (order as any).courier_id
         };
       });
 
@@ -336,7 +354,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
           Alert.alert('Error', 'Failed to fetch orders');
         }
-      } catch {}
+      } catch { }
     } finally {
       fetchInProgressRef.current = false;
       if (mountedRef.current) setLoading(false);
@@ -380,21 +398,21 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (mountedRef.current) setLoading(true);
       const token = await AsyncStorage.getItem('auth_token');
       const isAdmin = await AsyncStorage.getItem('is_admin') === 'true';
-      
+
       if (!token) {
         throw new Error('Authentication required');
       }
 
       const endpoint = isAdmin ? `/admin/orders/${orderId}` : `/orders/${orderId}`;
       const response = await apiService.delete(endpoint);
-      
+
       if (response.data && response.data.success) {
         orderDetailsRef.current.delete(orderId);
         if (mountedRef.current) {
           setOrders(prev => prev.filter(order => order.id !== orderId));
           await saveOrdersToCache(Array.from(orderDetailsRef.current.values()));
         }
-        
+
         // Send notification to user about order deletion
         if (isAdmin) {
           await apiService.post('/notifications', {
@@ -420,7 +438,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (response.error) {
         try {
           if (mountedRef.current) Alert.alert('Error', response.error);
-        } catch {}
+        } catch { }
         return;
       }
 
@@ -441,7 +459,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Show success message
       try {
         if (mountedRef.current) Alert.alert('Success', 'Order status updated successfully');
-      } catch {}
+      } catch { }
     } catch (error) {
       console.error('[OrderContext] Error updating order status:', error);
       try {
@@ -451,7 +469,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             'Unable to update order status. Please try again later.'
           );
         }
-      } catch {}
+      } catch { }
     }
   };
 
@@ -482,7 +500,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }));
 
       // Use the payment_method_display from backend
-      const paymentMethodDisplay = rawOrder.payment_method_display || 
+      const paymentMethodDisplay = rawOrder.payment_method_display ||
         (rawOrder.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment');
 
       // Transform the order
@@ -498,7 +516,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         created_at: rawOrder.created_at,
         updated_at: rawOrder.updated_at,
         discount_amount: rawOrder.discount_amount,
-        delivery_charge: rawOrder.delivery_charge
+        delivery_charge: rawOrder.delivery_charge,
+        shipment_status: rawOrder.shipment_status,
+        shiprocket_order_id: rawOrder.shiprocket_order_id,
+        shiprocket_shipment_id: rawOrder.shiprocket_shipment_id,
+        awb_number: rawOrder.awb_number,
+        courier_name: rawOrder.courier_name,
+        courier_id: rawOrder.courier_id
       };
     } catch (error) {
       console.error('Error transforming order:', error);
@@ -533,10 +557,10 @@ export const useOrders = () => {
       orders: [],
       loading: false,
       createOrder: async () => { throw new Error('OrderProvider not available') },
-      fetchOrders: async () => {},
-      updateOrderStatus: async () => {},
+      fetchOrders: async () => { },
+      updateOrderStatus: async () => { },
       getOrderById: () => undefined,
-      deleteOrder: async () => {},
+      deleteOrder: async () => { },
       getOrderDetails: () => undefined,
     };
   }

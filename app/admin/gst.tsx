@@ -83,6 +83,19 @@ function GstPageInner() {
     };
   }, []);
 
+  useEffect(() => {
+    // Debug logging
+    if (productGst.length > 0 || allProducts.length > 0) {
+      console.log('GST Data State:', {
+        productGstCount: productGst.length,
+        allProductsCount: allProducts.length,
+        mergedCount: mergedProductGst.length,
+        sampleProductGst: productGst.slice(0, 2),
+        sampleMerged: mergedProductGst.slice(0, 2)
+      });
+    }
+  }, [productGst, allProducts, mergedProductGst]);
+
   const fetchGstRates = async () => {
     try {
       setLoading(true);
@@ -220,6 +233,19 @@ function GstPageInner() {
       })
       .sort((a, b) => (a.product_name || '').localeCompare(b.product_name || ''));
   }, [allProducts, productGst]);
+
+  useEffect(() => {
+    // Debug logging
+    if (productGst.length > 0 || allProducts.length > 0) {
+      console.log('GST Data State:', {
+        productGstCount: productGst.length,
+        allProductsCount: allProducts.length,
+        mergedCount: mergedProductGst.length,
+        sampleProductGst: productGst.slice(0, 2),
+        sampleMerged: mergedProductGst.slice(0, 2)
+      });
+    }
+  }, [productGst, allProducts, mergedProductGst]);
 
   const handleAdd = () => {
     setEditingGst(null);

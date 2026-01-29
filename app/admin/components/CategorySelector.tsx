@@ -22,8 +22,62 @@ export default function CategorySelector({
     onClose,
     onSelect,
     selectedCategory,
-}: CategorySelectorProps) {
+    multiSelect = false,
+    selectedCategories = [],
+    onSelectMultiple
+}: CategorySelectorProps & {
+    multiSelect?: boolean;
+    selectedCategories?: string[];
+    onSelectMultiple?: (categories: { id: number; name: string }[]) => void;
+}) {
     const { mainCategories, subCategories, loading, error, fetchCategories } = useCategories();
+    // Local state for multi-select
+    const [tempSelected, setTempSelected] = React.useState<string[]>([]);
+
+    React.useEffect(() => {
+        if (visible && multiSelect) {
+            setTempSelected(selectedCategories || []);
+        }
+
+        // Force refresh categories when modal opens to ensure we have latest data
+        if (visible) {
+            fetchCategories(true);
+        }
+    }, [visible, multiSelect, selectedCategories]);
+
+    const handleToggle = (category: { id: number; name: string }) => {
+        if (multiSelect) {
+            setTempSelected(prev => {
+                if (prev.includes(category.name)) {
+                    return prev.filter(c => c !== category.name);
+                } else {
+                    return [...prev, category.name];
+                }
+            });
+        } else {
+            onSelect(category);
+        }
+    };
+
+    const handleDone = () => {
+        if (multiSelect && onSelectMultiple) {
+            const selectedObjs: { id: number, name: string }[] = [];
+            // Reconstruct objects from names (a bit inefficient but safe)
+            const allCats = [...mainCategories, ...Object.values(subCategories).flat()];
+            tempSelected.forEach(name => {
+                const found = allCats.find(c => c.name === name);
+                if (found) selectedObjs.push(found);
+            });
+            onSelectMultiple(selectedObjs);
+        }
+        onClose();
+    };
+
+    // Helper to check if selected
+    const isSelected = (name: string) => {
+        if (multiSelect) return tempSelected.includes(name);
+        return selectedCategory === name;
+    };
 
     return (
         <Modal
@@ -35,10 +89,17 @@ export default function CategorySelector({
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Select Category</Text>
-                        <TouchableOpacity onPress={onClose}>
-                            <Ionicons name="close" size={24} color="#000" />
-                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>{multiSelect ? 'Select Categories' : 'Select Category'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {multiSelect && (
+                                <TouchableOpacity onPress={handleDone} style={{ marginRight: 16 }}>
+                                    <Text style={{ color: '#007AFF', fontWeight: '600', fontSize: 16 }}>Done</Text>
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={onClose}>
+                                <Ionicons name="close" size={24} color="#000" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                     <ScrollView style={styles.categoryList}>
                         {loading ? (
@@ -48,12 +109,9 @@ export default function CategorySelector({
                         ) : error ? (
                             <View style={styles.errorContainer}>
                                 <Text style={styles.errorText}>Error loading categories: {error}</Text>
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.retryButton}
-                                    onPress={() => {
-                                        // Trigger a refresh by calling fetchCategories
-                                        fetchCategories();
-                                    }}
+                                    onPress={() => fetchCategories()}
                                 >
                                     <Text style={styles.retryButtonText}>Retry</Text>
                                 </TouchableOpacity>
@@ -68,17 +126,27 @@ export default function CategorySelector({
                                     <TouchableOpacity
                                         style={[
                                             styles.categoryItem,
-                                            selectedCategory === category.name && styles.selectedCategory
+                                            isSelected(category.name) && styles.selectedCategory
                                         ]}
-                                        onPress={() => onSelect(category)}
+                                        onPress={() => handleToggle(category)}
                                     >
-                                        <Text style={[
-                                            styles.categoryName,
-                                            selectedCategory === category.name && styles.selectedCategoryText
-                                        ]}>
-                                            {category.name}
-                                        </Text>
-                                        {subCategories[category.id]?.length > 0 && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            {multiSelect && (
+                                                <Ionicons
+                                                    name={isSelected(category.name) ? "checkbox" : "square-outline"}
+                                                    size={24}
+                                                    color={isSelected(category.name) ? "#007bff" : "#666"}
+                                                    style={{ marginRight: 12 }}
+                                                />
+                                            )}
+                                            <Text style={[
+                                                styles.categoryName,
+                                                isSelected(category.name) && styles.selectedCategoryText
+                                            ]}>
+                                                {category.name}
+                                            </Text>
+                                        </View>
+                                        {subCategories[category.id]?.length > 0 && !multiSelect && (
                                             <Ionicons name="chevron-forward" size={20} color="#666" />
                                         )}
                                     </TouchableOpacity>
@@ -88,16 +156,26 @@ export default function CategorySelector({
                                             style={[
                                                 styles.categoryItem,
                                                 styles.subCategoryItem,
-                                                selectedCategory === subCategory.name && styles.selectedCategory
+                                                isSelected(subCategory.name) && styles.selectedCategory
                                             ]}
-                                            onPress={() => onSelect(subCategory)}
+                                            onPress={() => handleToggle(subCategory)}
                                         >
-                                            <Text style={[
-                                                styles.categoryName,
-                                                selectedCategory === subCategory.name && styles.selectedCategoryText
-                                            ]}>
-                                                {subCategory.name}
-                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                {multiSelect && (
+                                                    <Ionicons
+                                                        name={isSelected(subCategory.name) ? "checkbox" : "square-outline"}
+                                                        size={24}
+                                                        color={isSelected(subCategory.name) ? "#007bff" : "#666"}
+                                                        style={{ marginRight: 12 }}
+                                                    />
+                                                )}
+                                                <Text style={[
+                                                    styles.categoryName,
+                                                    isSelected(subCategory.name) && styles.selectedCategoryText
+                                                ]}>
+                                                    {subCategory.name}
+                                                </Text>
+                                            </View>
                                         </TouchableOpacity>
                                     ))}
                                 </View>

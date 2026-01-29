@@ -50,7 +50,7 @@ export default function OrdersPage() {
       const token = await AsyncStorage.getItem('auth_token');
       console.log('[OrdersPage] Auth token exists:', !!token);
       console.log('[OrdersPage] Current orders:', orderSummaries);
-      
+
       if (!token) {
         Alert.alert(
           'Authentication Required',
@@ -68,7 +68,7 @@ export default function OrdersPage() {
         );
         return;
       }
-      
+
       await fetchOrders();
     } catch (error) {
       console.error('[OrdersPage] Error checking auth and orders:', error);
@@ -106,7 +106,7 @@ export default function OrdersPage() {
     // Convert UTC to IST (IST is UTC+5:30)
     const ISTOffset = 5.5 * 60 * 60 * 1000;
     const istDate = new Date(date.getTime() + ISTOffset);
-    
+
     // Format date in IST
     const day = istDate.getUTCDate();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -116,7 +116,7 @@ export default function OrdersPage() {
     const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 || 12;
-    
+
     const formattedDate = `${day} ${month}, ${year}`;
     const formattedTime = `${displayHours}:${minutes} ${ampm}`;
 
@@ -162,7 +162,7 @@ export default function OrdersPage() {
         >
           <Text style={styles.shopButtonText}>Start Shopping</Text>
         </TouchableOpacity>
-        
+
         {/* Debug button */}
         <TouchableOpacity
           style={[styles.shopButton, { marginTop: 20, backgroundColor: '#666' }]}
@@ -189,7 +189,7 @@ export default function OrdersPage() {
           ),
         }}
       />
-      <ScrollView 
+      <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 120, flexGrow: 1 }}
         refreshControl={
@@ -264,6 +264,7 @@ export default function OrdersPage() {
                     const itemsSubtotal = (order.items || []).reduce((sum, it) => sum + Number(it.price_at_time || 0) * Number(it.quantity || 0), 0);
                     const discount = Number(order.discount_amount || 0);
                     const delivery = Number(order.delivery_charge || 0);
+                    // GST is already included in item prices, so don't add it again
                     const payable = itemsSubtotal - discount + delivery;
                     return <Text style={styles.totalAmount}>₹{payable.toFixed(2)}</Text>;
                   })()}

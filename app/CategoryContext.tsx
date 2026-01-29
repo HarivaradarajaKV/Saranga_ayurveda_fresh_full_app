@@ -18,7 +18,7 @@ interface CategoryContextType {
     subCategories: { [key: number]: Category[] };
     loading: boolean;
     error: string | null;
-    fetchCategories: () => Promise<void>;
+    fetchCategories: (forceRefresh?: boolean) => Promise<void>;
     getCategoryById: (id: number) => Category | undefined;
     getSubcategories: (parentId: number) => Category[];
 }
@@ -54,22 +54,22 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const fetchCategories = async () => {
+    const fetchCategories = async (forceRefresh: boolean = false) => {
         const now = Date.now();
-        // Don't fetch if we've fetched recently (within last 5 minutes)
-        if (now - lastFetchTime < CACHE_EXPIRY_TIME) {
+        // Don't fetch if we've fetched recently (within last 5 minutes) unless forced
+        if (!forceRefresh && now - lastFetchTime < CACHE_EXPIRY_TIME) {
             return;
         }
 
         try {
             setLoading(true);
             const response = await apiService.getCategories();
-            
+
             if (response.error) {
                 throw new Error(response.error);
             }
             const fetchedCategories = response.data as Category[] || [];
-            
+
             // If no categories were fetched, try to fetch from cache or show error
             if (fetchedCategories.length === 0) {
                 // Try to load from cache as fallback
@@ -78,7 +78,10 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
                     const { categories: cachedCategories } = JSON.parse(cachedData);
                     setCategories(cachedCategories);
                 } else {
-                    throw new Error('No categories available and no cached data found');
+                    // Only throw if we truly have nothing
+                    if (categories.length === 0) {
+                        throw new Error('No categories available and no cached data found');
+                    }
                 }
             } else {
                 setCategories(fetchedCategories);
@@ -111,12 +114,12 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     // Memoize derived category data
-    const mainCategories = useMemo(() => 
+    const mainCategories = useMemo(() =>
         categories.filter(cat => !cat.parent_id),
         [categories]
     );
 
-    const subCategories = useMemo(() => 
+    const subCategories = useMemo(() =>
         categories.reduce((acc, cat) => {
             if (cat.parent_id) {
                 if (!acc[cat.parent_id]) {
@@ -129,12 +132,12 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         [categories]
     );
 
-    const getCategoryById = useMemo(() => 
+    const getCategoryById = useMemo(() =>
         (id: number) => categories.find(cat => cat.id === id),
         [categories]
     );
 
-    const getSubcategories = useMemo(() => 
+    const getSubcategories = useMemo(() =>
         (parentId: number) => subCategories[parentId] || [],
         [subCategories]
     );
@@ -168,7 +171,7 @@ export function useCategories() {
             subCategories: {},
             loading: false,
             error: null,
-            fetchCategories: async () => {},
+            fetchCategories: async () => { },
             getCategoryById: () => undefined,
             getSubcategories: () => [],
         };

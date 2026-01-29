@@ -129,23 +129,23 @@ export default function OrderDetailsPage() {
   const { orders: orderSummaries, loading, fetchOrders, getOrderDetails } = useOrders();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
-  
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  
+
   // Use useEffect to fetch orders if not available
   useEffect(() => {
     console.log('[OrderDetailsPage] Initial load - id:', id);
     console.log('[OrderDetailsPage] Initial orders:', orderSummaries);
-    
+
     const loadData = async () => {
       await fetchOrders();
       setIsInitialLoading(false);
     };
-    
+
     loadData();
-    
+
     // Start animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -199,18 +199,18 @@ export default function OrderDetailsPage() {
   // Memoized format date function
   const formatDate = useMemo(() => (dateString: string) => {
     const date = new Date(dateString);
-    
+
     // Convert UTC to IST (IST is UTC+5:30)
     const ISTOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
     const istDate = new Date(date.getTime() + ISTOffset);
-    
+
     // Format date in IST
     const day = istDate.getUTCDate();
     const month = istDate.toLocaleString('en-IN', { month: 'short' });
     const year = istDate.getUTCFullYear();
     const hours = String(istDate.getUTCHours()).padStart(2, '0');
     const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
-    
+
     return `${day} ${month}, ${year}, ${hours}:${minutes}`;
   }, []);
 
@@ -282,10 +282,11 @@ export default function OrderDetailsPage() {
             </div>
             <div class="section">
               <h3>Price Details</h3>
-              <p>Subtotal: ${formatPrice(totalAmount)}</p>
+              <p>Subtotal: ${formatPrice(order.items.reduce((sum, it) => sum + Number(it.price_at_time) * Number(it.quantity), 0))}</p>
               ${discountAmount > 0 ? `<p>Discount: -${formatPrice(discountAmount)}</p>` : ''}
+              ${Number(order.gst_amount || 0) > 0 ? `<p>GST: ${formatPrice(Number(order.gst_amount || 0))}</p>` : ''}
               <p>Delivery Charges: ${formatPrice(deliveryCharge)}</p>
-              <p class="total">Total Amount: ${formatPrice(totalAmount - discountAmount + deliveryCharge)}</p>
+              <p class="total">Total Amount: ${formatPrice(totalAmount)}</p>
             </div>
           </body>
         </html>
@@ -380,7 +381,7 @@ export default function OrderDetailsPage() {
             headerShadowVisible: true,
             headerRight: () => (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={handleSupport}
                   style={{ padding: 8, marginRight: 8 }}
                   hitSlop={HIT_SLOP}
@@ -393,8 +394,8 @@ export default function OrderDetailsPage() {
             ),
           }}
         />
-        <ScrollView 
-          style={styles.container} 
+        <ScrollView
+          style={styles.container}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           bounces={true}
@@ -409,235 +410,276 @@ export default function OrderDetailsPage() {
             <Text style={styles.mainTitle}>Saranga Ayurveda</Text>
             <Text style={styles.subTitle}>Order Details</Text>
           </Animated.View>
-        {/* Order Status Section */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <View style={styles.sectionHeader}>
-            <View style={styles.titleContainer}>
-              <Ionicons name="checkmark-circle" size={24} color="#694d21" style={styles.icon} />
-              <Text style={styles.sectionTitle}>Order Status</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-              <Text style={styles.statusText}>{order.status}</Text>
-            </View>
-          </View>
-          <Text style={styles.dateText}>Ordered on {formatDate(order.created_at)}</Text>
-        </Animated.View>
-
-        {/* Shipping Address Section */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <View style={styles.titleContainer}>
-            <Ionicons name="location" size={22} color="#694d21" style={styles.icon} />
-            <Text style={styles.sectionTitle}>Shipping Address</Text>
-          </View>
-          <View style={styles.addressCard}>
-            <View style={styles.addressHeader}>
-              <Ionicons name="person" size={18} color="#694d21" />
-              <Text style={styles.addressName}>{order.shipping_address.full_name}</Text>
-            </View>
-            <View style={styles.addressRow}>
-              <Ionicons name="home" size={16} color="#666" />
-              <Text style={styles.addressText}>{order.shipping_address.address_line1}</Text>
-            </View>
-            {order.shipping_address.address_line2 && (
-              <View style={styles.addressRow}>
-                <Ionicons name="map" size={16} color="#666" />
-                <Text style={styles.addressText}>{order.shipping_address.address_line2}</Text>
+          {/* Order Status Section */}
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.sectionHeader}>
+              <View style={styles.titleContainer}>
+                <Ionicons name="checkmark-circle" size={24} color="#694d21" style={styles.icon} />
+                <Text style={styles.sectionTitle}>Order Status</Text>
               </View>
-            )}
-            <View style={styles.addressRow}>
-              <Ionicons name="location" size={16} color="#666" />
-              <Text style={styles.addressText}>
-                {order.shipping_address.city}, {order.shipping_address.state} - {order.shipping_address.pincode || (order as any)?.shipping_postal_code || ''}
-              </Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+                <Text style={styles.statusText}>{order.status}</Text>
+              </View>
             </View>
-            <View style={styles.addressRow}>
-              <Ionicons name="call" size={16} color="#666" />
-              <Text style={styles.addressText}>
-                {order.shipping_address?.phone || 
-                 (order.shipping_address as any)?.phone_number || 
-                 (order as any)?.shipping_phone_number || 
-                 'N/A'}
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
+            <Text style={styles.dateText}>Ordered on {formatDate(order.created_at)}</Text>
+          </Animated.View>
 
-        {/* Order Items Section */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <View style={styles.titleContainer}>
-            <Ionicons name="cube" size={22} color="#694d21" style={styles.icon} />
-            <Text style={styles.sectionTitle}>Order Items</Text>
-          </View>
-          {order.items.map((item, index) => (
-            <Animated.View 
-              key={index} 
+          {/* Shipping Address Section */}
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.titleContainer}>
+              <Ionicons name="location" size={22} color="#694d21" style={styles.icon} />
+              <Text style={styles.sectionTitle}>Shipping Address</Text>
+            </View>
+            <View style={styles.addressCard}>
+              <View style={styles.addressHeader}>
+                <Ionicons name="person" size={18} color="#694d21" />
+                <Text style={styles.addressName}>{order.shipping_address.full_name}</Text>
+              </View>
+              <View style={styles.addressRow}>
+                <Ionicons name="home" size={16} color="#666" />
+                <Text style={styles.addressText}>{order.shipping_address.address_line1}</Text>
+              </View>
+              {order.shipping_address.address_line2 && (
+                <View style={styles.addressRow}>
+                  <Ionicons name="map" size={16} color="#666" />
+                  <Text style={styles.addressText}>{order.shipping_address.address_line2}</Text>
+                </View>
+              )}
+              <View style={styles.addressRow}>
+                <Ionicons name="location" size={16} color="#666" />
+                <Text style={styles.addressText}>
+                  {order.shipping_address.city}, {order.shipping_address.state} - {order.shipping_address.pincode || (order as any)?.shipping_postal_code || ''}
+                </Text>
+              </View>
+              <View style={styles.addressRow}>
+                <Ionicons name="call" size={16} color="#666" />
+                <Text style={styles.addressText}>
+                  {order.shipping_address?.phone ||
+                    (order.shipping_address as any)?.phone_number ||
+                    (order as any)?.shipping_phone_number ||
+                    'N/A'}
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Order Items Section */}
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.titleContainer}>
+              <Ionicons name="cube" size={22} color="#694d21" style={styles.icon} />
+              <Text style={styles.sectionTitle}>Order Items</Text>
+            </View>
+            {order.items.map((item, index) => (
+              <Animated.View
+                key={index}
+                style={[
+                  styles.itemCard,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateX: slideAnim.interpolate({
+                        inputRange: [0, 30],
+                        outputRange: [0, 0]
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{item.product_name || 'Product Name Not Available'}</Text>
+                  {item.variant && (
+                    <Text style={styles.itemVariant}>Variant: {item.variant}</Text>
+                  )}
+                  <View style={styles.itemDetails}>
+                    <View style={styles.quantityBadge}>
+                      <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                    </View>
+                    <Text style={styles.itemPrice}>₹{item.price_at_time}</Text>
+                  </View>
+                </View>
+              </Animated.View>
+            ))}
+          </Animated.View>
+
+          {/* Payment Details Section */}
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.titleContainer}>
+              <Ionicons name="card" size={22} color="#694d21" style={styles.icon} />
+              <Text style={styles.sectionTitle}>Payment Details</Text>
+            </View>
+            <View style={styles.paymentCard}>
+              <View style={styles.paymentRow}>
+                <View style={styles.paymentLeft}>
+                  <Ionicons name="wallet" size={18} color="#694d21" />
+                  <Text style={styles.paymentLabel}>Payment Method</Text>
+                </View>
+                <Text style={styles.paymentValue}>
+                  {order.payment_method_display}
+                </Text>
+              </View>
+              <View style={styles.divider} />
+              {(() => {
+                const itemsSubtotal = order.items.reduce((sum, it) => sum + Number(it.price_at_time) * Number(it.quantity), 0);
+                const discount = Number(order.discount_amount || 0);
+                const gst = Number(order.gst_amount || 0);
+                const delivery = Number(order.delivery_charge || 0);
+                // GST is already included in item prices, so don't add it again
+                const payable = itemsSubtotal - discount + delivery;
+                return (
+                  <>
+                    <View style={styles.paymentRow}>
+                      <View style={styles.paymentLeft}>
+                        <Ionicons name="pricetag" size={18} color="#694d21" />
+                        <Text style={styles.paymentLabel}>Items Subtotal</Text>
+                      </View>
+                      <Text style={styles.paymentValue}>₹{itemsSubtotal.toFixed(2)}</Text>
+                    </View>
+                    {discount > 0 && (
+                      <View style={styles.paymentRow}>
+                        <View style={styles.paymentLeft}>
+                          <Ionicons name="remove-circle" size={18} color="#694d21" />
+                          <Text style={styles.paymentLabel}>Discount</Text>
+                        </View>
+                        <Text style={styles.paymentValue}>-₹{discount.toFixed(2)}</Text>
+                      </View>
+                    )}
+                    {gst > 0 && (
+                      <View style={styles.paymentRow}>
+                        <View style={styles.paymentLeft}>
+                          <Ionicons name="receipt" size={18} color="#694d21" />
+                          <Text style={styles.paymentLabel}>GST (included in prices)</Text>
+                        </View>
+                        <Text style={styles.paymentValue}>₹{gst.toFixed(2)}</Text>
+                      </View>
+                    )}
+                    <View style={styles.paymentRow}>
+                      <View style={styles.paymentLeft}>
+                        <Ionicons name="bicycle" size={18} color="#694d21" />
+                        <Text style={styles.paymentLabel}>Delivery Charges</Text>
+                      </View>
+                      <Text style={styles.paymentValue}>₹{delivery.toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.paymentRow}>
+                      <View style={styles.paymentLeft}>
+                        <Ionicons name="cash" size={18} color="#694d21" />
+                        <Text style={styles.paymentLabel}>Total Amount</Text>
+                      </View>
+                      <Text style={[styles.paymentValue, styles.totalAmount]}>₹{payable.toFixed(2)}</Text>
+                    </View>
+                  </>
+                );
+              })()}
+            </View>
+          </Animated.View>
+
+          {/* Track Shipment Button - only show if AWB number exists */}
+          {(order as any).awb_number && (
+            <Animated.View
               style={[
-                styles.itemCard,
+                styles.section,
                 {
                   opacity: fadeAnim,
-                  transform: [{ 
-                    translateX: slideAnim.interpolate({
-                      inputRange: [0, 30],
-                      outputRange: [0, 0]
-                    })
-                  }]
+                  transform: [{ translateY: slideAnim }]
                 }
               ]}
             >
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.product_name || 'Product Name Not Available'}</Text>
-                {item.variant && (
-                  <Text style={styles.itemVariant}>Variant: {item.variant}</Text>
-                )}
-                <View style={styles.itemDetails}>
-                  <View style={styles.quantityBadge}>
-                    <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                  </View>
-                  <Text style={styles.itemPrice}>₹{item.price_at_time}</Text>
-                </View>
-              </View>
+              <TouchableOpacity
+                style={styles.trackButton}
+                onPress={() => router.push(`/tracking/${order.id}`)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#694d21', '#5a3f1a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.trackButtonGradient}
+                >
+                  <Ionicons name="location-outline" size={24} color="#fff" />
+                  <Text style={styles.trackButtonText}>Track Shipment</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
             </Animated.View>
-          ))}
-        </Animated.View>
+          )}
 
-        {/* Payment Details Section */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <View style={styles.titleContainer}>
-            <Ionicons name="card" size={22} color="#694d21" style={styles.icon} />
-            <Text style={styles.sectionTitle}>Payment Details</Text>
-          </View>
-          <View style={styles.paymentCard}>
-            <View style={styles.paymentRow}>
-              <View style={styles.paymentLeft}>
-                <Ionicons name="wallet" size={18} color="#694d21" />
-                <Text style={styles.paymentLabel}>Payment Method</Text>
-              </View>
-              <Text style={styles.paymentValue}>
-                {order.payment_method_display}
-              </Text>
+          {/* Help Section */}
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.titleContainer}>
+              <Ionicons name="help-buoy" size={22} color="#694d21" style={styles.icon} />
+              <Text style={styles.sectionTitle}>Need Help?</Text>
             </View>
-            <View style={styles.divider} />
-            {(() => {
-              const itemsSubtotal = order.items.reduce((sum, it) => sum + Number(it.price_at_time) * Number(it.quantity), 0);
-              const discount = Number(order.discount_amount || 0);
-              const delivery = Number(order.delivery_charge || 0);
-              const payable = itemsSubtotal - discount + delivery;
-              return (
-                <>
-                  <View style={styles.paymentRow}>
-                    <View style={styles.paymentLeft}>
-                      <Ionicons name="pricetag" size={18} color="#694d21" />
-                      <Text style={styles.paymentLabel}>Items Subtotal</Text>
-                    </View>
-                    <Text style={styles.paymentValue}>₹{itemsSubtotal.toFixed(2)}</Text>
-                  </View>
-                  {discount > 0 && (
-                    <View style={styles.paymentRow}>
-                      <View style={styles.paymentLeft}>
-                        <Ionicons name="remove-circle" size={18} color="#694d21" />
-                        <Text style={styles.paymentLabel}>Discount</Text>
-                      </View>
-                      <Text style={styles.paymentValue}>-₹{discount.toFixed(2)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.paymentRow}>
-                    <View style={styles.paymentLeft}>
-                      <Ionicons name="bicycle" size={18} color="#694d21" />
-                      <Text style={styles.paymentLabel}>Delivery Charges</Text>
-                    </View>
-                    <Text style={styles.paymentValue}>₹{delivery.toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.divider} />
-                  <View style={styles.paymentRow}>
-                    <View style={styles.paymentLeft}>
-                      <Ionicons name="cash" size={18} color="#694d21" />
-                      <Text style={styles.paymentLabel}>Total Amount</Text>
-                    </View>
-                    <Text style={[styles.paymentValue, styles.totalAmount]}>₹{payable.toFixed(2)}</Text>
-                  </View>
-                </>
-              );
-            })()}
-          </View>
-        </Animated.View>
-
-        {/* Help Section */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <View style={styles.titleContainer}>
-            <Ionicons name="help-buoy" size={22} color="#694d21" style={styles.icon} />
-            <Text style={styles.sectionTitle}>Need Help?</Text>
-          </View>
-          <View style={styles.helpButtons}>
-            <TouchableOpacity
-              style={styles.helpButton}
-              onPress={() => router.push('/support/live-chat')}
-            >
-              <LinearGradient
-                colors={['#694d21', '#5a3f1a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.helpButtonGradient}
+            <View style={styles.helpButtons}>
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => router.push('/support/live-chat')}
               >
-                <Ionicons name="chatbubble-ellipses" size={24} color="#fff" />
-                <Text style={styles.helpButtonText}>Chat with Us</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.helpButton}
-              onPress={() => router.push('/support/call')}
-            >
-              <LinearGradient
-                colors={['#694d21', '#5a3f1a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.helpButtonGradient}
+                <LinearGradient
+                  colors={['#694d21', '#5a3f1a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.helpButtonGradient}
+                >
+                  <Ionicons name="chatbubble-ellipses" size={24} color="#fff" />
+                  <Text style={styles.helpButtonText}>Chat with Us</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => router.push('/support/call')}
               >
-                <Ionicons name="call" size={24} color="#fff" />
-                <Text style={styles.helpButtonText}>Call Support</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+                <LinearGradient
+                  colors={['#694d21', '#5a3f1a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.helpButtonGradient}
+                >
+                  <Ionicons name="call" size={24} color="#fff" />
+                  <Text style={styles.helpButtonText}>Call Support</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -886,6 +928,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  trackButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  trackButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+    gap: 12,
+  },
+  trackButtonText: {
+    fontSize: 17,
+    color: '#fff',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    flex: 1,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,

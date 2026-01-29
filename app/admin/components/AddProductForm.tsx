@@ -19,7 +19,9 @@ interface NewProductForm {
     name: string;
     description: string;
     price: number;
-    category: string;
+    category: string; // Primary category name for display/compatibility
+    category_id?: number; // Primary category ID
+    selectedCategories: { id: number; name: string }[]; // New: Multiple categories
     stock_quantity: number;
     usage_instructions: string;
     size: string;
@@ -50,9 +52,35 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
     const [activeSection, setActiveSection] = useState('basic');
     const { mainCategories, subCategories, loading, error, fetchCategories } = useCategories();
 
-    const handleCategorySelect = (category: { id: number; name: string }) => {
-        setNewProduct((prev: NewProductForm) => ({ ...prev, category: category.name }));
+    const handleCategorySelect = (categories: { id: number; name: string }[]) => {
+        if (categories.length > 0) {
+            setNewProduct((prev: NewProductForm) => ({
+                ...prev,
+                category: categories[0].name, // Keep existing field for primary
+                category_id: categories[0].id,
+                selectedCategories: categories
+            }));
+        } else {
+            setNewProduct((prev: NewProductForm) => ({
+                ...prev,
+                category: '',
+                category_id: undefined,
+                selectedCategories: []
+            }));
+        }
         setShowCategoryModal(false);
+    };
+
+    const removeCategory = (catId: number) => {
+        setNewProduct((prev: NewProductForm) => {
+            const newStats = prev.selectedCategories.filter(c => c.id !== catId);
+            return {
+                ...prev,
+                selectedCategories: newStats,
+                category: newStats.length > 0 ? newStats[0].name : '',
+                category_id: newStats.length > 0 ? newStats[0].id : undefined
+            };
+        });
     };
 
     const handlePriceChange = (text: string) => {
@@ -87,7 +115,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
     const getSectionCompletion = (section: string) => {
         switch (section) {
             case 'basic':
-                return newProduct.name.trim() && newProduct.category && newProduct.price > 0;
+                return newProduct.name.trim() && newProduct.selectedCategories.length > 0 && newProduct.price > 0;
             case 'details':
                 return true; // Optional section
             case 'images':
@@ -102,7 +130,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
     const renderSectionButton = (section: string, label: string, icon: string) => {
         const isCompleted = getSectionCompletion(section);
         const isActive = activeSection === section;
-        
+
         return (
             <TouchableOpacity
                 style={[
@@ -113,13 +141,13 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
                 onPress={() => setActiveSection(section)}
             >
                 <View style={styles.sectionButtonContent}>
-                    <Ionicons 
-                        name={isCompleted ? 'checkmark-circle' : icon as any} 
-                        size={20} 
+                    <Ionicons
+                        name={isCompleted ? 'checkmark-circle' : icon as any}
+                        size={20}
                         color={
-                            isActive ? '#fff' : 
-                            isCompleted ? '#28a745' : '#666'
-                        } 
+                            isActive ? '#fff' :
+                                isCompleted ? '#28a745' : '#666'
+                        }
                     />
                     <Text style={[
                         styles.sectionButtonText,
@@ -137,8 +165,8 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
         <View style={styles.container}>
             {/* Fixed Header */}
             <View style={styles.header}>
-                <ScrollView 
-                    horizontal 
+                <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.sectionNavContent}
                 >
@@ -154,7 +182,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
             </View>
 
             {/* Scrollable Content */}
-            <KeyboardAvoidingView 
+            <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.contentContainer}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
@@ -255,22 +283,46 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
                                 <Text style={styles.helperText}>Enter discount percentage (0 means no offer)</Text>
                             </View>
                             <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Category *</Text>
+                                <Text style={styles.label}>Categories *</Text>
                                 <TouchableOpacity
                                     style={[
-                                        styles.input, 
+                                        styles.input,
                                         styles.categorySelector,
-                                        !newProduct.category && styles.inputError
+                                        newProduct.selectedCategories.length === 0 && styles.inputError
                                     ]}
                                     onPress={() => setShowCategoryModal(true)}
                                 >
-                                    <Text style={newProduct.category ? styles.categoryText : styles.placeholderText}>
-                                        {newProduct.category || 'Select Category'}
+                                    <Text style={newProduct.selectedCategories.length > 0 ? styles.categoryText : styles.placeholderText}>
+                                        {newProduct.selectedCategories.length > 0
+                                            ? `${newProduct.selectedCategories.length} Selected`
+                                            : 'Select Categories'}
                                     </Text>
                                     <Ionicons name="chevron-down" size={20} color="#666" />
                                 </TouchableOpacity>
-                                {!newProduct.category && (
-                                    <Text style={styles.errorText}>Please select a category</Text>
+
+                                {/* Selected Categories Chips */}
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                                    {newProduct.selectedCategories.map((cat) => (
+                                        <View key={cat.id} style={{
+                                            backgroundColor: '#e3f2fd',
+                                            paddingHorizontal: 10,
+                                            paddingVertical: 4,
+                                            borderRadius: 16,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderWidth: 1,
+                                            borderColor: '#90caf9'
+                                        }}>
+                                            <Text style={{ color: '#1976d2', marginRight: 6, fontSize: 12 }}>{cat.name}</Text>
+                                            <TouchableOpacity onPress={() => removeCategory(cat.id)}>
+                                                <Ionicons name="close-circle" size={16} color="#1976d2" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </View>
+
+                                {newProduct.selectedCategories.length === 0 && (
+                                    <Text style={styles.errorText}>Please select at least one category</Text>
                                 )}
                             </View>
                         </View>
@@ -415,7 +467,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
             {/* Fixed Footer */}
             <View style={styles.footer}>
                 <View style={styles.footerContent}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.cancelButton}
                         onPress={() => {
                             // Reset form and go back
@@ -424,6 +476,8 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
                                 description: '',
                                 price: 0,
                                 category: '',
+                                category_id: undefined,
+                                selectedCategories: [],
                                 stock_quantity: 0,
                                 usage_instructions: '',
                                 size: '',
@@ -440,8 +494,8 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
                         <Ionicons name="close-circle" size={20} color="#666" />
                         <Text style={styles.cancelButtonText}>Cancel</Text>
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                         style={styles.submitButton}
                         onPress={onSubmit}
                         activeOpacity={0.8}
@@ -456,7 +510,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
             </View>
 
             {/* Floating Action Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={styles.floatingActionButton}
                 onPress={onSubmit}
                 activeOpacity={0.8}
@@ -467,8 +521,10 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
             <CategorySelector
                 visible={showCategoryModal}
                 onClose={() => setShowCategoryModal(false)}
-                onSelect={handleCategorySelect}
-                selectedCategory={newProduct.category}
+                onSelectMultiple={handleCategorySelect}
+                selectedCategories={newProduct.selectedCategories.map(c => c.name)}
+                multiSelect={true}
+                onSelect={() => { }} // No-op for single select
             />
         </View>
     );

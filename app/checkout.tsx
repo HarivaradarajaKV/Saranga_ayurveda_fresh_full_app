@@ -154,7 +154,7 @@ const CheckoutPage = () => {
             }));
             console.log('Addresses with phone:', addressesWithPhone);
             setAddresses(addressesWithPhone as Address[]);
-            
+
             // Check for selected address from navigation params
             if (params?.selectedAddressId) {
               const selected = addressesWithPhone.find(addr => addr.id === Number(params.selectedAddressId));
@@ -164,7 +164,7 @@ const CheckoutPage = () => {
                 return;
               }
             }
-            
+
             // Fallback to default or first address
             const defaultAddress = addressesWithPhone.find(addr => addr.is_default) || addressesWithPhone[0];
             console.log('Default address:', defaultAddress);
@@ -182,7 +182,7 @@ const CheckoutPage = () => {
   const handleChangeAddress = () => {
     router.push({
       pathname: '/profile/addresses',
-      params: { 
+      params: {
         mode: 'select',
         returnTo: 'checkout'
       }
@@ -205,9 +205,9 @@ const CheckoutPage = () => {
     }
   ];
 
-  // Set the default payment method to COD
+  // Set the default payment method to Razorpay (Online)
   useEffect(() => {
-    setSelectedPayment(paymentMethods[0]);
+    setSelectedPayment(paymentMethods[1]);
   }, []);
 
   useEffect(() => {
@@ -320,7 +320,7 @@ const CheckoutPage = () => {
   const toggleSection = (section: keyof typeof sectionExpanded) => {
     const newValue = !sectionExpanded[section];
     setSectionExpanded(prev => ({ ...prev, [section]: newValue }));
-    
+
     Animated.timing(fadeAnims[section], {
       toValue: newValue ? 1 : 0,
       duration: 200,
@@ -350,7 +350,7 @@ const CheckoutPage = () => {
         let errorMessage = response.error
           .replace('POST post error: request error: ', '')
           .replace('POST request error: ', '');
-        
+
         // Check if it's a minimum purchase error
         if (errorMessage.includes('Minimum purchase amount')) {
           const amount = errorMessage.match(/₹(\d+(\.\d{2})?)/);
@@ -358,7 +358,7 @@ const CheckoutPage = () => {
             errorMessage = `Minimum purchase amount of ${amount[0]} required`;
           }
         }
-        
+
         setCouponError(errorMessage);
         setAppliedCoupon(null);
         setDiscountAmount(0);
@@ -368,7 +368,7 @@ const CheckoutPage = () => {
 
       if (response.data?.valid) {
         const coupon = response.data.coupon;
-        
+
         // Validate minimum purchase amount
         if (subtotal < coupon.min_purchase_amount) {
           setCouponError(`Minimum purchase amount of ₹${coupon.min_purchase_amount.toFixed(2)} required`);
@@ -377,7 +377,7 @@ const CheckoutPage = () => {
           calculateTotals(0);
           return;
         }
-        
+
         setAppliedCoupon(coupon);
         calculateDiscount(coupon);
         Alert.alert('Success', 'Coupon applied successfully!');
@@ -393,7 +393,7 @@ const CheckoutPage = () => {
       errorMessage = errorMessage
         .replace('POST post error: request error: ', '')
         .replace('POST request error: ', '');
-      
+
       setCouponError(errorMessage);
       setAppliedCoupon(null);
       setDiscountAmount(0);
@@ -439,10 +439,10 @@ const CheckoutPage = () => {
     }, 0);
 
     setSubtotal(itemsTotal);
-    
+
     // Calculate subtotal after discount
     const subtotalAfterDiscount = itemsTotal - discount;
-    
+
     // Calculate GST per product (after discount allocation). Since discount may be coupon-level,
     // we apply GST on finalPrice (already includes product-level offers) without reducing further.
     let gstTotal = 0;
@@ -458,11 +458,11 @@ const CheckoutPage = () => {
       gstTotal += finalPrice * item.quantity * (gstPct / 100);
     }
     setGstAmount(gstTotal);
-    
-    // Calculate delivery charge (free for orders above 999)
-    const delivery = itemsTotal > 999 ? 0 : 99;
+
+    // Calculate delivery charge (₹59 for orders below ₹500, free for ₹500+)
+    const delivery = itemsTotal >= 500 ? 0 : 59;
     setDeliveryCharge(delivery);
-    
+
     // Apply discount, GST, and delivery to get final total
     const finalTotal = subtotalAfterDiscount + gstTotal + delivery;
     setTotal(finalTotal);
@@ -487,7 +487,7 @@ const CheckoutPage = () => {
         selectedCartItems.map(async (item) => {
           const response = await apiService.get(`/products/${item.id}`);
           const currentStock = response.data.stock_quantity;
-          
+
           if (currentStock < item.quantity) {
             throw new Error(`Only ${currentStock} units available for ${item.name}`);
           }
@@ -536,10 +536,10 @@ const CheckoutPage = () => {
 
         if (response.data?.order && response.data.order.id) {
           await clearCart();
-          
+
           router.replace({
             pathname: "/orders/[id]",
-            params: { 
+            params: {
               id: String(response.data.order.id),
               status: 'success',
               totalAmount: total
@@ -553,14 +553,14 @@ const CheckoutPage = () => {
         try {
           const response = await apiService.post('/orders', orderData);
           const { order } = response.data;
-          
+
           if (!order || !order.razorpay_order) {
             throw new Error('Failed to create order');
           }
 
           const razorpayOrderData = order.razorpay_order;
           setCurrentOrderId(order.id);
-          
+
           // Configure Razorpay options
           const options: RazorpayOptions = {
             key: razorpayOrderData.key || razorpayOrderData.key_id,
@@ -602,7 +602,7 @@ const CheckoutPage = () => {
   const handlePaymentSuccess = async (paymentData: any) => {
     try {
       setLoading(true);
-      
+
       // Verify payment with backend
       await apiService.post('/razorpay/verify-payment', {
         ...paymentData,
@@ -616,11 +616,11 @@ const CheckoutPage = () => {
         // Just log the error, don't show it to the user
         console.error('Error clearing cart:', error);
       }
-      
+
       // Always navigate to success page
       router.replace({
         pathname: "/orders/[id]",
-        params: { 
+        params: {
           id: String(currentOrderId),
           status: 'success',
           totalAmount: total
@@ -667,7 +667,7 @@ const CheckoutPage = () => {
   // Filter coupons based on input
   const handleCouponInputChange = (text: string) => {
     setCouponCode(text);
-    const filtered = coupons.filter(coupon => 
+    const filtered = coupons.filter(coupon =>
       coupon.code.toLowerCase().includes(text.toLowerCase())
     );
     setFilteredCoupons(filtered);
@@ -717,310 +717,352 @@ const CheckoutPage = () => {
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
-          {/* Order Summary Section */}
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
-            onPress={() => toggleSection('orderSummary')}
-          >
-            <Text style={styles.sectionTitle}>Order Summary</Text>
-            <Ionicons 
-              name={sectionExpanded.orderSummary ? 'chevron-up' : 'chevron-down'} 
-              size={24} 
-              color="#333"
-            />
-          </TouchableOpacity>
-          <Animated.View style={[
-            styles.section,
-            { opacity: fadeAnims.orderSummary }
-          ]}>
-            {sectionExpanded.orderSummary && (
-              <View style={styles.orderItems}>
-                {selectedCartItems.map((item) => (
-                  <View key={`order-item-${item.id}-${item.cartId || Date.now()}`} style={styles.orderItem}>
-                    <Image 
-                      source={{ uri: apiService.getFullImageUrl(item.image_url) }} 
-                      style={styles.itemImage} 
-                    />
-                    <View style={styles.itemDetails}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
-                      <Text style={styles.itemPrice}>
-                        ₹{(() => {
-                          // Use combo discounted price if item is from combo, otherwise use normal discounted price
-                          let finalPrice: number;
-                          if (item.is_from_combo && item.combo_discounted_price !== undefined) {
-                            finalPrice = item.combo_discounted_price;
-                          } else {
-                            finalPrice = Number(item.price) * (1 - (item.offer_percentage / 100));
-                          }
-                          return (finalPrice * item.quantity).toFixed(2);
-                        })()}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </Animated.View>
-
-          {/* Coupon Section */}
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
-            onPress={() => toggleSection('coupons')}
-          >
-            <Text style={styles.sectionTitle}>Apply Coupon</Text>
-            <Ionicons 
-              name={sectionExpanded.coupons ? 'chevron-up' : 'chevron-down'} 
-              size={24} 
-              color="#333"
-            />
-          </TouchableOpacity>
-          <Animated.View style={[
-            styles.section,
-            { opacity: fadeAnims.coupons }
-          ]}>
-            {sectionExpanded.coupons && (
-              <View style={styles.couponContainer}>
-                <View style={styles.couponInputContainer}>
-                  <TextInput
-                    style={styles.couponInput}
-                    placeholder="Enter coupon code"
-                    value={couponCode}
-                    onChangeText={handleCouponInputChange}
-                    autoCapitalize="characters"
-                  />
-                  <TouchableOpacity
-                    style={[
-                      styles.applyCouponButton,
-                      (!couponCode.trim() || isApplyingCoupon) && styles.applyCouponButtonDisabled
-                    ]}
-                    onPress={handleApplyCoupon}
-                    disabled={!couponCode.trim() || isApplyingCoupon}
-                  >
-                    {isApplyingCoupon ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={[
-                        styles.applyCouponText,
-                        !couponCode.trim() && styles.applyCouponTextDisabled
-                      ]}>Apply</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-                {couponError ? (
-                  <Text style={styles.errorText}>{couponError}</Text>
-                ) : null}
-                {availableCoupons.length > 0 ? (
-                  <TouchableOpacity
-                    style={styles.viewCouponsButton}
-                    onPress={() => setShowCouponsModal(true)}
-                  >
-                    <Ionicons name="pricetag" size={20} color="#FF69B4" style={styles.couponIcon} />
-                    <Text style={styles.viewCouponsText}>
-                      View Available Coupons ({availableCoupons.length})
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={styles.noCouponsText}>No coupons available</Text>
-                )}
-                {appliedCoupon && (
-                  <View style={styles.appliedCouponContainer}>
-                    <View style={styles.appliedCouponInfo}>
-                      <View style={styles.appliedCouponDetails}>
-                        <Text style={styles.appliedCouponCode}>{appliedCoupon.code}</Text>
-                        <Text style={styles.appliedCouponDesc}>{appliedCoupon.description}</Text>
-                        <Text style={styles.discountText}>
-                          Discount: {appliedCoupon.discount_type === 'percentage' 
-                            ? `${appliedCoupon.discount_value}%` 
-                            : `₹${appliedCoupon.discount_value}`}
+            {/* Order Summary Section */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('orderSummary')}
+            >
+              <Text style={styles.sectionTitle}>Order Summary</Text>
+              <Ionicons
+                name={sectionExpanded.orderSummary ? 'chevron-up' : 'chevron-down'}
+                size={24}
+                color="#333"
+              />
+            </TouchableOpacity>
+            <Animated.View style={[
+              styles.section,
+              { opacity: fadeAnims.orderSummary }
+            ]}>
+              {sectionExpanded.orderSummary && (
+                <View style={styles.orderItems}>
+                  {selectedCartItems.map((item) => (
+                    <View key={`order-item-${item.id}-${item.cartId || Date.now()}`} style={styles.orderItem}>
+                      <Image
+                        source={{ uri: apiService.getFullImageUrl(item.image_url) }}
+                        style={styles.itemImage}
+                      />
+                      <View style={styles.itemDetails}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
+                        <Text style={styles.itemPrice}>
+                          ₹{(() => {
+                            // Use combo discounted price if item is from combo, otherwise use normal discounted price
+                            let finalPrice: number;
+                            if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+                              finalPrice = item.combo_discounted_price;
+                            } else {
+                              finalPrice = Number(item.price) * (1 - (item.offer_percentage / 100));
+                            }
+                            return (finalPrice * item.quantity).toFixed(2);
+                          })()}
                         </Text>
                       </View>
-                      <TouchableOpacity
-                        style={styles.removeCouponButton}
-                        onPress={removeCoupon}
-                      >
-                        <Ionicons name="close-circle" size={24} color="#ff4444" />
-                      </TouchableOpacity>
                     </View>
-                  </View>
-                )}
-              </View>
-            )}
-          </Animated.View>
+                  ))}
+                </View>
+              )}
+            </Animated.View>
 
-          {/* Delivery Address Section */}
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
-            onPress={() => toggleSection('address')}
-          >
-            <Text style={styles.sectionTitle}>Delivery Address</Text>
-            <Ionicons 
-              name={sectionExpanded.address ? 'chevron-up' : 'chevron-down'} 
-              size={24} 
-              color="#333"
-            />
-          </TouchableOpacity>
-          <Animated.View style={[
-            styles.section,
-            { opacity: fadeAnims.address }
-          ]}>
-            {sectionExpanded.address && (
-              <View style={styles.addressSection}>
-                {selectedAddress ? (
-                  <>
-                    <View style={styles.addressCard}>
-                      <View style={styles.addressHeader}>
-                        <View style={styles.addressType}>
-                          <Ionicons name="location" size={20} color="#FF69B4" />
-                          <Text style={styles.addressTypeText}>
-                            {selectedAddress.address_type || 'Delivery Address'}
+            {/* Coupon Section */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('coupons')}
+            >
+              <Text style={styles.sectionTitle}>Apply Coupon</Text>
+              <Ionicons
+                name={sectionExpanded.coupons ? 'chevron-up' : 'chevron-down'}
+                size={24}
+                color="#333"
+              />
+            </TouchableOpacity>
+            <Animated.View style={[
+              styles.section,
+              { opacity: fadeAnims.coupons }
+            ]}>
+              {sectionExpanded.coupons && (
+                <View style={styles.couponContainer}>
+                  <View style={styles.couponInputContainer}>
+                    <TextInput
+                      style={styles.couponInput}
+                      placeholder="Enter coupon code"
+                      value={couponCode}
+                      onChangeText={handleCouponInputChange}
+                      autoCapitalize="characters"
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.applyCouponButton,
+                        (!couponCode.trim() || isApplyingCoupon) && styles.applyCouponButtonDisabled
+                      ]}
+                      onPress={handleApplyCoupon}
+                      disabled={!couponCode.trim() || isApplyingCoupon}
+                    >
+                      {isApplyingCoupon ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={[
+                          styles.applyCouponText,
+                          !couponCode.trim() && styles.applyCouponTextDisabled
+                        ]}>Apply</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {couponError ? (
+                    <Text style={styles.errorText}>{couponError}</Text>
+                  ) : null}
+                  {availableCoupons.length > 0 ? (
+                    <TouchableOpacity
+                      style={styles.viewCouponsButton}
+                      onPress={() => setShowCouponsModal(true)}
+                    >
+                      <Ionicons name="pricetag" size={20} color="#FF69B4" style={styles.couponIcon} />
+                      <Text style={styles.viewCouponsText}>
+                        View Available Coupons ({availableCoupons.length})
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.noCouponsText}>No coupons available</Text>
+                  )}
+                  {appliedCoupon && (
+                    <View style={styles.appliedCouponContainer}>
+                      <View style={styles.appliedCouponInfo}>
+                        <View style={styles.appliedCouponDetails}>
+                          <Text style={styles.appliedCouponCode}>{appliedCoupon.code}</Text>
+                          <Text style={styles.appliedCouponDesc}>{appliedCoupon.description}</Text>
+                          <Text style={styles.discountText}>
+                            Discount: {appliedCoupon.discount_type === 'percentage'
+                              ? `${appliedCoupon.discount_value}%`
+                              : `₹${appliedCoupon.discount_value}`}
                           </Text>
                         </View>
                         <TouchableOpacity
-                          style={styles.changeAddressButton}
-                          onPress={handleChangeAddress}
+                          style={styles.removeCouponButton}
+                          onPress={removeCoupon}
                         >
-                          <Text style={styles.changeAddressText}>Change</Text>
+                          <Ionicons name="close-circle" size={24} color="#ff4444" />
                         </TouchableOpacity>
                       </View>
-                      <Text style={styles.addressName}>{selectedAddress.full_name}</Text>
-                      <Text style={styles.addressText}>
-                        {selectedAddress.address_line1}
-                        {selectedAddress.address_line2 ? `, ${selectedAddress.address_line2}` : ''}
-                      </Text>
-                      <Text style={styles.addressText}>
-                        {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode || selectedAddress.postal_code || ''}
-                      </Text>
-                      <Text style={styles.addressPhone}>
-                        <Ionicons name="call-outline" size={16} color="#666" /> {selectedAddress.phone || selectedAddress.phone_number || ''}
-                      </Text>
                     </View>
-                  </>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.addAddressButton}
-                    onPress={() => router.push('/profile/addresses/new')}
-                  >
-                    <View style={styles.addAddressContent}>
-                      <Ionicons name="add-circle-outline" size={24} color="#FF69B4" />
-                      <Text style={styles.addAddressText}>Add New Delivery Address</Text>
-                    </View>
-                  </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </Animated.View>
+
+            {/* Delivery Address Section */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('address')}
+            >
+              <Text style={styles.sectionTitle}>Delivery Address</Text>
+              <Ionicons
+                name={sectionExpanded.address ? 'chevron-up' : 'chevron-down'}
+                size={24}
+                color="#333"
+              />
+            </TouchableOpacity>
+            <Animated.View style={[
+              styles.section,
+              { opacity: fadeAnims.address }
+            ]}>
+              {sectionExpanded.address && (
+                <View style={styles.addressSection}>
+                  {selectedAddress ? (
+                    <>
+                      <View style={styles.addressCard}>
+                        <View style={styles.addressHeader}>
+                          <View style={styles.addressType}>
+                            <Ionicons name="location" size={20} color="#FF69B4" />
+                            <Text style={styles.addressTypeText}>
+                              {selectedAddress.address_type || 'Delivery Address'}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.changeAddressButton}
+                            onPress={handleChangeAddress}
+                          >
+                            <Text style={styles.changeAddressText}>Change</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={styles.addressName}>{selectedAddress.full_name}</Text>
+                        <Text style={styles.addressText}>
+                          {selectedAddress.address_line1}
+                          {selectedAddress.address_line2 ? `, ${selectedAddress.address_line2}` : ''}
+                        </Text>
+                        <Text style={styles.addressText}>
+                          {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode || selectedAddress.postal_code || ''}
+                        </Text>
+                        <Text style={styles.addressPhone}>
+                          <Ionicons name="call-outline" size={16} color="#666" /> {selectedAddress.phone || selectedAddress.phone_number || ''}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.addAddressButton}
+                      onPress={() => router.push('/profile/addresses/new')}
+                    >
+                      <View style={styles.addAddressContent}>
+                        <Ionicons name="add-circle-outline" size={24} color="#FF69B4" />
+                        <Text style={styles.addAddressText}>Add New Delivery Address</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </Animated.View>
+
+            {/* Payment Method */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('payment')}
+            >
+              <Text style={styles.sectionTitle}>Payment Method</Text>
+              <Ionicons
+                name={sectionExpanded.payment ? 'chevron-up' : 'chevron-down'}
+                size={24}
+                color="#333"
+              />
+            </TouchableOpacity>
+            <Animated.View style={[
+              styles.section,
+              { opacity: fadeAnims.payment }
+            ]}>
+              {sectionExpanded.payment && (
+                <View style={styles.paymentMethodsContainer}>
+                  {paymentMethods.map((method) => {
+                    const isCOD = method.id === 'cod';
+                    return (
+                      <TouchableOpacity
+                        key={method.id}
+                        style={[
+                          styles.paymentMethodCard,
+                          selectedPayment?.id === method.id && styles.selectedPaymentCard,
+                          isCOD && {
+                            backgroundColor: '#fafafa',
+                            borderColor: '#eee',
+                            opacity: 0.8
+                          }
+                        ]}
+                        onPress={() => !isCOD && setSelectedPayment(method)}
+                        disabled={isCOD}
+                      >
+                        <View style={styles.paymentMethodContent}>
+                          <View style={styles.paymentMethodHeader}>
+                            <View style={[
+                              styles.paymentMethodIconContainer,
+                              isCOD && { backgroundColor: '#e0e0e0' }
+                            ]}>
+                              <Ionicons
+                                name={method.id === 'cod' ? 'lock-closed' : 'card'}
+                                size={24}
+                                color={selectedPayment?.id === method.id ? '#fff' : (isCOD ? '#757575' : '#694d21')}
+                              />
+                            </View>
+                            <View style={styles.paymentMethodInfo}>
+                              <Text style={[
+                                styles.paymentMethodName,
+                                selectedPayment?.id === method.id && styles.selectedPaymentText,
+                                isCOD && { color: '#757575' }
+                              ]}>
+                                {method.name}
+                              </Text>
+                              <Text style={[
+                                styles.paymentMethodDescription,
+                                selectedPayment?.id === method.id && styles.selectedPaymentText,
+                                isCOD && { color: '#9e9e9e' }
+                              ]}>
+                                {method.description}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.paymentMethodRadio}>
+                            {!isCOD && (
+                              <View style={[
+                                styles.radioOuter,
+                                selectedPayment?.id === method.id && styles.radioOuterSelected
+                              ]}>
+                                {selectedPayment?.id === method.id && (
+                                  <View style={styles.radioInner} />
+                                )}
+                              </View>
+                            )}
+                            {isCOD && (
+                              <Ionicons name="ban" size={20} color="#bdbdbd" />
+                            )}
+                          </View>
+                        </View>
+                        {isCOD && (
+                          <View style={{
+                            backgroundColor: '#fff0f0',
+                            marginHorizontal: 16,
+                            marginBottom: 16,
+                            padding: 12,
+                            borderRadius: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: '#ffcdd2'
+                          }}>
+                            <Ionicons name="information-circle" size={20} color="#e57373" style={{ marginRight: 8 }} />
+                            <Text style={{
+                              fontSize: 12,
+                              color: '#d32f2f',
+                              flex: 1,
+                              lineHeight: 18
+                            }}>
+                              Cash on Delivery is currently unavailable for your PIN code. We’ll be enabling COD soon. Please use prepaid payment options to place your order.
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </Animated.View>
+
+            {/* Price Details */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Price Details</Text>
+              <View style={styles.priceDetails}>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Subtotal</Text>
+                  <Text style={styles.priceValue}>₹{subtotal.toFixed(2)}</Text>
+                </View>
+                {appliedCoupon && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>Discount</Text>
+                    <Text style={[styles.priceValue, styles.discountText]}>
+                      -₹{discountAmount.toFixed(2)}
+                    </Text>
+                  </View>
                 )}
-              </View>
-            )}
-          </Animated.View>
-
-          {/* Payment Method */}
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
-            onPress={() => toggleSection('payment')}
-          >
-            <Text style={styles.sectionTitle}>Payment Method</Text>
-            <Ionicons 
-              name={sectionExpanded.payment ? 'chevron-up' : 'chevron-down'} 
-              size={24} 
-              color="#333"
-            />
-          </TouchableOpacity>
-          <Animated.View style={[
-            styles.section,
-            { opacity: fadeAnims.payment }
-          ]}>
-            {sectionExpanded.payment && (
-              <View style={styles.paymentMethodsContainer}>
-                {paymentMethods.map((method) => (
-                  <TouchableOpacity
-                    key={method.id}
-                    style={[
-                      styles.paymentMethodCard,
-                      selectedPayment?.id === method.id && styles.selectedPaymentCard
-                    ]}
-                    onPress={() => setSelectedPayment(method)}
-                  >
-                    <View style={styles.paymentMethodContent}>
-                      <View style={styles.paymentMethodHeader}>
-                        <View style={styles.paymentMethodIconContainer}>
-                          <Ionicons
-                            name={method.id === 'cod' ? 'cash-outline' : 'card-outline'}
-                            size={24}
-                            color={selectedPayment?.id === method.id ? '#fff' : '#694d21'}
-                          />
-                        </View>
-                        <View style={styles.paymentMethodInfo}>
-                          <Text style={[
-                            styles.paymentMethodName,
-                            selectedPayment?.id === method.id && styles.selectedPaymentText
-                          ]}>
-                            {method.name}
-                          </Text>
-                          <Text style={[
-                            styles.paymentMethodDescription,
-                            selectedPayment?.id === method.id && styles.selectedPaymentText
-                          ]}>
-                            {method.description}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.paymentMethodRadio}>
-                        <View style={[
-                          styles.radioOuter,
-                          selectedPayment?.id === method.id && styles.radioOuterSelected
-                        ]}>
-                          {selectedPayment?.id === method.id && (
-                            <View style={styles.radioInner} />
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </Animated.View>
-
-          {/* Price Details */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Price Details</Text>
-            <View style={styles.priceDetails}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Subtotal</Text>
-                <Text style={styles.priceValue}>₹{subtotal.toFixed(2)}</Text>
-              </View>
-              {appliedCoupon && (
                 <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Discount</Text>
-                  <Text style={[styles.priceValue, styles.discountText]}>
-                    -₹{discountAmount.toFixed(2)}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Subtotal (after discount)</Text>
-                <Text style={styles.priceValue}>
-                  ₹{(subtotal - discountAmount).toFixed(2)}
-                </Text>
-              </View>
-              {gstAmount > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>GST (per product rates)</Text>
+                  <Text style={styles.priceLabel}>Subtotal (after discount)</Text>
                   <Text style={styles.priceValue}>
-                    ₹{gstAmount.toFixed(2)}
+                    ₹{(subtotal - discountAmount).toFixed(2)}
                   </Text>
                 </View>
-              )}
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Delivery Charges</Text>
-                <Text style={styles.priceValue}>
-                  {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge.toFixed(2)}`}
-                </Text>
-              </View>
-              <View style={[styles.priceRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total Amount</Text>
-                <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
+                {gstAmount > 0 && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>GST (per product rates)</Text>
+                    <Text style={styles.priceValue}>
+                      ₹{gstAmount.toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Delivery Charges</Text>
+                  <Text style={styles.priceValue}>
+                    {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge.toFixed(2)}`}
+                  </Text>
+                </View>
+                <View style={[styles.priceRow, styles.totalRow]}>
+                  <Text style={styles.totalLabel}>Total Amount</Text>
+                  <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
+                </View>
               </View>
             </View>
-          </View>
           </ScrollView>
 
           {/* Footer with Order Total and Place Order Button */}
@@ -1047,7 +1089,7 @@ const CheckoutPage = () => {
               )}
             </TouchableOpacity>
           </View>
-          
+
           {/* Available Coupons Modal */}
           <Modal
             visible={showCouponsModal}
@@ -1486,7 +1528,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
     paddingBottom: Platform.OS === 'ios' ? 20 : 16,
   },
-  
+
   totalContainer: {
     flexDirection: 'row',
     alignItems: 'center',

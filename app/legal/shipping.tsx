@@ -15,7 +15,7 @@ export default function ShippingPolicyScreen() {
         <View style={styles.content}>
           <Text style={styles.title}>Shipping Policy</Text>
           <Text style={styles.lastUpdated}>Last updated: February 24, 2024</Text>
-          
+
           <Text style={styles.section}>1. Processing Time</Text>
           <Text style={styles.text}>
             Orders are typically processed within 1-2 business days. During peak seasons
@@ -30,7 +30,7 @@ export default function ShippingPolicyScreen() {
 
           <Text style={styles.section}>3. Shipping Costs</Text>
           <Text style={styles.text}>
-            Standard shipping is free for orders over $50. Express shipping and international
+            Standard shipping is free for orders over INR 500. Express shipping and international
             shipping rates are calculated at checkout based on location and weight.
           </Text>
 

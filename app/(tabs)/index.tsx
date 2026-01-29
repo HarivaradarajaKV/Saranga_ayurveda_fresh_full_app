@@ -12,6 +12,7 @@ import ProductGrid from '../components/ProductGrid';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCategories } from '../CategoryContext';
 import BrandReviews from '../components/BrandReviews';
+import FoundationSection from '../components/FoundationSection';
 import Accordion from '../components/Accordion';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Product } from '../types/product';
@@ -93,7 +94,7 @@ const skincareTips: SkincareTip[] = [
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => {
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  
+
   const onPressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.95,
@@ -107,16 +108,16 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => {
       useNativeDriver: true,
     }).start();
   };
-  
+
   return (
-    <TouchableWithoutFeedback 
+    <TouchableWithoutFeedback
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => router.push({
         pathname: '/all-products',
-        params: { 
+        params: {
           type: title.toLowerCase().replace(/\s+/g, '-'),
-          title: title 
+          title: title
         }
       })}
     >
@@ -160,7 +161,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ name, rating, comment, date, av
       }
     ]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <Image 
+        <Image
           source={{ uri: avatar }}
           style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
         />
@@ -204,8 +205,8 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
 
   useEffect(() => {
     // Staggered entrance animation for categories
-    Animated.stagger(100, 
-      categoryAnims.map(anim => 
+    Animated.stagger(100,
+      categoryAnims.map(anim =>
         Animated.timing(anim, {
           toValue: 1,
           duration: 500,
@@ -247,62 +248,64 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
 
   return (
     <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryScrollContainer}
-      >
-        {categories.map((category, index) => {
-          const imageUrl = getCategoryImage(normalizeCategoryName(category.name), 'tile');
-          const isSelected = selectedCategory === category.id;
-          
-          return (
-            <Animated.View
-              key={category.id}
-              style={[
-                {
-                  opacity: categoryAnims[index],
-                  transform: [
-                    { scale: scaleAnims[index] },
-                    { translateY: categoryAnims[index].interpolate({
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.categoryScrollContainer}
+    >
+      {categories.map((category, index) => {
+        const imageUrl = getCategoryImage(normalizeCategoryName(category.name), 'tile');
+        const isSelected = selectedCategory === category.id;
+
+        return (
+          <Animated.View
+            key={category.id}
+            style={[
+              {
+                opacity: categoryAnims[index],
+                transform: [
+                  { scale: scaleAnims[index] },
+                  {
+                    translateY: categoryAnims[index].interpolate({
                       inputRange: [0, 1],
                       outputRange: [30, 0]
-                    })}
-                  ]
-                }
+                    })
+                  }
+                ]
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.categoryCircle,
+                isSelected && styles.selectedCategoryCircle
               ]}
+              onPress={() => handleCategoryPress(category.id, index)}
+              activeOpacity={0.8}
             >
-              <TouchableOpacity
-                style={[
-                  styles.categoryCircle,
-                  isSelected && styles.selectedCategoryCircle
-                ]}
-                onPress={() => handleCategoryPress(category.id, index)}
-                activeOpacity={0.8}
-              >
-                <View style={[
-                  styles.categoryIconContainer,
-                  isSelected && styles.selectedCategoryCircle
-                ]}>
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={styles.categoryImage}
-                    resizeMode="cover"
-                  />
-                  {isSelected && (
-                    <View style={styles.selectedOverlay} />
-                  )}
-                </View>
-                <Text style={[
-                  styles.categoryText,
-                  isSelected && styles.selectedCategoryText
-                ]}>
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        })}
-      </ScrollView>
+              <View style={[
+                styles.categoryIconContainer,
+                isSelected && styles.selectedCategoryCircle
+              ]}>
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.categoryImage}
+                  resizeMode="cover"
+                />
+                {isSelected && (
+                  <View style={styles.selectedOverlay} />
+                )}
+              </View>
+              <Text style={[
+                styles.categoryText,
+                isSelected && styles.selectedCategoryText
+              ]}>
+                {category.name}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      })}
+    </ScrollView>
   );
 };
 
@@ -387,7 +390,7 @@ const ContactUs: React.FC = () => {
 // Legal information component
 const LegalInformation: React.FC = () => {
   const router = useRouter();
-  
+
   return (
     <View style={styles.legalContainer}>
       <TouchableOpacity
@@ -1902,11 +1905,11 @@ const Page = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const { mainCategories, loading: categoriesLoading } = useCategories();
   // Map mainCategories to add an image property using getCategoryImage with normalization
-  const mainCategoriesWithImages = mainCategories && Array.isArray(mainCategories) 
+  const mainCategoriesWithImages = mainCategories && Array.isArray(mainCategories)
     ? mainCategories.map(cat => ({
-        ...cat,
-        image: getCategoryImage(normalizeCategoryName(cat.name), 'tile'),
-      }))
+      ...cat,
+      image: getCategoryImage(normalizeCategoryName(cat.name), 'tile'),
+    }))
     : [];
 
   console.log('Category images:', mainCategoriesWithImages.length > 0 ? mainCategoriesWithImages.map(c => ({ name: c.name, image: c.image })) : 'No categories loaded');
@@ -1925,15 +1928,15 @@ const Page = () => {
     { id: 3, uri: 'https://via.placeholder.com/150x150?text=Ad+3' },
     { id: 4, uri: 'https://via.placeholder.com/150x150?text=Ad+4' },
   ];
-  
-  const videos = [
+
+  const videos: string[] = [
     // Disable videos temporarily to prevent audio focus issues
     // 'https://videos.pexels.com/video-files/3181673/3181673-sd_640_360_25fps.mp4',
     // 'https://videos.pexels.com/video-files/3181893/3181893-sd_640_360_25fps.mp4',
     // 'https://videos.pexels.com/video-files/4154245/4154245-sd_960_506_25fps.mp4'
   ];
   const [status, setStatus] = useState({});
-  
+
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -1942,7 +1945,7 @@ const Page = () => {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const videoScrollViewRef = useRef<ScrollView | null>(null);
   const scrollAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Enhanced animation refs for modern UI
   const headerSlideAnim = useRef(new Animated.Value(-100)).current;
   const searchSlideAnim = useRef(new Animated.Value(50)).current;
@@ -2006,7 +2009,7 @@ const Page = () => {
 
   // Handle tab press for scroll to top
   useEffect(() => {
-    const unsubscribe = navigation.addListener('tabPress', (e) => {
+    const unsubscribe = navigation.addListener('tabPress' as any, (e: any) => {
       // Check if this is the home tab
       if (isFocused) {
         // Prevent default behavior
@@ -2035,7 +2038,7 @@ const Page = () => {
               setUserName(fetchedName);
               await AsyncStorage.setItem('name', fetchedName);
             }
-          } catch {}
+          } catch { }
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
@@ -2059,7 +2062,7 @@ const Page = () => {
           }
         }
         setUserName(storedName || '');
-      } catch {}
+      } catch { }
     };
     if (isMenuOpen && isAuthenticated) {
       loadUserName();
@@ -2134,7 +2137,7 @@ const Page = () => {
         if (response.data && Array.isArray(response.data)) {
           // Filter active combos based on dates
           const active = response.data.filter((combo: any) => isComboActive(combo));
-          
+
           // Sort active by created_at (newest first)
           const sortedActive = active.sort((a: any, b: any) => {
             const dateA = new Date(a.created_at || a.id || 0).getTime();
@@ -2144,29 +2147,29 @@ const Page = () => {
 
           // Get active combos (up to 2)
           let displayCombos = sortedActive.slice(0, 2);
-          
+
           // If we have less than 2 active combos, add upcoming combos
           if (displayCombos.length < 2) {
             // Get active combo IDs to exclude from upcoming
             const activeIds = new Set(displayCombos.map((c: any) => c.id));
-            
+
             // Filter upcoming combos (excluding those already in active list)
-            const upcoming = response.data.filter((combo: any) => 
+            const upcoming = response.data.filter((combo: any) =>
               isComboUpcoming(combo) && !activeIds.has(combo.id)
             );
-            
+
             // Sort upcoming by created_at (newest first)
             const sortedUpcoming = upcoming.sort((a: any, b: any) => {
               const dateA = new Date(a.created_at || a.id || 0).getTime();
               const dateB = new Date(b.created_at || b.id || 0).getTime();
               return dateB - dateA;
             });
-            
+
             // Add upcoming combos to fill up to 2
             const needed = 2 - displayCombos.length;
             displayCombos = [...displayCombos, ...sortedUpcoming.slice(0, needed)];
           }
-          
+
           setActiveCombos(displayCombos);
         }
       } catch (error) {
@@ -2256,11 +2259,11 @@ const Page = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch all products by using a high limit to get all products at once
         // This ensures the Core Collection can cycle through ALL products
         const response = await apiService.get(`${apiService.ENDPOINTS.PRODUCTS}?limit=1000`);
-        
+
         if (response.error) {
           console.error('API Error:', response.error);
           throw new Error(response.error);
@@ -2317,7 +2320,7 @@ const Page = () => {
           // This ensures we cycle through ALL products regardless of total count
           const totalProducts = allProducts.length;
           const nextOffset = (prevOffset + 4) % totalProducts;
-          
+
           // Log which products will be displayed
           const productsToShow = [];
           for (let i = 0; i < 4; i++) {
@@ -2375,7 +2378,7 @@ const Page = () => {
           return value;
         }
       }
-    } catch {}
+    } catch { }
 
     return '';
   };
@@ -2409,7 +2412,7 @@ const Page = () => {
           productsData = response.data;
         }
         if (productsData.length > 0) return productsData;
-      } catch {}
+      } catch { }
     }
     return null;
   };
@@ -2464,7 +2467,7 @@ const Page = () => {
       try {
         router.push({
           pathname: "/category/[id]",
-          params: { 
+          params: {
             id: categoryId.toString(),
             name: category.name
           }
@@ -2620,7 +2623,7 @@ const Page = () => {
           <Ionicons name="close" size={24} color="#333333" />
         </TouchableOpacity>
       </View>
-      <ScrollView 
+      <ScrollView
         style={styles.menuContent}
         contentContainerStyle={styles.menuScrollContent}
         showsVerticalScrollIndicator={false}
@@ -2634,8 +2637,8 @@ const Page = () => {
               <Text style={styles.menuUserText}>Welcome{userName ? ` ${userName}` : ''}</Text>
             </View>
             <View style={styles.menuDivider} />
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Profile button pressed');
                 handleDrawerClose();
@@ -2646,8 +2649,8 @@ const Page = () => {
               <Ionicons name="person-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>My Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Cart button pressed');
                 handleDrawerClose();
@@ -2658,8 +2661,8 @@ const Page = () => {
               <Ionicons name="cart-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Shopping Cart</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Orders button pressed');
                 handleDrawerClose();
@@ -2670,8 +2673,8 @@ const Page = () => {
               <Ionicons name="bag-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Track Order</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Wishlist button pressed');
                 handleDrawerClose();
@@ -2683,8 +2686,8 @@ const Page = () => {
               <Text style={styles.menuItemText}>Wishlist</Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Settings button pressed');
                 handleDrawerClose();
@@ -2695,8 +2698,8 @@ const Page = () => {
               <Ionicons name="settings-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Settings</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Help button pressed');
                 handleDrawerClose();
@@ -2708,8 +2711,8 @@ const Page = () => {
               <Text style={styles.menuItemText}>Help & Support</Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
-            <TouchableOpacity 
-              style={[styles.menuItem, styles.logoutItem]} 
+            <TouchableOpacity
+              style={[styles.menuItem, styles.logoutItem]}
               onPress={async () => {
                 console.log('Logout button pressed');
                 handleDrawerClose();
@@ -2736,8 +2739,8 @@ const Page = () => {
               <Text style={styles.menuUserText}>Welcome Guest</Text>
             </View>
             <View style={styles.menuDivider} />
-            <TouchableOpacity 
-              style={[styles.menuItem, { backgroundColor: '#8B6B43' }]} 
+            <TouchableOpacity
+              style={[styles.menuItem, { backgroundColor: '#8B6B43' }]}
               onPress={() => {
                 console.log('Login button pressed');
                 handleDrawerClose();
@@ -2748,8 +2751,8 @@ const Page = () => {
               <Ionicons name="log-in-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Login</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Register button pressed');
                 handleDrawerClose();
@@ -2761,8 +2764,8 @@ const Page = () => {
               <Text style={styles.menuItemText}>Register</Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('Help button pressed');
                 handleDrawerClose();
@@ -2773,8 +2776,8 @@ const Page = () => {
               <Ionicons name="help-circle-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Help & Support</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 console.log('About button pressed');
                 handleDrawerClose();
@@ -2894,9 +2897,9 @@ const Page = () => {
   // Add function to handle drawer open with improved error handling and loading state
   const handleDrawerOpen = () => {
     if (isMenuLoading) return; // Prevent multiple simultaneous calls
-    
+
     setIsMenuLoading(true);
-    
+
     try {
       setIsMenuOpen(true);
       Animated.timing(drawerAnimation, {
@@ -2930,9 +2933,9 @@ const Page = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
-        style={styles.container} 
+        style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: bottomTabHeight + 20 // Add extra 20 for spacing
@@ -2945,48 +2948,48 @@ const Page = () => {
             { scale: pulseAnim }
           ]
         }]}>
-        <View style={styles.header}>
-          <View style={styles.titleContainer}>
-            <Animated.Text style={[styles.title, {
-              transform: [{ scale: pulseAnim }]
-            }]}>Saranga Ayurveda</Animated.Text>
-            <Animated.Text style={[styles.subtitle, {
-              transform: [{ translateX: searchSlideAnim }]
-            }]}>
-              <Text style={{ color: '#176e14' }}>Natural</Text>
-              <Text> Skin Care </Text>
-              <Ionicons name="leaf" size={14} color="#176e14" />
-            </Animated.Text>
+          <View style={styles.header}>
+            <View style={styles.titleContainer}>
+              <Animated.Text style={[styles.title, {
+                transform: [{ scale: pulseAnim }]
+              }]}>Saranga Ayurveda</Animated.Text>
+              <Animated.Text style={[styles.subtitle, {
+                transform: [{ translateX: searchSlideAnim }]
+              }]}>
+                <Text style={{ color: '#176e14' }}>Natural</Text>
+                <Text> Skin Care </Text>
+                <Ionicons name="leaf" size={14} color="#176e14" />
+              </Animated.Text>
+            </View>
           </View>
-        </View>
 
-        <Animated.View style={[styles.searchRow, {
-          transform: [{ translateY: searchSlideAnim }]
-        }]}>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <TouchableOpacity 
-              style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
-              onPress={handleDrawerOpen}
-              disabled={isMenuLoading}
-              activeOpacity={0.7}
-            >
-              {isMenuLoading ? (
-                <ActivityIndicator size="small" color="#694d21" />
-              ) : (
-                <Ionicons name="menu" size={28} color="#694d21" />
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <TouchableOpacity 
-              style={styles.searchIconButton}
-              onPress={() => router.push('/search')}
-            >
-              <Ionicons name="search" size={28} color="#694d21" />
-            </TouchableOpacity>
-          </Animated.View>
+          <Animated.View style={[styles.searchRow, {
+            transform: [{ translateY: searchSlideAnim }]
+          }]}>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity 
+              <TouchableOpacity
+                style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
+                onPress={handleDrawerOpen}
+                disabled={isMenuLoading}
+                activeOpacity={0.7}
+              >
+                {isMenuLoading ? (
+                  <ActivityIndicator size="small" color="#694d21" />
+                ) : (
+                  <Ionicons name="menu" size={28} color="#694d21" />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity
+                style={styles.searchIconButton}
+                onPress={() => router.push('/search')}
+              >
+                <Ionicons name="search" size={28} color="#694d21" />
+              </TouchableOpacity>
+            </Animated.View>
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity
                 style={styles.natureButton}
                 onPress={handleNatureTouch}
                 activeOpacity={0.7}
@@ -3001,7 +3004,7 @@ const Page = () => {
               </TouchableOpacity>
             </Animated.View>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.iconButton}
                 onPress={() => router.push('/profile/notifications')}
               >
@@ -3009,7 +3012,7 @@ const Page = () => {
               </TouchableOpacity>
             </Animated.View>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.iconButton}
                 onPress={() => router.push('/cart')}
               >
@@ -3020,7 +3023,7 @@ const Page = () => {
 
           <View style={styles.offersHeader}>
             <View style={styles.offersContainer}>
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.offersContent,
                   { transform: [{ translateX: scrollAnim }] }
@@ -3032,7 +3035,7 @@ const Page = () => {
               >
                 <Text style={styles.offersTitle} numberOfLines={1}>Weekend Sale! Checkout for new products...</Text>
               </Animated.View>
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.offersContent,
                   { transform: [{ translateX: scrollAnim }] }
@@ -3044,219 +3047,221 @@ const Page = () => {
           </View>
         </Animated.View>
 
-          {loading ? (
-            <Animated.View style={[styles.loadingContainer, {
-              opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }]
-            }]}>
-              <Animated.View style={{
-                transform: [{ scale: pulseAnim }]
-              }}>
-                <ActivityIndicator size="large" color="#694d21" />
-              </Animated.View>
-              <Animated.Text style={[styles.loadingText, {
-                opacity: shimmerAnim
-              }]}>Loading amazing products...</Animated.Text>
-              
-              {/* Modern skeleton loading */}
-              <View style={styles.skeletonContainer}>
-                {[1, 2, 3, 4].map((item) => (
-                  <Animated.View 
-                    key={item}
+        {loading ? (
+          <Animated.View style={[styles.loadingContainer, {
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }]
+          }]}>
+            <Animated.View style={{
+              transform: [{ scale: pulseAnim }]
+            }}>
+              <ActivityIndicator size="large" color="#694d21" />
+            </Animated.View>
+            <Animated.Text style={[styles.loadingText, {
+              opacity: shimmerAnim
+            }]}>Loading amazing products...</Animated.Text>
+
+            {/* Modern skeleton loading */}
+            <View style={styles.skeletonContainer}>
+              {[1, 2, 3, 4].map((item) => (
+                <Animated.View
+                  key={item}
+                  style={[
+                    styles.skeletonCard,
+                    {
+                      opacity: shimmerAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.3, 0.7]
+                      })
+                    }
+                  ]}
+                >
+                  <View style={styles.skeletonImage} />
+                  <View style={styles.skeletonText} />
+                  <View style={styles.skeletonPrice} />
+                </Animated.View>
+              ))}
+            </View>
+          </Animated.View>
+        ) : searchQuery ? (
+          <View style={styles.searchResultsContainer}>
+            <Text style={[styles.sectionTitle, { marginLeft: 16 }]}>Search Results</Text>
+            <Text style={{ marginLeft: 16, color: '#666', marginTop: 4 }}>
+              {filteredProducts.length} result{filteredProducts.length === 1 ? '' : 's'} for "{searchQuery}"
+            </Text>
+            {filteredProducts.length > 0 ? (
+              <Animated.View style={[styles.searchResultsGrid, {
+                transform: [{ translateY: productSlideAnim }]
+              }]}>
+                {filteredProducts.map((product, index) => (
+                  <Animated.View
+                    key={product.id}
                     style={[
-                      styles.skeletonCard,
+                      styles.searchProductWrapper,
                       {
-                        opacity: shimmerAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.3, 0.7]
-                        })
+                        opacity: fadeAnim,
+                        transform: [
+                          { translateY: productSlideAnim },
+                          { scale: scaleAnim }
+                        ]
                       }
                     ]}
                   >
-                    <View style={styles.skeletonImage} />
-                    <View style={styles.skeletonText} />
-                    <View style={styles.skeletonPrice} />
+                    <ProductCard product={product} />
                   </Animated.View>
                 ))}
+              </Animated.View>
+            ) : (
+              <View style={styles.noResultsContainer}>
+                <Ionicons name="search-outline" size={48} color="#694d21" />
+                <Text style={styles.noResultsText}>No products found</Text>
+                <Text style={[styles.noResultsText, { fontSize: 14, marginTop: 8, color: '#999' }]}>
+                  Try different search terms
+                </Text>
               </View>
-            </Animated.View>
-          ) : searchQuery ? (
-            <View style={styles.searchResultsContainer}>
-              <Text style={[styles.sectionTitle, { marginLeft: 16 }]}>Search Results</Text>
-              <Text style={{ marginLeft: 16, color: '#666', marginTop: 4 }}>
-                {filteredProducts.length} result{filteredProducts.length === 1 ? '' : 's'} for "{searchQuery}"
-              </Text>
-              {filteredProducts.length > 0 ? (
-                <Animated.View style={[styles.searchResultsGrid, {
-                  transform: [{ translateY: productSlideAnim }]
-                }]}>
-                  {filteredProducts.map((product, index) => (
-                    <Animated.View 
-                      key={product.id} 
-                      style={[
-                        styles.searchProductWrapper,
-                        {
-                          opacity: fadeAnim,
-                          transform: [
-                            { translateY: productSlideAnim },
-                            { scale: scaleAnim }
-                          ]
-                        }
-                      ]}
-                    >
-                      <ProductCard product={product} />
-                    </Animated.View>
-                  ))}
-                </Animated.View>
-              ) : (
-                <View style={styles.noResultsContainer}>
-                  <Ionicons name="search-outline" size={48} color="#694d21" />
-                  <Text style={styles.noResultsText}>No products found</Text>
-                  <Text style={[styles.noResultsText, { fontSize: 14, marginTop: 8, color: '#999' }]}>
-                    Try different search terms
-                  </Text>
+            )}
+          </View>
+        ) : (
+          <>
+            <View style={styles.categorySection}>
+              <View style={styles.categoryHeader}>
+                <View style={styles.categoryHeaderLeft}>
+                  <Ionicons name="water-outline" size={24} color="#694d21" />
+                  <Text style={styles.categoryTitle}>Tap in, Into the Deep...</Text>
                 </View>
+              </View>
+              {categoriesLoading ? (
+                <View style={styles.categoryScrollContainer}>
+                  <Text style={styles.loadingText}>Loading categories...</Text>
+                </View>
+              ) : (
+                <CategoryNavigation
+                  categories={mainCategoriesWithImages}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={handleCategorySelect}
+                />
               )}
             </View>
-          ) : (
-            <>
-              <View style={styles.categorySection}>
-                <View style={styles.categoryHeader}>
-                  <View style={styles.categoryHeaderLeft}>
-                    <Ionicons name="water-outline" size={24} color="#694d21" />
-                    <Text style={styles.categoryTitle}>Tap in, Into the Deep...</Text>
+
+            {videos.length > 0 && (
+              <ScrollView
+                ref={videoScrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={true}
+                style={styles.videoCarousel}
+                onMomentumScrollEnd={(event) => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+                  setCurrentVideoIndex(index);
+                }}
+              >
+                {videos.map((videoUri, index) => (
+                  <View key={index} style={styles.videoContainer}>
+                    <Video
+                      ref={(ref) => {
+                        if (ref) {
+                          videoRefs.current[index] = ref;
+                        }
+                      }}
+                      style={styles.video}
+                      source={{
+                        uri: videoUri,
+                      }}
+                      useNativeControls={false}
+                      resizeMode={ResizeMode.COVER}
+                      isLooping={true}
+                      shouldPlay={index === currentVideoIndex}
+                      onPlaybackStatusUpdate={(status) => {
+                        if (status.isLoaded && status.didJustFinish) {
+                          handleVideoEnd(index);
+                        }
+                      }}
+                    />
                   </View>
-                </View>
-                {categoriesLoading ? (
-                  <View style={styles.categoryScrollContainer}>
-                    <Text style={styles.loadingText}>Loading categories...</Text>
-                  </View>
-                ) : (
-                  <CategoryNavigation
-                    categories={mainCategoriesWithImages}
-                    selectedCategory={selectedCategory}
-                    onSelectCategory={handleCategorySelect}
-                  />
-                )}
-              </View>
+                ))}
+              </ScrollView>
+            )}
 
-              {videos.length > 0 && (
-                <ScrollView
-                  ref={videoScrollViewRef}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={true}
-                  style={styles.videoCarousel}
-                  onMomentumScrollEnd={(event) => {
-                    const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
-                    setCurrentVideoIndex(index);
-                  }}
-                >
-                  {videos.map((videoUri, index) => (
-                    <View key={index} style={styles.videoContainer}>
-                      <Video
-                        ref={(ref) => {
-                          if (ref) {
-                            videoRefs.current[index] = ref;
-                          }
-                        }}
-                        style={styles.video}
-                        source={{
-                          uri: videoUri,
-                        }}
-                        useNativeControls={false}
-                        resizeMode={ResizeMode.COVER}
-                        isLooping={true}
-                        shouldPlay={index === currentVideoIndex}
-                        onPlaybackStatusUpdate={(status) => {
-                          if (status.isLoaded && status.didJustFinish) {
-                            handleVideoEnd(index);
-                          }
-                        }}
-                      />
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
+            {/* New Combo Offers Section */}
+            <View style={styles.comboSection}>
+              <TouchableWithoutFeedback
+                onPress={() => router.push('/deals/combo-offers')}
+              >
+                <Animated.View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Combo Offers</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#000" />
+                </Animated.View>
+              </TouchableWithoutFeedback>
 
-              {/* New Combo Offers Section */}
-              <View style={styles.comboSection}>
-                <TouchableWithoutFeedback 
-                  onPress={() => router.push('/deals/combo-offers')}
-                >
-                  <Animated.View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Combo Offers</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#000" />
-                  </Animated.View>
-                </TouchableWithoutFeedback>
-                
-                {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
-                {activeCombos.length > 0 ? (
-                  activeCombos.map((combo, index) => {
-                    // Calculate prices
-                    const calculateTotalPrice = () => {
-                      return (combo.items || []).reduce((sum: number, item: any) => {
-                        const price = Number(item.price || 0);
-                        const quantity = Number(item.quantity || 1);
-                        return sum + (price * quantity);
-                      }, 0);
-                    };
+              {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
+              {activeCombos.length > 0 ? (
+                activeCombos.map((combo, index) => {
+                  // Calculate prices
+                  const calculateTotalPrice = () => {
+                    return (combo.items || []).reduce((sum: number, item: any) => {
+                      const price = Number(item.price || 0);
+                      const quantity = Number(item.quantity || 1);
+                      return sum + (price * quantity);
+                    }, 0);
+                  };
 
-                    const calculateDiscountedPrice = () => {
-                      const total = calculateTotalPrice();
-                      const discountValue = Number(combo.discount_value || 0);
-                      if (combo.discount_type === 'percentage') {
-                        return total - (total * (discountValue / 100));
-                      } else {
-                        return Math.max(0, total - discountValue);
-                      }
-                    };
+                  const calculateDiscountedPrice = () => {
+                    const total = calculateTotalPrice();
+                    const discountValue = Number(combo.discount_value || 0);
+                    if (combo.discount_type === 'percentage') {
+                      return total - (total * (discountValue / 100));
+                    } else {
+                      return Math.max(0, total - discountValue);
+                    }
+                  };
 
-                    const totalPrice = calculateTotalPrice();
-                    const discountedPrice = calculateDiscountedPrice();
-                    const savings = totalPrice - discountedPrice;
+                  const totalPrice = calculateTotalPrice();
+                  const discountedPrice = calculateDiscountedPrice();
+                  const savings = totalPrice - discountedPrice;
 
-                    // Get combo images (up to 2 for display)
-                    const comboImages = [
-                      combo.image_url,
-                      combo.image_url2,
-                      combo.image_url3,
-                      combo.image_url4
-                    ].filter(img => img && typeof img === 'string').slice(0, 2);
+                  // Get combo images (up to 2 for display)
+                  const comboImages = [
+                    combo.image_url,
+                    combo.image_url2,
+                    combo.image_url3,
+                    combo.image_url4
+                  ].filter(img => img && typeof img === 'string').slice(0, 2);
 
-                    const handleComboPress = () => {
-                      router.push({
-                        pathname: '/deals/combo-detail/[id]',
-                        params: {
-                          id: combo.id.toString(),
-                          comboData: JSON.stringify(combo),
-                        },
-                      });
-                    };
+                  const handleComboPress = () => {
+                    router.push({
+                      pathname: '/deals/combo-detail/[id]',
+                      params: {
+                        id: combo.id.toString(),
+                        comboData: JSON.stringify(combo),
+                      },
+                    });
+                  };
 
-                    // Apply different animations to each card
-                    const isFirstCard = index === 0;
-                    const rotate = isFirstCard ? comboCard1Rotate : comboCard2Rotate;
-                    const translateX = isFirstCard ? comboCard1TranslateX : comboCard2TranslateX;
-                    const translateY = isFirstCard ? comboCard1TranslateY : comboCard2TranslateY;
-                    const scale = isFirstCard ? comboCard1Scale : comboCard2Scale;
+                  // Apply different animations to each card
+                  const isFirstCard = index === 0;
+                  const rotate = isFirstCard ? comboCard1Rotate : comboCard2Rotate;
+                  const translateX = isFirstCard ? comboCard1TranslateX : comboCard2TranslateX;
+                  const translateY = isFirstCard ? comboCard1TranslateY : comboCard2TranslateY;
+                  const scale = isFirstCard ? comboCard1Scale : comboCard2Scale;
 
-                    return (
-                      <Animated.View
-                        key={combo.id}
-                        style={{
-                          transform: [
-                            { rotate: rotate.interpolate({
-                                inputRange: [-15, 0, 15],
-                                outputRange: ['-15deg', '0deg', '15deg']
-                              }) },
-                            { translateX },
-                            { translateY },
-                            { scale }
-                          ],
-                        }}
-                      >
-                      <TouchableOpacity 
+                  return (
+                    <Animated.View
+                      key={combo.id}
+                      style={{
+                        transform: [
+                          {
+                            rotate: rotate.interpolate({
+                              inputRange: [-15, 0, 15],
+                              outputRange: ['-15deg', '0deg', '15deg']
+                            })
+                          },
+                          { translateX },
+                          { translateY },
+                          { scale }
+                        ],
+                      }}
+                    >
+                      <TouchableOpacity
                         style={styles.comboCard}
                         onPress={handleComboPress}
                         activeOpacity={0.7}
@@ -3273,7 +3278,7 @@ const Page = () => {
                         <View style={styles.comboProductsRow}>
                           {comboImages.length > 0 ? (
                             comboImages.map((img, idx) => (
-                              <Image 
+                              <Image
                                 key={idx}
                                 source={{ uri: apiService.getFullImageUrl(img) }}
                                 style={styles.comboProductImage}
@@ -3289,212 +3294,134 @@ const Page = () => {
                         <View style={styles.comboPriceRow}>
                           <Text style={styles.comboPrice}>₹{discountedPrice.toFixed(2)}</Text>
                           <Text style={styles.comboSaveText}>
-                            Save {combo.discount_type === 'percentage' 
-                              ? `${Number(combo.discount_value || 0)}%` 
+                            Save {combo.discount_type === 'percentage'
+                              ? `${Number(combo.discount_value || 0)}%`
                               : `₹${Number(combo.discount_value || 0)}`}
                           </Text>
                         </View>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={styles.viewComboButton}
                           onPress={handleComboPress}
                         >
                           <Text style={styles.viewComboButtonText}>View Combo</Text>
                         </TouchableOpacity>
                       </TouchableOpacity>
-                      </Animated.View>
-                    );
-                  })
-                ) : (
-                  // Fallback: Show placeholder when no active combos
-                  <TouchableOpacity 
-                    style={styles.comboCard}
-                    onPress={() => router.push('/deals/combo-offers')}
-                  >
-                    <View style={styles.comboHeader}>
-                      <Ionicons name="gift-outline" size={24} color="#694d21" />
-                      <Text style={styles.comboTitle}>Check Out Our Combo Offers</Text>
-                    </View>
-                    <Text style={styles.comboDescription}>
-                      Discover amazing combo deals and save more on your favorite products
-                    </Text>
-                    <View style={styles.comboProductsRow}>
-                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="gift" size={32} color="#999" />
-                      </View>
-                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="star" size={32} color="#999" />
-                      </View>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.viewComboButton}
-                      onPress={() => router.push('/deals/combo-offers')}
-                    >
-                      <Text style={styles.viewComboButtonText}>View All Combo Offers</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* All Products Section */}
-              <View style={styles.allProductsSection}>
-                <View style={styles.allProductsHeader}>
-                  <Text style={styles.allProductsTitle}>Core Collection</Text>
-                  <TouchableOpacity 
-                    style={styles.viewAllButton}
-                    onPress={() => router.push('/all-products')}
-                  >
-                    <Text style={styles.viewAllText}>View All</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#694d21" />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.productsGrid}>
-                  {(() => {
-                    // Get current 4 products circularly from all products in backend
-                    // This works for ANY number of products - 5, 10, 50, 100, 1000, etc.
-                    if (allProducts.length === 0) {
-                      return null;
-                    }
-                    
-                    const totalProducts = allProducts.length;
-                    const currentProducts: Product[] = [];
-                    
-                    // Always show 4 products, using modulo to wrap around
-                    // This ensures we cycle through ALL products regardless of total count
-                    for (let i = 0; i < 4; i++) {
-                      // Use modulo to wrap around when we reach the end of the array
-                      // This works for any number of products in the backend
-                      const index = (coreProductsOffset + i) % totalProducts;
-                      currentProducts.push(allProducts[index]);
-                    }
-                    
-                    // Log current display state for debugging (only when offset changes)
-                    // Note: This may log on every render, but that's expected with React re-renders
-                    
-                    return currentProducts.map((product, index) => (
-                      <Animated.View 
-                        key={`${product.id}-${coreProductsOffset}-${index}`} 
-                        style={[
-                          styles.productItem,
-                          {
-                            opacity: fadeAnim,
-                            transform: [
-                              { translateY: productSlideAnim },
-                              { scale: scaleAnim }
-                            ]
-                          }
-                        ]}
-                      >
-                        <ProductCard product={product} />
-                      </Animated.View>
-                    ));
-                  })()}
-                </View>
-              </View>
-
-              {/* Pillars of Beauty Section */}
-              <View style={styles.pillarsSection}>
-                <View style={styles.pillarsHeader}>
-                  <Text style={styles.pillarsTitle}>Pillars of Beauty in Ayurveda</Text>
-                  <Text style={styles.pillarsSubtitle}>
-                    Discover the ancient wisdom of Ayurvedic beauty rituals
+                    </Animated.View>
+                  );
+                })
+              ) : (
+                // Fallback: Show placeholder when no active combos
+                <TouchableOpacity
+                  style={styles.comboCard}
+                  onPress={() => router.push('/deals/combo-offers')}
+                >
+                  <View style={styles.comboHeader}>
+                    <Ionicons name="gift-outline" size={24} color="#694d21" />
+                    <Text style={styles.comboTitle}>Check Out Our Combo Offers</Text>
+                  </View>
+                  <Text style={styles.comboDescription}>
+                    Discover amazing combo deals and save more on your favorite products
                   </Text>
-                </View>
-                <View style={[styles.pillarsGrid, { 
-                  alignItems: 'center', 
-                  paddingVertical: 40,
-                  backgroundColor: '#fff',
-                  borderRadius: 20,
-                  marginHorizontal: 16
-                }]}>
-                  {/* First row - 2 items */}
-                  <View style={{ 
-                    flexDirection: 'row', 
-                    justifyContent: 'space-around', 
-                    width: '90%', 
-                    marginBottom: 60
-                  }}>
-                    <View style={{ width: '42%', alignItems: 'center' }}>
-                      <View style={{ 
-                        width: 110, 
-                        height: 110, 
-                        borderRadius: 55,
-                        marginBottom: 16,
-                        borderWidth: 2,
-                        borderColor: '#694d21',
-                        backgroundColor: '#fff',
-                        elevation: 4,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 4,
-                        overflow: 'hidden'
-                      }}>
-                        <Image 
-                          source={{ uri: 'https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={{ 
-                        fontSize: 18,
-                        marginBottom: 8,
-                        color: '#694d21',
-                        fontWeight: '600',
-                        textAlign: 'center'
-                      }}>Roopam</Text>
-                      <Text style={{ 
-                        fontSize: 14,
-                        color: '#666',
-                        textAlign: 'center',
-                        paddingHorizontal: 4
-                      }}>Outer Beauty & Radiance</Text>
+                  <View style={styles.comboProductsRow}>
+                    <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Ionicons name="gift" size={32} color="#999" />
                     </View>
-                    <View style={{ width: '42%', alignItems: 'center' }}>
-                      <View style={{ 
-                        width: 110, 
-                        height: 110, 
-                        borderRadius: 55,
-                        marginBottom: 16,
-                        borderWidth: 2,
-                        borderColor: '#694d21',
-                        backgroundColor: '#fff',
-                        elevation: 4,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 4,
-                        overflow: 'hidden'
-                      }}>
-                        <Image 
-                          source={{ uri: 'https://images.pexels.com/photos/3762890/pexels-photo-3762890.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={{ 
-                        fontSize: 18,
-                        marginBottom: 8,
-                        color: '#694d21',
-                        fontWeight: '600',
-                        textAlign: 'center'
-                      }}>Gunam</Text>
-                      <Text style={{ 
-                        fontSize: 14,
-                        color: '#666',
-                        textAlign: 'center',
-                        paddingHorizontal: 4
-                      }}>Inner Beauty & Wellness</Text>
+                    <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Ionicons name="star" size={32} color="#999" />
                     </View>
                   </View>
-                  {/* Second row - 1 item centered */}
-                  <View style={{ 
-                    width: '42%', 
-                    alignItems: 'center',
-                    transform: [{ translateY: -20 }]
-                  }}>
-                    <View style={{ 
-                      width: 110, 
-                      height: 110, 
+                  <TouchableOpacity
+                    style={styles.viewComboButton}
+                    onPress={() => router.push('/deals/combo-offers')}
+                  >
+                    <Text style={styles.viewComboButtonText}>View All Combo Offers</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* All Products Section */}
+            <View style={styles.allProductsSection}>
+              <View style={styles.allProductsHeader}>
+                <Text style={styles.allProductsTitle}>Core Collection</Text>
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={() => router.push('/all-products')}
+                >
+                  <Text style={styles.viewAllText}>View All</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#694d21" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.productsGrid}>
+                {(() => {
+                  // Get current 4 products circularly from all products in backend
+                  // This works for ANY number of products - 5, 10, 50, 100, 1000, etc.
+                  if (allProducts.length === 0) {
+                    return null;
+                  }
+
+                  const totalProducts = allProducts.length;
+                  const currentProducts: Product[] = [];
+
+                  // Always show 4 products, using modulo to wrap around
+                  // This ensures we cycle through ALL products regardless of total count
+                  for (let i = 0; i < 4; i++) {
+                    // Use modulo to wrap around when we reach the end of the array
+                    // This works for any number of products in the backend
+                    const index = (coreProductsOffset + i) % totalProducts;
+                    currentProducts.push(allProducts[index]);
+                  }
+
+                  // Log current display state for debugging (only when offset changes)
+                  // Note: This may log on every render, but that's expected with React re-renders
+
+                  return currentProducts.map((product, index) => (
+                    <Animated.View
+                      key={`${product.id}-${coreProductsOffset}-${index}`}
+                      style={[
+                        styles.productItem,
+                        {
+                          opacity: fadeAnim,
+                          transform: [
+                            { translateY: productSlideAnim },
+                            { scale: scaleAnim }
+                          ]
+                        }
+                      ]}
+                    >
+                      <ProductCard product={product} />
+                    </Animated.View>
+                  ));
+                })()}
+              </View>
+            </View>
+
+            {/* Pillars of Beauty Section */}
+            <View style={styles.pillarsSection}>
+              <View style={styles.pillarsHeader}>
+                <Text style={styles.pillarsTitle}>Pillars of Beauty in Ayurveda</Text>
+                <Text style={styles.pillarsSubtitle}>
+                  Discover the ancient wisdom of Ayurvedic beauty rituals
+                </Text>
+              </View>
+              <View style={[styles.pillarsGrid, {
+                alignItems: 'center',
+                paddingVertical: 40,
+                backgroundColor: '#fff',
+                borderRadius: 20,
+                marginHorizontal: 16
+              }]}>
+                {/* First row - 2 items */}
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-around',
+                  width: '90%',
+                  marginBottom: 60
+                }}>
+                  <View style={{ width: '42%', alignItems: 'center' }}>
+                    <View style={{
+                      width: 110,
+                      height: 110,
                       borderRadius: 55,
                       marginBottom: 16,
                       borderWidth: 2,
@@ -3507,253 +3434,334 @@ const Page = () => {
                       shadowRadius: 4,
                       overflow: 'hidden'
                     }}>
-                      <Image 
-                        source={{ uri: 'https://images.pexels.com/photos/3762880/pexels-photo-3762880.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                      <Image
+                        source={{ uri: 'https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=600' }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="cover"
                       />
                     </View>
-                    <Text style={{ 
+                    <Text style={{
                       fontSize: 18,
                       marginBottom: 8,
                       color: '#694d21',
                       fontWeight: '600',
                       textAlign: 'center'
-                    }}>Vayastyag</Text>
-                    <Text style={{ 
+                    }}>Roopam</Text>
+                    <Text style={{
                       fontSize: 14,
                       color: '#666',
                       textAlign: 'center',
                       paddingHorizontal: 4
-                    }}>Lasting Beauty & Grace</Text>
+                    }}>Outer Beauty & Radiance</Text>
+                  </View>
+                  <View style={{ width: '42%', alignItems: 'center' }}>
+                    <View style={{
+                      width: 110,
+                      height: 110,
+                      borderRadius: 55,
+                      marginBottom: 16,
+                      borderWidth: 2,
+                      borderColor: '#694d21',
+                      backgroundColor: '#fff',
+                      elevation: 4,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                      overflow: 'hidden'
+                    }}>
+                      <Image
+                        source={{ uri: 'https://images.pexels.com/photos/3762890/pexels-photo-3762890.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
+                    <Text style={{
+                      fontSize: 18,
+                      marginBottom: 8,
+                      color: '#694d21',
+                      fontWeight: '600',
+                      textAlign: 'center'
+                    }}>Gunam</Text>
+                    <Text style={{
+                      fontSize: 14,
+                      color: '#666',
+                      textAlign: 'center',
+                      paddingHorizontal: 4
+                    }}>Inner Beauty & Wellness</Text>
                   </View>
                 </View>
+                {/* Second row - 1 item centered */}
+                <View style={{
+                  width: '42%',
+                  alignItems: 'center',
+                  transform: [{ translateY: -20 }]
+                }}>
+                  <View style={{
+                    width: 110,
+                    height: 110,
+                    borderRadius: 55,
+                    marginBottom: 16,
+                    borderWidth: 2,
+                    borderColor: '#694d21',
+                    backgroundColor: '#fff',
+                    elevation: 4,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    overflow: 'hidden'
+                  }}>
+                    <Image
+                      source={{ uri: 'https://images.pexels.com/photos/3762880/pexels-photo-3762880.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <Text style={{
+                    fontSize: 18,
+                    marginBottom: 8,
+                    color: '#694d21',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>Vayastyag</Text>
+                  <Text style={{
+                    fontSize: 14,
+                    color: '#666',
+                    textAlign: 'center',
+                    paddingHorizontal: 4
+                  }}>Lasting Beauty & Grace</Text>
+                </View>
               </View>
+            </View>
 
-                <View style={styles.tipsContainer}>
-                  <View style={styles.tipsHeader}>
+            <View style={styles.tipsContainer}>
+              <View style={styles.tipsHeader}>
                 <Ionicons name="bulb" size={32} color="#694d21" />
-                    <Text style={styles.tipsTitle}>Daily Skincare Tips:</Text>
-                  </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.tipsScrollView}
+                <Text style={styles.tipsTitle}>Daily Skincare Tips:</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.tipsScrollView}
                 contentContainerStyle={{ paddingHorizontal: 8 }}
-                  >
-                    {skincareTips.map((tip, index) => (
-                      <Animated.View 
-                        key={tip.id} 
-                        style={[
-                          styles.tipCard,
+              >
+                {skincareTips.map((tip, index) => (
+                  <Animated.View
+                    key={tip.id}
+                    style={[
+                      styles.tipCard,
+                      {
+                        opacity: tipCardAnims[index],
+                        transform: [
                           {
-                            opacity: tipCardAnims[index],
-                            transform: [
-                              { scale: tipCardAnims[index].interpolate({
-                                inputRange: [0, 9],
-                                outputRange: [0.8, 2]
-                              })}
-                            ]
+                            scale: tipCardAnims[index].interpolate({
+                              inputRange: [0, 9],
+                              outputRange: [0.8, 2]
+                            })
                           }
-                        ]}
-                      >
-                        <LinearGradient
-                          colors={[tip.backgroundColor, '#ffffff']}
-                          style={styles.tipGradient}
-                          start={{ x: 0, y: 0 }}
+                        ]
+                      }
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={[tip.backgroundColor, '#ffffff']}
+                      style={styles.tipGradient}
+                      start={{ x: 0, y: 0 }}
                       end={{ x: 0, y: 1 }}
-                        >
-                          <View style={[styles.tipIcon, { backgroundColor: tip.backgroundColor }]}>
-                            <Ionicons name={tip.icon as any} size={36} color="#694d21" />
-                          </View>
-                          <Text style={styles.tipTitle}>{tip.title}</Text>
-                          <Text style={styles.tipDescription}>{tip.description}</Text>
-                        </LinearGradient>
-                      </Animated.View>
-                    ))}
-                  </ScrollView>
+                    >
+                      <View style={[styles.tipIcon, { backgroundColor: tip.backgroundColor }]}>
+                        <Ionicons name={tip.icon as any} size={36} color="#694d21" />
+                      </View>
+                      <Text style={styles.tipTitle}>{tip.title}</Text>
+                      <Text style={styles.tipDescription}>{tip.description}</Text>
+                    </LinearGradient>
+                  </Animated.View>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Your Concern, Our Collections Section */}
+            <View style={styles.concernSection}>
+              <View style={styles.concernHeader}>
+                <Text style={styles.concernTitle}>Your Concern, Our Collections</Text>
+                <Text style={styles.concernSubtitle}>Find solutions for your specific needs</Text>
               </View>
-
-              {/* Your Concern, Our Collections Section */}
-              <View style={styles.concernSection}>
-                <View style={styles.concernHeader}>
-                  <Text style={styles.concernTitle}>Your Concern, Our Collections</Text>
-                  <Text style={styles.concernSubtitle}>Find solutions for your specific needs</Text>
-                </View>
-                <View style={styles.concernContainer}>
-                  {/* First row - 2 items */}
-                  <View style={styles.concernRow}>
-                    {mainCategoriesWithImages.slice(0, 2).map((category) => (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={styles.concernCircle}
-                        onPress={() => router.push({
-                          pathname: '/category/[id]',
-                          params: { id: category.id, name: category.name }
-                        })}
-                      >
-                        <View style={styles.concernIconContainer}>
-                          <Image
-                            source={{ uri: category.image }}
-                            style={styles.concernCircleImage}
-                            resizeMode="cover"
-                          />
-                        </View>
-                        <Text style={styles.concernText}>{category.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Second row - 3 items */}
-                  <View style={styles.concernRow}>
-                    {mainCategoriesWithImages.slice(2, 5).map((category) => (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={styles.concernCircle}
-                        onPress={() => router.push({
-                          pathname: '/category/[id]',
-                          params: { id: category.id, name: category.name }
-                        })}
-                      >
-                        <View style={styles.concernIconContainer}>
-                          <Image
-                            source={{ uri: category.image }}
-                            style={styles.concernCircleImage}
-                            resizeMode="cover"
-                          />
-                        </View>
-                        <Text style={styles.concernText}>{category.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Third row - 3 items */}
-                  <View style={styles.concernRow}>
-                    {mainCategoriesWithImages.slice(5, 8).map((category) => (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={styles.concernCircle}
-                        onPress={() => router.push({
-                          pathname: '/category/[id]',
-                          params: { id: category.id, name: category.name }
-                        })}
-                      >
-                        <View style={styles.concernIconContainer}>
-                          <Image
-                            source={{ uri: category.image }}
-                            style={styles.concernCircleImage}
-                            resizeMode="cover"
-                          />
-                        </View>
-                        <Text style={styles.concernText}>{category.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Fourth row - 2 items */}
-                  <View style={styles.concernRow}>
-                    {mainCategoriesWithImages.slice(8, 10).map((category) => (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={styles.concernCircle}
-                        onPress={() => router.push({
-                          pathname: '/category/[id]',
-                          params: { id: category.id, name: category.name }
-                        })}
-                      >
-                        <View style={styles.concernIconContainer}>
-                          <Image
-                            source={{ uri: category.image }}
-                            style={styles.concernCircleImage}
-                            resizeMode="cover"
-                          />
-                        </View>
-                        <Text style={styles.concernText}>{category.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.section}>
-                {/* Add Charity and Donations Section */}
-                <View style={styles.charitySection}>
-                  <View style={styles.charityHeader}>
-                    <Text style={styles.charityTitle}>With every tap, we give life.</Text>
-                    <Text style={styles.charitySubtitle}>Making a difference together</Text>
-                  </View>
-                  
-                  <View style={styles.donationStatsContainer}>
-                    <View style={styles.donationCard}>
-                      <Ionicons name="heart" size={32} color="#694d21" />
-                      <Text style={styles.donationAmount}>₹1,25,000</Text>
-                      <Text style={styles.donationLabel}>Total Donations</Text>
-                    </View>
-                    
-                    <View style={styles.donationCard}>
-                      <Ionicons name="people" size={32} color="#694d21" />
-                      <Text style={styles.donationAmount}>250+</Text>
-                      <Text style={styles.donationLabel}>Lives Impacted</Text>
-                    </View>
-                    
-                    <View style={styles.donationCard}>
-                      <Ionicons name="leaf" size={32} color="#694d21" />
-                      <Text style={styles.donationAmount}>15</Text>
-                      <Text style={styles.donationLabel}>Projects Funded</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.donationChartContainer}>
-                    <View style={styles.chartHeader}>
-                      <Text style={styles.chartTitle}>We don't just collect—we deliver hope.</Text>
-                      <Text style={styles.chartSubtitle}>Last 6 months</Text>
-                    </View>
-                    
-                    <View style={styles.barChart}>
-                      {[45, 60, 75, 55, 80, 65].map((height, index) => (
-                        <View key={index} style={styles.barContainer}>
-                          <View style={[styles.bar, { height: height }]} />
-                          <Text style={styles.barLabel}>
-                            {['Dec','Jan', 'Feb', 'Mar', 'Apr', 'May'][index]}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-
-                  <View style={styles.impactCategories}>
-                    <View style={styles.impactCategory}>
-                      <View style={[styles.impactIcon, { backgroundColor: '#FFE4E1' }]}>
-                        <Ionicons name="medkit" size={24} color="#694d21" />
+              <View style={styles.concernContainer}>
+                {/* First row - 2 items */}
+                <View style={styles.concernRow}>
+                  {mainCategoriesWithImages.slice(0, 2).map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={styles.concernCircle}
+                      onPress={() => router.push({
+                        pathname: '/category/[id]',
+                        params: { id: category.id, name: category.name }
+                      })}
+                    >
+                      <View style={styles.concernIconContainer}>
+                        <Image
+                          source={{ uri: category.image }}
+                          style={styles.concernCircleImage}
+                          resizeMode="cover"
+                        />
                       </View>
-                      <Text style={styles.impactTitle}>Healthcare</Text>
-                      <Text style={styles.impactAmount}>₹45,000</Text>
-                    </View>
-                    
-                    <View style={styles.impactCategory}>
-                      <View style={[styles.impactIcon, { backgroundColor: '#E0FFFF' }]}>
-                        <Ionicons name="book" size={24} color="#694d21" />
-                      </View>
-                      <Text style={styles.impactTitle}>Education</Text>
-                      <Text style={styles.impactAmount}>₹35,000</Text>
-                    </View>
-                    
-                    <View style={styles.impactCategory}>
-                      <View style={[styles.impactIcon, { backgroundColor: '#F0FFF0' }]}>
-                        <Ionicons name="nutrition" size={24} color="#694d21" />
-                      </View>
-                      <Text style={styles.impactTitle}>Food & Nutrition</Text>
-                      <Text style={styles.impactAmount}>₹45,000</Text>
-                    </View>
-                  </View>
-
-                  {/* Remove donation button */}
+                      <Text style={styles.concernText}>{category.name}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
-                <BrandReviews />
+                {/* Second row - 3 items */}
+                <View style={styles.concernRow}>
+                  {mainCategoriesWithImages.slice(2, 5).map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={styles.concernCircle}
+                      onPress={() => router.push({
+                        pathname: '/category/[id]',
+                        params: { id: category.id, name: category.name }
+                      })}
+                    >
+                      <View style={styles.concernIconContainer}>
+                        <Image
+                          source={{ uri: category.image }}
+                          style={styles.concernCircleImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text style={styles.concernText}>{category.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Third row - 3 items */}
+                <View style={styles.concernRow}>
+                  {mainCategoriesWithImages.slice(5, 8).map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={styles.concernCircle}
+                      onPress={() => router.push({
+                        pathname: '/category/[id]',
+                        params: { id: category.id, name: category.name }
+                      })}
+                    >
+                      <View style={styles.concernIconContainer}>
+                        <Image
+                          source={{ uri: category.image }}
+                          style={styles.concernCircleImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text style={styles.concernText}>{category.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Fourth row - 2 items */}
+                <View style={styles.concernRow}>
+                  {mainCategoriesWithImages.slice(8, 10).map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={styles.concernCircle}
+                      onPress={() => router.push({
+                        pathname: '/category/[id]',
+                        params: { id: category.id, name: category.name }
+                      })}
+                    >
+                      <View style={styles.concernIconContainer}>
+                        <Image
+                          source={{ uri: category.image }}
+                          style={styles.concernCircleImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text style={styles.concernText}>{category.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              {/* Add Charity and Donations Section */}
+              <View style={styles.charitySection}>
+                <View style={styles.charityHeader}>
+                  <Text style={styles.charityTitle}>With every tap, we give life.</Text>
+                  <Text style={styles.charitySubtitle}>Making a difference together</Text>
+                </View>
+
+                <View style={styles.donationStatsContainer}>
+                  <View style={styles.donationCard}>
+                    <Ionicons name="heart" size={32} color="#694d21" />
+                    <Text style={styles.donationAmount}>₹1,25,000</Text>
+                    <Text style={styles.donationLabel}>Total Donations</Text>
+                  </View>
+
+                  <View style={styles.donationCard}>
+                    <Ionicons name="people" size={32} color="#694d21" />
+                    <Text style={styles.donationAmount}>250+</Text>
+                    <Text style={styles.donationLabel}>Lives Impacted</Text>
+                  </View>
+
+                  <View style={styles.donationCard}>
+                    <Ionicons name="leaf" size={32} color="#694d21" />
+                    <Text style={styles.donationAmount}>15</Text>
+                    <Text style={styles.donationLabel}>Projects Funded</Text>
+                  </View>
+                </View>
+
+                <View style={styles.donationChartContainer}>
+                  <View style={styles.chartHeader}>
+                    <Text style={styles.chartTitle}>We don't just collect—we deliver hope.</Text>
+                    <Text style={styles.chartSubtitle}>Last 6 months</Text>
+                  </View>
+
+                  <View style={styles.barChart}>
+                    {[45, 60, 75, 55, 80, 65].map((height, index) => (
+                      <View key={index} style={styles.barContainer}>
+                        <View style={[styles.bar, { height: height }]} />
+                        <Text style={styles.barLabel}>
+                          {['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'][index]}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.impactCategories}>
+                  <View style={styles.impactCategory}>
+                    <View style={[styles.impactIcon, { backgroundColor: '#FFE4E1' }]}>
+                      <Ionicons name="medkit" size={24} color="#694d21" />
+                    </View>
+                    <Text style={styles.impactTitle}>Healthcare</Text>
+                    <Text style={styles.impactAmount}>₹45,000</Text>
+                  </View>
+
+                  <View style={styles.impactCategory}>
+                    <View style={[styles.impactIcon, { backgroundColor: '#E0FFFF' }]}>
+                      <Ionicons name="book" size={24} color="#694d21" />
+                    </View>
+                    <Text style={styles.impactTitle}>Education</Text>
+                    <Text style={styles.impactAmount}>₹35,000</Text>
+                  </View>
+
+                  <View style={styles.impactCategory}>
+                    <View style={[styles.impactIcon, { backgroundColor: '#F0FFF0' }]}>
+                      <Ionicons name="nutrition" size={24} color="#694d21" />
+                    </View>
+                    <Text style={styles.impactTitle}>Food & Nutrition</Text>
+                    <Text style={styles.impactAmount}>₹45,000</Text>
+                  </View>
+                </View>
+
+                {/* Remove donation button */}
               </View>
 
-              <View style={styles.footerContainer}>
+              <FoundationSection />
+              <BrandReviews />
+            </View>
+
+            <View style={styles.footerContainer}>
               {/* Quick Links Section */}
               <View style={styles.footerSection}>
                 <Text style={styles.footerTitle}>Quick Links</Text>
@@ -3819,7 +3827,7 @@ const Page = () => {
 
               {/* Bottom Section */}
               <View style={styles.footerBottom}>
-                <Text style={styles.footerBottomText}>© 2025 Saranga Ayurveda. All rights reserved.</Text>
+                <Text style={styles.footerBottomText}>© 2026 Saranga Ayurveda. All rights reserved.</Text>
                 <View style={styles.footerRow}>
                   {[
                     { title: 'Privacy Policy', route: '/legal/privacy-policy' },
@@ -3848,7 +3856,7 @@ const Page = () => {
                 </View>
                 <Text style={[styles.footerBottomText, { marginTop: 16 }]}>
                   Made with ♥ in India
-                  
+
                 </Text>
                 <Text style={styles.footerBottomText}>Crafted and powered with care by Curiospry Technologies
 
@@ -3857,79 +3865,79 @@ const Page = () => {
             </View>
           </>
         )}
-        </ScrollView>
+      </ScrollView>
 
-        <View style={[styles.chatbotContainer, { bottom: bottomTabHeight + 20 }]}>
-          <Chatbot />
-        </View>
+      <View style={[styles.chatbotContainer, { bottom: bottomTabHeight + 20 }]}>
+        <Chatbot />
+      </View>
 
-        {/* New Deals Popup Modal */}
-        <Modal
-          visible={showNewDealsPopup}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowNewDealsPopup(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.newDealsPopup}>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setShowNewDealsPopup(false)}
-              >
-                <Ionicons name="close" size={24} color="#694d21" />
-              </TouchableOpacity>
-              <Text style={styles.newDealsTitle}>New Deals Alert! 🎉</Text>
-              <Text style={styles.newDealsText}>
-                Discover our latest Saranga Ayurveda products with exclusive offers and discounts. Limited time only!
-              </Text>
-              <TouchableOpacity 
-                style={styles.newDealsButton}
-                onPress={handleViewDeals}
-              >
-                <Text style={styles.newDealsButtonText}>View Deals</Text>
-              </TouchableOpacity>
-            </View>
+      {/* New Deals Popup Modal */}
+      <Modal
+        visible={showNewDealsPopup}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNewDealsPopup(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newDealsPopup}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowNewDealsPopup(false)}
+            >
+              <Ionicons name="close" size={24} color="#694d21" />
+            </TouchableOpacity>
+            <Text style={styles.newDealsTitle}>New Deals Alert! 🎉</Text>
+            <Text style={styles.newDealsText}>
+              Discover our latest Saranga Ayurveda products with exclusive offers and discounts. Limited time only!
+            </Text>
+            <TouchableOpacity
+              style={styles.newDealsButton}
+              onPress={handleViewDeals}
+            >
+              <Text style={styles.newDealsButtonText}>View Deals</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Drawer Modal */}
-        <Modal
-          visible={isMenuOpen}
-          transparent={true}
-          animationType="none"
-          onRequestClose={handleDrawerClose}
-        >
-          <View style={styles.drawerOverlay}>
-            <Animated.View 
+      {/* Drawer Modal */}
+      <Modal
+        visible={isMenuOpen}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleDrawerClose}
+      >
+        <View style={styles.drawerOverlay}>
+          <Animated.View
+            style={[
+              styles.drawerContainer,
+              {
+                transform: [{
+                  translateX: drawerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-300, 0],
+                  })
+                }]
+              }
+            ]}
+          >
+            {renderMenu()}
+          </Animated.View>
+          <TouchableWithoutFeedback onPress={handleDrawerClose}>
+            <Animated.View
               style={[
-                styles.drawerContainer,
+                styles.drawerBackdrop,
                 {
-                  transform: [{
-                    translateX: drawerAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-300, 0],
-                    })
-                  }]
+                  opacity: drawerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1],
+                  })
                 }
               ]}
-            >
-              {renderMenu()}
-            </Animated.View>
-            <TouchableWithoutFeedback onPress={handleDrawerClose}>
-              <Animated.View 
-                style={[
-                  styles.drawerBackdrop,
-                  {
-                    opacity: drawerAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 1],
-                    })
-                  }
-                ]} 
-              />
-            </TouchableWithoutFeedback>
-          </View>
-        </Modal>
+            />
+          </TouchableWithoutFeedback>
+        </View>
+      </Modal>
     </View>
   );
 };

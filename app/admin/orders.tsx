@@ -102,10 +102,10 @@ const AdminOrdersInner = () => {
     );
   }
 
-  const { 
-    orders: orderSummaries = [], 
-    loading = false, 
-    fetchOrders, 
+  const {
+    orders: orderSummaries = [],
+    loading = false,
+    fetchOrders,
     updateOrderStatus,
     getOrderById,
   } = ordersContext || {};
@@ -121,6 +121,8 @@ const AdminOrdersInner = () => {
   const [visibleCount, setVisibleCount] = useState<number>(20); // Show 20 orders initially
   const [canRender, setCanRender] = useState(false); // Defer rendering to prevent crashes
   const [loadingMore, setLoadingMore] = useState(false); // Track if we're loading more orders
+  const [shiprocketLoading, setShiprocketLoading] = useState(false);
+  const [shiprocketAction, setShiprocketAction] = useState<string | null>(null);
   const mountedRef = React.useRef(true);
   const fetchInProgressRef = React.useRef(false);
   const lastFetchTimeRef = React.useRef(0);
@@ -197,11 +199,11 @@ const AdminOrdersInner = () => {
       setRefreshing(false);
       return;
     }
-    
+
     fetchInProgressRef.current = true;
     lastFetchTimeRef.current = Date.now();
     if (mountedRef.current) setRefreshing(true);
-    
+
     try {
       await fetchOrders();
       // Reset visible count on refresh to show initial batch
@@ -231,7 +233,7 @@ const AdminOrdersInner = () => {
       return [];
     }
   }, [orderSummaries, selectedStatus]);
-  
+
   const visibleOrders = React.useMemo(() => {
     try {
       if (!Array.isArray(filteredOrders) || filteredOrders.length === 0) return [];
@@ -242,16 +244,16 @@ const AdminOrdersInner = () => {
       return [];
     }
   }, [filteredOrders, visibleCount]);
-  
+
   // Update visible count when filtered orders change
   useEffect(() => {
     if (!mountedRef.current) return;
-    
+
     try {
       if (!mountedRef.current) return;
       setVisibleCount((prevCount) => {
         const safeLength = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
-        
+
         if (safeLength > 0) {
           // If we have more orders available, ensure we show at least 20
           if (prevCount < 20) {
@@ -271,36 +273,36 @@ const AdminOrdersInner = () => {
       console.error('Error updating visible count:', error);
     }
   }, [filteredOrders.length]);
-  
+
   const loadMore = React.useCallback(() => {
     if (!mountedRef.current || loadMoreInProgressRef.current) return;
-    
+
     try {
       const totalAvailable = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
       if (totalAvailable === 0) return;
-      
+
       // Check if there are more orders to load using current visibleCount
       setVisibleCount((prevCount) => {
         // Check if there are more orders to load
         if (prevCount >= totalAvailable) {
           return prevCount; // Already showing all orders
         }
-        
+
         // Load 20 more orders at a time for better performance
         const increment = 20;
         const next = Math.min(prevCount + increment, totalAvailable);
-        
+
         // If we're close to the end (within 20 orders), just show all remaining
         if (totalAvailable - prevCount <= increment) {
           return totalAvailable;
         }
         return next;
       });
-      
+
       // Set loading state outside of setState callback
       loadMoreInProgressRef.current = true;
       if (mountedRef.current) setLoadingMore(true);
-      
+
       if (loadMoreTimeoutRef.current) {
         clearTimeout(loadMoreTimeoutRef.current);
       }
@@ -319,7 +321,7 @@ const AdminOrdersInner = () => {
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
     if (!mountedRef.current || !updateOrderStatus || typeof updateOrderStatus !== 'function') return;
     if (!orderId || !newStatus) return;
-    
+
     try {
       await updateOrderStatus(orderId, newStatus);
       // Refresh orders after status update
@@ -403,6 +405,196 @@ const AdminOrdersInner = () => {
       console.error('Download PDF error:', e);
     } finally {
       if (mountedRef.current) setDownloading(false);
+    }
+  };
+
+  // Shiprocket Helper Functions
+  const hasShiprocketData = (order: Order) => {
+    return !!(order as any).shiprocket_order_id;
+  };
+
+  const hasAWB = (order: Order) => {
+    return !!(order as any).awb_number;
+  };
+
+  const handleCreateShipment = async (orderId: string) => {
+    if (!mountedRef.current || shiprocketLoading) return;
+
+    try {
+      setShiprocketLoading(true);
+      setShiprocketAction('create');
+
+      const token = await AsyncStorage.getItem('auth_token');
+      const baseUrl = getBaseUrl();
+
+      const response = await fetch(`${baseUrl}/shiprocket/create-shipment/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pickupLocation: 'warehouse',
+          weight: 0.5,
+          length: 10,
+          breadth: 10,
+          height: 10
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('✅ Shipment created successfully!');
+
+        // Update the order in state with Shiprocket data
+        if (selectedOrderForDetails && data.data) {
+          setSelectedOrderForDetails({
+            ...selectedOrderForDetails,
+            shiprocket_order_id: data.data.order_id,
+            shiprocket_shipment_id: data.data.shipment_id,
+            shipment_status: 'created'
+          } as any);
+        }
+
+        // Also refresh the orders list in background
+        if (fetchOrders && typeof fetchOrders === 'function') {
+          fetchOrders();
+        }
+      } else {
+        alert('❌ Failed: ' + (data.error || 'Unknown error') + '\n\nPlease add a pickup location named "Primary" in Shiprocket dashboard.');
+      }
+    } catch (error) {
+      console.error('Create shipment error:', error);
+      alert('❌ Error: Add pickup location in Shiprocket\n\n1. Go to shiprocket.in\n2. Settings → Pickup Addresses\n3. Add location named "Primary"');
+    } finally {
+      if (mountedRef.current) {
+        setShiprocketLoading(false);
+        setShiprocketAction(null);
+      }
+    }
+  };
+
+  const handleAssignCourier = async (orderId: string) => {
+    if (!mountedRef.current || shiprocketLoading) return;
+
+    try {
+      setShiprocketLoading(true);
+      setShiprocketAction('assign');
+
+      const token = await AsyncStorage.getItem('auth_token');
+      const baseUrl = getBaseUrl();
+
+      const response = await fetch(`${baseUrl}/shiprocket/assign-courier/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('✅ Courier assigned & AWB generated!');
+
+        // Update order with AWB data immediately
+        if (selectedOrderForDetails && data.data) {
+          setSelectedOrderForDetails({
+            ...selectedOrderForDetails,
+            awb_number: data.data.awb_code,
+            courier_id: data.data.courier_company_id,
+            courier_name: data.data.courier_name,
+            shipment_status: 'ready_to_ship'
+          } as any);
+        }
+
+        // Refresh list in background
+        if (fetchOrders && typeof fetchOrders === 'function') {
+          fetchOrders();
+        }
+      } else {
+        alert('❌ Failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Assign courier error:', error);
+      alert('❌ Error assigning courier');
+    } finally {
+      if (mountedRef.current) {
+        setShiprocketLoading(false);
+        setShiprocketAction(null);
+      }
+    }
+  };
+
+  const handleDownloadLabel = async (orderId: string) => {
+    if (!mountedRef.current || shiprocketLoading) return;
+
+    try {
+      setShiprocketLoading(true);
+      setShiprocketAction('label');
+
+      const token = await AsyncStorage.getItem('auth_token');
+      const baseUrl = getBaseUrl();
+
+      const response = await fetch(`${baseUrl}/shiprocket/generate-label/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data.label_url) {
+        Linking.openURL(data.data.label_url);
+        alert('✅ Label opened!');
+      } else {
+        alert('❌ Failed to generate label');
+      }
+    } catch (error) {
+      console.error('Download label error:', error);
+      alert('❌ Error downloading label');
+    } finally {
+      if (mountedRef.current) {
+        setShiprocketLoading(false);
+        setShiprocketAction(null);
+      }
+    }
+  };
+
+  const handleSchedulePickup = async (orderId: string) => {
+    if (!mountedRef.current || shiprocketLoading) return;
+
+    try {
+      setShiprocketLoading(true);
+      setShiprocketAction('pickup');
+
+      const token = await AsyncStorage.getItem('auth_token');
+      const baseUrl = getBaseUrl();
+
+      const response = await fetch(`${baseUrl}/shiprocket/request-pickup/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('✅ Pickup scheduled!');
+      } else {
+        alert('❌ Failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Schedule pickup error:', error);
+      alert('❌ Error scheduling pickup');
+    } finally {
+      if (mountedRef.current) {
+        setShiprocketLoading(false);
+        setShiprocketAction(null);
+      }
     }
   };
 
@@ -506,199 +698,199 @@ const AdminOrdersInner = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.filterSection}>
-        <Text style={styles.filterLabel}>Filter by status:</Text>
-        <View style={styles.pickerContainer}>
-          {Platform.OS !== 'web' ? (
-            <Picker
-              selectedValue={selectedStatus}
-              style={[styles.picker, Platform.select({
-                android: { color: '#333' },
-                ios: { color: '#333' }
-              })]}
-              dropdownIconColor="#333"
-              mode={Platform.select({ ios: 'dialog', android: 'dropdown' })}
-              itemStyle={Platform.select({
-                ios: { fontSize: 16, color: '#333' }
-              })}
-              onValueChange={itemValue => {
-                if (mountedRef.current) {
-                  setSelectedStatus(itemValue);
-                }
-              }}
-            >
-              <Picker.Item label="All Orders" value="all" />
-              <Picker.Item label="Pending" value="pending" />
-              <Picker.Item label="Confirmed" value="confirmed" />
-              <Picker.Item label="Shipped" value="shipped" />
-              <Picker.Item label="Delivered" value="delivered" />
-              <Picker.Item label="Cancelled" value="cancelled" />
-            </Picker>
-          ) : (
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                if (mountedRef.current) {
-                  setSelectedStatus(e.target.value);
-                }
-              }}
-              style={{ width: '100%', padding: 12, fontSize: 16, borderRadius: 8 }}
-            >
-              <option value="all">All Orders</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="shipped">Shipped</option>
-              <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          )}
-        </View>
-        <View style={{ marginTop: 12 }}>
-          <Text style={styles.filterLabel}>Export orders by date:</Text>
-          <View style={{ flexDirection: 'row', marginTop: 8, alignItems: 'stretch' }}>
-            <TouchableOpacity
-              onPress={() => setShowStartPicker(true)}
-              style={{ flex: 1, marginRight: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Text style={{ color: '#333', textAlign: 'center' }}>{startDate ? `Start: ${startDate.toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })}` : 'Select start date'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setShowEndPicker(true)}
-              style={{ flex: 1, marginLeft: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Text style={{ color: '#333', textAlign: 'center' }}>{endDate ? `End: ${endDate.toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })}` : 'Select end date'}</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            disabled={downloading}
-            onPress={downloadPdf}
-            style={{ marginTop: 8, backgroundColor: '#0066cc', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '600' }}>{downloading ? 'Downloading...' : 'Download PDF'}</Text>
-          </TouchableOpacity>
-          {showStartPicker && (
-            <DateTimePicker
-              value={startDate || new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => {
-                setShowStartPicker(false);
-                if (date) setStartDate(date);
-              }}
-            />
-          )}
-          {showEndPicker && (
-            <DateTimePicker
-              value={endDate || new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => {
-                setShowEndPicker(false);
-                if (date) setEndDate(date);
-              }}
-            />
-          )}
-        </View>
-      </View>
-
-      {!canRender ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066cc" />
-          <Text style={{ marginTop: 12, color: '#666' }}>Loading orders...</Text>
-        </View>
-      ) : (
-      <FlatList
-        style={styles.ordersList}
-        contentContainerStyle={styles.scrollContent}
-        data={Array.isArray(visibleOrders) ? visibleOrders : []}
-        keyExtractor={(order) => {
-          if (!order || !order.id) return `order-${Math.random()}`;
-          return String(order.id);
-        }}
-        renderItem={({ item }: { item: OrderSummary }) => {
-          if (!item) return null;
-          try {
-            const hydrated = buildOrderDetails(item);
-            if (!hydrated) return null;
-            return (
-              <OrderCard 
-                order={hydrated} 
-                isExpanded={false}
-                onToggle={() => {
-                  if (!mountedRef.current) return;
-                  try {
-                    const detail = typeof getOrderById === 'function' ? getOrderById(String(item.id)) : undefined;
-                    setSelectedOrderForDetails(detail || hydrated);
-                    setShowOrderDetailsModal(true);
-                    if (!detail && typeof fetchOrders === 'function') {
-                      fetchOrders().catch(err => console.error('Error refetching orders for detail:', err));
-                    }
-                  } catch (error) {
-                    console.error('Error opening order details:', error);
+          <Text style={styles.filterLabel}>Filter by status:</Text>
+          <View style={styles.pickerContainer}>
+            {Platform.OS !== 'web' ? (
+              <Picker
+                selectedValue={selectedStatus}
+                style={[styles.picker, Platform.select({
+                  android: { color: '#333' },
+                  ios: { color: '#333' }
+                })]}
+                dropdownIconColor="#333"
+                mode={Platform.select({ ios: 'dialog', android: 'dropdown' })}
+                itemStyle={Platform.select({
+                  ios: { fontSize: 16, color: '#333' }
+                })}
+                onValueChange={itemValue => {
+                  if (mountedRef.current) {
+                    setSelectedStatus(itemValue);
                   }
                 }}
+              >
+                <Picker.Item label="All Orders" value="all" />
+                <Picker.Item label="Pending" value="pending" />
+                <Picker.Item label="Confirmed" value="confirmed" />
+                <Picker.Item label="Shipped" value="shipped" />
+                <Picker.Item label="Delivered" value="delivered" />
+                <Picker.Item label="Cancelled" value="cancelled" />
+              </Picker>
+            ) : (
+              <select
+                value={selectedStatus}
+                onChange={(e) => {
+                  if (mountedRef.current) {
+                    setSelectedStatus(e.target.value);
+                  }
+                }}
+                style={{ width: '100%', padding: 12, fontSize: 16, borderRadius: 8 }}
+              >
+                <option value="all">All Orders</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            )}
+          </View>
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.filterLabel}>Export orders by date:</Text>
+            <View style={{ flexDirection: 'row', marginTop: 8, alignItems: 'stretch' }}>
+              <TouchableOpacity
+                onPress={() => setShowStartPicker(true)}
+                style={{ flex: 1, marginRight: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#333', textAlign: 'center' }}>{startDate ? `Start: ${startDate.toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })}` : 'Select start date'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowEndPicker(true)}
+                style={{ flex: 1, marginLeft: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#333', textAlign: 'center' }}>{endDate ? `End: ${endDate.toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })}` : 'Select end date'}</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              disabled={downloading}
+              onPress={downloadPdf}
+              style={{ marginTop: 8, backgroundColor: '#0066cc', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>{downloading ? 'Downloading...' : 'Download PDF'}</Text>
+            </TouchableOpacity>
+            {showStartPicker && (
+              <DateTimePicker
+                value={startDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  setShowStartPicker(false);
+                  if (date) setStartDate(date);
+                }}
               />
-            );
-          } catch (error) {
-            console.error('Error rendering OrderCard:', error);
-            return null;
-          }
-        }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        showsVerticalScrollIndicator={true}
-        removeClippedSubviews={Platform.OS !== 'web'} // Disable on web for better scroll detection
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={10}
-        updateCellsBatchingPeriod={50}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.3}
-        ListEmptyComponent={<Text style={styles.noOrders}>No orders found</Text>}
-        ListFooterComponent={
-          (() => {
-            try {
-              const visibleLength = Array.isArray(visibleOrders) ? visibleOrders.length : 0;
-              const filteredLength = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
-              
-              if (visibleLength < filteredLength) {
+            )}
+            {showEndPicker && (
+              <DateTimePicker
+                value={endDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  setShowEndPicker(false);
+                  if (date) setEndDate(date);
+                }}
+              />
+            )}
+          </View>
+        </View>
+
+        {!canRender ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0066cc" />
+            <Text style={{ marginTop: 12, color: '#666' }}>Loading orders...</Text>
+          </View>
+        ) : (
+          <FlatList
+            style={styles.ordersList}
+            contentContainerStyle={styles.scrollContent}
+            data={Array.isArray(visibleOrders) ? visibleOrders : []}
+            keyExtractor={(order) => {
+              if (!order || !order.id) return `order-${Math.random()}`;
+              return String(order.id);
+            }}
+            renderItem={({ item }: { item: OrderSummary }) => {
+              if (!item) return null;
+              try {
+                const hydrated = buildOrderDetails(item);
+                if (!hydrated) return null;
                 return (
-                  <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                    {loadingMore && <ActivityIndicator size="small" color="#0066cc" style={{ marginBottom: 8 }} />}
-                    <TouchableOpacity
-                      onPress={loadMore}
-                      disabled={loadingMore}
-                      style={{ 
-                        paddingVertical: 8, 
-                        paddingHorizontal: 16, 
-                        backgroundColor: loadingMore ? '#ccc' : '#0066cc', 
-                        borderRadius: 8 
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                        {loadingMore ? 'Loading...' : `Load More (${filteredLength - visibleLength} remaining)`}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  <OrderCard
+                    order={hydrated}
+                    isExpanded={false}
+                    onToggle={() => {
+                      if (!mountedRef.current) return;
+                      try {
+                        const detail = typeof getOrderById === 'function' ? getOrderById(String(item.id)) : undefined;
+                        setSelectedOrderForDetails(detail || hydrated);
+                        setShowOrderDetailsModal(true);
+                        if (!detail && typeof fetchOrders === 'function') {
+                          fetchOrders().catch(err => console.error('Error refetching orders for detail:', err));
+                        }
+                      } catch (error) {
+                        console.error('Error opening order details:', error);
+                      }
+                    }}
+                  />
                 );
-              } else if (visibleLength > 0) {
-                return (
-                  <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                    <Text style={{ color: '#666', fontSize: 12 }}>
-                      All orders loaded ({filteredLength} total)
-                    </Text>
-                  </View>
-                );
+              } catch (error) {
+                console.error('Error rendering OrderCard:', error);
+                return null;
               }
-              return null;
-            } catch (error) {
-              console.error('Error rendering ListFooterComponent:', error);
-              return null;
+            }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
-          })()
-        }
-      />
-      )}
+            showsVerticalScrollIndicator={true}
+            removeClippedSubviews={Platform.OS !== 'web'} // Disable on web for better scroll detection
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            updateCellsBatchingPeriod={50}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.3}
+            ListEmptyComponent={<Text style={styles.noOrders}>No orders found</Text>}
+            ListFooterComponent={
+              (() => {
+                try {
+                  const visibleLength = Array.isArray(visibleOrders) ? visibleOrders.length : 0;
+                  const filteredLength = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
+
+                  if (visibleLength < filteredLength) {
+                    return (
+                      <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                        {loadingMore && <ActivityIndicator size="small" color="#0066cc" style={{ marginBottom: 8 }} />}
+                        <TouchableOpacity
+                          onPress={loadMore}
+                          disabled={loadingMore}
+                          style={{
+                            paddingVertical: 8,
+                            paddingHorizontal: 16,
+                            backgroundColor: loadingMore ? '#ccc' : '#0066cc',
+                            borderRadius: 8
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
+                            {loadingMore ? 'Loading...' : `Load More (${filteredLength - visibleLength} remaining)`}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  } else if (visibleLength > 0) {
+                    return (
+                      <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                        <Text style={{ color: '#666', fontSize: 12 }}>
+                          All orders loaded ({filteredLength} total)
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return null;
+                } catch (error) {
+                  console.error('Error rendering ListFooterComponent:', error);
+                  return null;
+                }
+              })()
+            }
+          />
+        )}
       </View>
 
       {/* Order Details Modal - Moved from inline expansion to prevent memory crashes */}
@@ -726,7 +918,80 @@ const AdminOrdersInner = () => {
                 <Text style={styles.sectionTitle}>Order Status</Text>
                 <OrderStatusPicker currentStatus={selectedOrderForDetails.status || 'pending'} orderId={selectedOrderForDetails.id} />
               </View>
-              
+
+              {/* Shiprocket Management Section */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>📦 Shipment Management</Text>
+
+                {!hasShiprocketData(selectedOrderForDetails) ? (
+                  // Not created yet
+                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
+                    <Text style={{ color: '#666', marginBottom: 12 }}>No shipment created yet</Text>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                      onPress={() => handleCreateShipment(selectedOrderForDetails.id)}
+                      disabled={shiprocketLoading}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                        {shiprocketLoading && shiprocketAction === 'create' ? '⏳ Creating...' : '📦 Create Shiprocket Shipment'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : !hasAWB(selectedOrderForDetails) ? (
+                  // Created but no AWB
+                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
+                    <Text style={{ color: '#28a745', fontWeight: '600', marginBottom: 8 }}>✓ Shipment Created</Text>
+                    <Text style={{ color: '#666', fontSize: 12, marginBottom: 12 }}>
+                      Shipment ID: {(selectedOrderForDetails as any).shiprocket_shipment_id}
+                    </Text>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                      onPress={() => handleAssignCourier(selectedOrderForDetails.id)}
+                      disabled={shiprocketLoading}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                        {shiprocketLoading && shiprocketAction === 'assign' ? '⏳ Assigning...' : '🚚 Assign Courier & Get AWB'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  // AWB generated - ready to ship
+                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
+                    <Text style={{ color: '#28a745', fontWeight: '600', marginBottom: 8 }}>✓ Ready to Ship</Text>
+                    <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 6, marginVertical: 8 }}>
+                      <Text style={{ color: '#666', fontSize: 12 }}>AWB Number:</Text>
+                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>
+                        {(selectedOrderForDetails as any).awb_number}
+                      </Text>
+                    </View>
+                    <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
+                      Courier: {(selectedOrderForDetails as any).courier_name || 'Assigned'}
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                        onPress={() => handleDownloadLabel(selectedOrderForDetails.id)}
+                        disabled={shiprocketLoading}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                          {shiprocketLoading && shiprocketAction === 'label' ? '⏳' : '🏷️ Label'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                        onPress={() => handleSchedulePickup(selectedOrderForDetails.id)}
+                        disabled={shiprocketLoading}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                          {shiprocketLoading && shiprocketAction === 'pickup' ? '⏳' : '📍 Pickup'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Customer Details</Text>
                 <View style={styles.customerInfo}>
@@ -787,12 +1052,18 @@ const AdminOrdersInner = () => {
                 <View style={styles.summaryContainer}>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Subtotal:</Text>
-                    <Text style={styles.summaryValue}>₹{(Number(selectedOrderForDetails.total_amount || 0) - Number(selectedOrderForDetails.delivery_charge || 0) + Number(selectedOrderForDetails.discount_amount || 0)).toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>₹{(selectedOrderForDetails.items?.reduce((sum, item) => sum + (Number(item.price_at_time || 0) * Number(item.quantity || 0)), 0) || 0).toFixed(2)}</Text>
                   </View>
                   {Number(selectedOrderForDetails.discount_amount || 0) > 0 && (
                     <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Discount:</Text>
                       <Text style={[styles.summaryValue, styles.discountText]}>-₹{Number(selectedOrderForDetails.discount_amount || 0).toFixed(2)}</Text>
+                    </View>
+                  )}
+                  {Number(selectedOrderForDetails.gst_amount || 0) > 0 && (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>GST (included in prices):</Text>
+                      <Text style={styles.summaryValue}>₹{Number(selectedOrderForDetails.gst_amount || 0).toFixed(2)}</Text>
                     </View>
                   )}
                   {Number(selectedOrderForDetails.delivery_charge || 0) > 0 && (

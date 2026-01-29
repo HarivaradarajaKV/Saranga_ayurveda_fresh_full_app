@@ -12,7 +12,8 @@ interface BackendInfo {
 // Flip this flag to point the app at your local backend.
 // true  => use LAN IP / localhost backend
 // false => use hosted Vercel backend
-const USE_LOCAL_BACKEND = false;
+const USE_LOCAL_BACKEND = true
+    ;
 
 const LOCAL_FALLBACK = {
     api: 'http://localhost:5001/api',
@@ -67,19 +68,19 @@ export const DEV_CONFIG = {
     // Local backend configuration - default template; actual IP resolved dynamically
     LOCAL_API_BASE_URL: LOCAL_FALLBACK.api,
     LOCAL_WS_URL: LOCAL_FALLBACK.ws,
-    
+
     // Production configuration (fallback)
     PROD_API_BASE_URL: VERCEL_TARGET.api,
     PROD_WS_URL: VERCEL_TARGET.ws,
-    
+
     // Development mode flag
     IS_DEV: __DEV__,
-    
+
     // Resolve LAN IP from Expo to avoid hard-coded addresses
     resolveLocalBaseUrls,
 
     getActiveBackend,
-    
+
     // Get the appropriate URLs based on toggle
     getApiUrl: () => {
         const backend = getActiveBackend();

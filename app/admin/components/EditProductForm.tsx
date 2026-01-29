@@ -20,6 +20,9 @@ interface Product {
     description: string;
     price: number;
     category: string;
+    category: string;
+    category_id?: number; // Added category_id
+    categories?: { id: number; name: string }[]; // New: Multiple categories
     image_url: string;
     image_url2?: string;
     image_url3?: string;
@@ -49,6 +52,8 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
         description: product.description,
         price: product.price,
         category: product.category,
+        category_id: product.category_id, // Initialize category_id
+        categories: product.categories || [], // Initialize categories
         stock_quantity: product.stock_quantity,
         usage_instructions: product.usage_instructions,
         size: product.size,
@@ -65,14 +70,19 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [activeSection, setActiveSection] = useState('basic');
 
-    // Update selectedImages when product changes
+    // Update selectedImages and categories when product changes
     useEffect(() => {
         setSelectedImages([
             product.image_url || '',
             product.image_url2 || '',
             product.image_url3 || '',
         ]);
-    }, [product.image_url, product.image_url2, product.image_url3]);
+        setEditedProduct(prev => ({
+            ...prev,
+            category_id: product.category_id, // Ensure ID syncs
+            categories: product.categories || []
+        }));
+    }, [product.image_url, product.image_url2, product.image_url3, product.category_id, product.categories]);
 
     const handleImagePick = async (index: number) => {
         try {
@@ -161,20 +171,58 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
         );
     };
 
-    const handleCategorySelect = (category: { id: number; name: string }) => {
-        setEditedProduct(prev => ({ ...prev, category: category.name }));
+    const handleCategorySelect = (categories: { id: number; name: string }[]) => {
+        if (categories.length > 0) {
+            setEditedProduct(prev => ({
+                ...prev,
+                category: categories[0].name,
+                category_id: categories[0].id,
+                categories: categories
+            }));
+        } else {
+            setEditedProduct(prev => ({
+                ...prev,
+                category: '',
+                category_id: undefined,
+                categories: []
+            }));
+        }
         setShowCategoryModal(false);
+    };
+
+    const removeCategory = (catId: number) => {
+        setEditedProduct(prev => {
+            const currentCats = prev.categories || [];
+            const newStats = currentCats.filter(c => c.id !== catId);
+            return {
+                ...prev,
+                categories: newStats,
+                category: newStats.length > 0 ? newStats[0].name : '',
+                category_id: newStats.length > 0 ? newStats[0].id : undefined
+            };
+        });
     };
 
     const handleSubmit = async () => {
         try {
             // Create FormData for image uploads
             const formData = new FormData();
-            
+
             // Add basic product data
             formData.append('name', editedProduct.name || '');
             formData.append('description', editedProduct.description || '');
             formData.append('price', String(editedProduct.price || 0));
+            if (editedProduct.category_id) {
+                formData.append('category_id', String(editedProduct.category_id));
+            }
+            // Add categories
+            if (editedProduct.categories && editedProduct.categories.length > 0) {
+                formData.append('category_ids', JSON.stringify(editedProduct.categories.map(c => c.id)));
+                // Also ensure primary category is set to the first one
+                formData.append('category', editedProduct.categories[0].name);
+                formData.append('category_id', String(editedProduct.categories[0].id));
+            }
+
             formData.append('stock_quantity', String(editedProduct.stock_quantity || 0));
             formData.append('offer_percentage', String(editedProduct.offer_percentage || 0));
             formData.append('usage_instructions', editedProduct.usage_instructions || '');
@@ -182,9 +230,9 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
             formData.append('benefits', editedProduct.benefits || '');
             formData.append('ingredients', editedProduct.ingredients || '');
             formData.append('product_details', editedProduct.product_details || '');
-            
+
             console.log('Selected images for update:', selectedImages);
-            
+
             // Handle images - send all image data to backend
             selectedImages.forEach((imageUri, index) => {
                 if (imageUri && imageUri.trim() !== '') {
@@ -194,15 +242,15 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
                         const filename = imageUri.split('/').pop() || `image${index + 1}.jpg`;
                         const match = /\.(\w+)$/.exec(filename);
                         const type = match ? `image/${match[1]}` : 'image/jpeg';
-                        
+
                         console.log(`Adding new image${index + 1}:`, filename, 'Type:', type);
-                        
+
                         formData.append(`image${index + 1}`, {
                             uri: imageUri,
                             type: type,
                             name: filename
                         } as any);
-                        
+
                         // Mark that this image should replace the existing one
                         formData.append(`replace_image${index + 1}`, 'true');
                     } else if (imageUri.startsWith('/uploads/') || imageUri.startsWith('http')) {
@@ -216,7 +264,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
                     formData.append(`remove_image${index + 1}`, 'true');
                 }
             });
-            
+
             console.log('FormData entries:', Array.from(formData.entries()));
             await onSubmit(formData);
         } catch (error) {
@@ -247,12 +295,11 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
                             >
                                 {uri ? (
                                     <>
-                                        <Image 
-                                            source={{ 
-                                                uri: uri.startsWith('file://') ? uri : 
-                                                uri.startsWith('/uploads/') ? apiService.getFullImageUrl(uri) : uri 
-                                            }} 
-                                            style={styles.image} 
+                                        <Image
+                                            source={{
+                                                uri: uri.startsWith('file://') ? uri : uri
+                                            }}
+                                            style={styles.image}
                                         />
                                         <View style={styles.imageOverlay}>
                                             <Ionicons name="camera" size={20} color="#fff" />
@@ -375,15 +422,45 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
                         />
                     </View>
 
-                    <TouchableOpacity
-                        style={[styles.input, styles.categorySelector]}
-                        onPress={() => setShowCategoryModal(true)}
-                    >
-                        <Text style={editedProduct.category ? styles.categoryText : styles.placeholderText}>
-                            {editedProduct.category || 'Select Category'}
-                        </Text>
-                        <Ionicons name="chevron-down" size={20} color="#666" />
-                    </TouchableOpacity>
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Categories</Text>
+                        <TouchableOpacity
+                            style={[
+                                styles.input,
+                                styles.categorySelector,
+                                (!editedProduct.categories || editedProduct.categories.length === 0) && styles.inputError
+                            ]}
+                            onPress={() => setShowCategoryModal(true)}
+                        >
+                            <Text style={editedProduct.categories && editedProduct.categories.length > 0 ? styles.categoryText : styles.placeholderText}>
+                                {editedProduct.categories && editedProduct.categories.length > 0
+                                    ? `${editedProduct.categories.length} Selected`
+                                    : 'Select Categories'}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color="#666" />
+                        </TouchableOpacity>
+
+                        {/* Selected Categories Chips */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 16 }}>
+                            {editedProduct.categories?.map((cat) => (
+                                <View key={cat.id} style={{
+                                    backgroundColor: '#e3f2fd',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 4,
+                                    borderRadius: 16,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    borderWidth: 1,
+                                    borderColor: '#90caf9'
+                                }}>
+                                    <Text style={{ color: '#1976d2', marginRight: 6, fontSize: 12 }}>{cat.name}</Text>
+                                    <TouchableOpacity onPress={() => removeCategory(cat.id)}>
+                                        <Ionicons name="close-circle" size={16} color="#1976d2" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
                 </View>
             ) : (
                 <View style={styles.formSection}>
@@ -478,13 +555,23 @@ const EditProductForm: React.FC<EditProductFormProps> = ({
             <CategorySelector
                 visible={showCategoryModal}
                 onClose={() => setShowCategoryModal(false)}
-                onSelect={handleCategorySelect}
+                onSelectMultiple={handleCategorySelect}
+                selectedCategories={(editedProduct.categories || []).map(c => c.name)}
+                multiSelect={true}
+                onSelect={() => { }} // No-op
             />
         </ScrollView>
     );
 };
 
 const styles = StyleSheet.create({
+    inputContainer: {
+        marginBottom: 8,
+    },
+    inputError: {
+        borderColor: '#dc3545',
+        backgroundColor: '#fff5f5',
+    },
     container: {
         flex: 1,
         backgroundColor: '#fff',
@@ -557,12 +644,6 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#ddd',
         borderStyle: 'dashed',
-    },
-    placeholderText: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 4,
-        textAlign: 'center',
     },
     removeButton: {
         position: 'absolute',

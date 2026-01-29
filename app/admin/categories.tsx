@@ -17,6 +17,7 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
 import { Category as ApiCategory } from '../types/api';
+import { useCategories } from '../CategoryContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -31,6 +32,7 @@ export default function AdminCategories() {
     const [refreshing, setRefreshing] = useState(false);
     const [newCategory, setNewCategory] = useState({ name: '', description: '' });
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const { fetchCategories: refreshGlobalCategories } = useCategories();
 
     const fetchCategories = async () => {
         try {
@@ -79,7 +81,10 @@ export default function AdminCategories() {
                 throw new Error(response.error);
             }
             setNewCategory({ name: '', description: '' });
+            setNewCategory({ name: '', description: '' });
             await fetchCategories();
+            // Refresh global context so other screens (like AddProduct) see the new category
+            refreshGlobalCategories(true);
         } catch (error) {
             console.error('Error adding category:', error);
             Alert.alert('Error', 'Failed to add category');
@@ -95,7 +100,9 @@ export default function AdminCategories() {
                 throw new Error(response.error);
             }
             setEditingCategory(null);
+            setEditingCategory(null);
             await fetchCategories();
+            refreshGlobalCategories(true);
         } catch (error) {
             console.error('Error updating category:', error);
             Alert.alert('Error', 'Failed to update category');
@@ -117,7 +124,11 @@ export default function AdminCategories() {
                             if (response.error) {
                                 throw new Error(response.error);
                             }
+                            if (response.error) {
+                                throw new Error(response.error);
+                            }
                             await fetchCategories();
+                            refreshGlobalCategories(true);
                         } catch (error) {
                             console.error('Error deleting category:', error);
                             Alert.alert('Error', 'Failed to delete category');
@@ -138,11 +149,11 @@ export default function AdminCategories() {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <Stack.Screen 
+            <Stack.Screen
                 options={{
                     title: 'Categories',
                     headerRight: () => (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.headerButton}
                             onPress={() => setNewCategory({ name: '', description: '' })}
                         >
@@ -163,26 +174,26 @@ export default function AdminCategories() {
                                 <TextInput
                                     style={styles.input}
                                     value={editingCategory.name}
-                                    onChangeText={(text) => 
+                                    onChangeText={(text) =>
                                         setEditingCategory(prev => prev ? { ...prev, name: text } : null)
                                     }
                                 />
                                 <TextInput
                                     style={[styles.input, styles.textArea]}
                                     value={editingCategory.description}
-                                    onChangeText={(text) => 
+                                    onChangeText={(text) =>
                                         setEditingCategory(prev => prev ? { ...prev, description: text } : null)
                                     }
                                     multiline
                                 />
                                 <View style={styles.editActions}>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
                                         onPress={handleUpdateCategory}
                                     >
                                         <Text style={styles.actionButtonText}>Save</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={[styles.actionButton, { backgroundColor: '#666' }]}
                                         onPress={() => setEditingCategory(null)}
                                     >
@@ -195,13 +206,13 @@ export default function AdminCategories() {
                                 <View style={styles.categoryHeader}>
                                     <Text style={styles.categoryName}>{category.name}</Text>
                                     <View style={styles.categoryActions}>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             onPress={() => setEditingCategory(category)}
                                             style={styles.iconButton}
                                         >
                                             <Ionicons name="create" size={20} color="#666" />
                                         </TouchableOpacity>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             onPress={() => handleDeleteCategory(category.id)}
                                             style={styles.iconButton}
                                         >
@@ -239,7 +250,7 @@ export default function AdminCategories() {
                                 onChangeText={(text) => setNewCategory(prev => ({ ...prev, description: text }))}
                                 multiline
                             />
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.addButton}
                                 onPress={handleAddCategory}
                             >
