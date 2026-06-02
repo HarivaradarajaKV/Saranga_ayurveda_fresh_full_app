@@ -6,7 +6,7 @@ import {
     Alert,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import AddProductForm from '../components/AddProductForm';
+import AddProductForm, { MediaAsset } from '../components/AddProductForm';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../../services/api';
 
@@ -15,6 +15,8 @@ interface NewProductForm {
     description: string;
     price: number;
     category: string;
+    category_id?: number;
+    selectedCategories: { id: number; name: string }[];
     stock_quantity: number;
     usage_instructions: string;
     size: string;
@@ -31,6 +33,7 @@ export default function NewProduct() {
         description: '',
         price: 0,
         category: '',
+        selectedCategories: [],
         stock_quantity: 0,
         usage_instructions: '',
         size: '',
@@ -39,70 +42,10 @@ export default function NewProduct() {
         product_details: '',
         offer_percentage: 0
     });
-    const [selectedImages, setSelectedImages] = useState<string[]>([]);
+    const [selectedImages, setSelectedImages] = useState<MediaAsset[]>([]);
 
-    const handleImagePick = async (index: number) => {
-        try {
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permissionResult.granted) {
-                Alert.alert('Permission Required', 'Please allow access to your photo library');
-                return;
-            }
-
-            // Show aspect ratio options for more flexible cropping
-            Alert.alert(
-                'Select Image Aspect Ratio',
-                'Choose the aspect ratio for your image crop:',
-                [
-                    {
-                        text: 'Square (1:1)',
-                        onPress: () => pickImageWithAspect(index, [1, 1])
-                    },
-                    {
-                        text: 'Landscape (4:3)',
-                        onPress: () => pickImageWithAspect(index, [4, 3])
-                    },
-                    {
-                        text: 'Portrait (3:4)',
-                        onPress: () => pickImageWithAspect(index, [3, 4])
-                    },
-                    {
-                        text: 'Wide (16:9)',
-                        onPress: () => pickImageWithAspect(index, [16, 9])
-                    },
-                    {
-                        text: 'Cancel',
-                        style: 'cancel'
-                    }
-                ]
-            );
-        } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image');
-        }
-    };
-
-    const pickImageWithAspect = async (index: number, aspect: [number, number]) => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: aspect, // Flexible aspect ratio based on user choice
-                quality: 0.95, // Higher quality for better images
-                allowsMultipleSelection: false,
-                exif: false, // Disable EXIF data to reduce file size
-                base64: false, // Don't include base64 to reduce memory usage
-            });
-
-            if (!result.canceled && result.assets[0]) {
-                const newImages = [...selectedImages];
-                newImages[index] = result.assets[0].uri;
-                setSelectedImages(newImages);
-            }
-        } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image');
-        }
+    const handleImagePick = (index: number) => {
+        // Deprecated: Media upload is now managed inline inside AddProductForm
     };
 
     const handleAddProduct = async () => {
@@ -125,13 +68,27 @@ export default function NewProduct() {
                 return;
             }
 
+            if (newProduct.selectedCategories.length === 0) {
+                Alert.alert('Error', 'Please select at least one category');
+                return;
+            }
+
             const formData = new FormData();
 
             // Add required fields
             formData.append('name', String(newProduct.name).trim());
             formData.append('description', String(newProduct.description || '').trim());
             formData.append('price', String(Math.abs(Number(newProduct.price))));
-            formData.append('category', newProduct.category);
+
+            // Add category info
+            // Primary category (first selected)
+            const primaryCategory = newProduct.selectedCategories[0];
+            formData.append('category_id', String(primaryCategory.id));
+            formData.append('category', primaryCategory.name);
+
+            // All categories for relation
+            formData.append('category_ids', JSON.stringify(newProduct.selectedCategories.map(c => c.id)));
+
             formData.append('stock_quantity', String(Math.max(0, Number(newProduct.stock_quantity))));
 
             // Add optional fields
@@ -154,20 +111,71 @@ export default function NewProduct() {
                 formData.append('offer_percentage', String(Math.max(0, Math.min(100, Number(newProduct.offer_percentage)))));
             }
 
-            // Handle images
-            selectedImages.forEach((uri, index) => {
-                if (uri) {
-                    const filename = uri.split('/').pop() || `image${index + 1}.jpg`;
-                    const match = /\.(\w+)$/.exec(filename);
-                    const type = match ? `image/${match[1]}` : 'image/jpeg';
+            let useDirectUpload = false;
+            let validMediaItems: Array<{ url: string; type: string }> = [];
 
-                    formData.append('images', {
-                        uri,
-                        type,
-                        name: filename
-                    } as any);
+            try {
+                console.log('[Direct Upload] Attempting secure signed URL direct uploads for adding product from dedicated screen...');
+                
+                const mediaItems = await Promise.all(
+                    selectedImages.map(async (item) => {
+                        if (item && item.uri) {
+                            console.log(`[Direct Upload] Requesting signed upload URL for: ${item.name}`);
+                            const signedRes = await apiService.post<{ signedUrl: string; publicUrl: string; path: string }>('/products/signed-upload-url', {
+                                fileName: item.name || 'image.jpg'
+                            });
+
+                            if (!signedRes.data || !signedRes.data.signedUrl || !signedRes.data.publicUrl) {
+                                throw new Error(signedRes.error || 'Failed to get signed URL');
+                            }
+
+                            console.log(`[Direct Upload] Uploading to signed URL: ${signedRes.data.signedUrl}`);
+                            const localFile = await fetch(item.uri);
+                            const blob = await localFile.blob();
+
+                            const uploadResponse = await fetch(signedRes.data.signedUrl, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': item.type || 'image/jpeg',
+                                },
+                                body: blob
+                            });
+
+                            if (!uploadResponse.ok) {
+                                const errorText = await uploadResponse.text();
+                                throw new Error(`Signed upload failed: ${errorText}`);
+                            }
+
+                            console.log(`[Direct Upload] Successfully uploaded directly to Supabase: ${signedRes.data.publicUrl}`);
+                            return { url: signedRes.data.publicUrl, type: item.type };
+                        }
+                        return null;
+                    })
+                );
+
+                validMediaItems = mediaItems.filter(Boolean) as Array<{ url: string; type: string }>;
+                useDirectUpload = true;
+                formData.append('existing_media', JSON.stringify(validMediaItems));
+                console.log('Sending direct stitched media order:', JSON.stringify(validMediaItems));
+            } catch (err) {
+                console.warn('[Direct Upload] Failed or not supported, falling back to backend multi-part upload:', err);
+                useDirectUpload = false;
+            }
+
+            if (!useDirectUpload) {
+                // Fallback: Retain original upload method
+                if (selectedImages.length > 0) {
+                    selectedImages.forEach((item) => {
+                        if (item && item.uri) {
+                            formData.append('images', {
+                                uri: item.uri,
+                                type: item.type,
+                                name: item.name
+                            } as any);
+                        }
+                    });
                 }
-            });
+            }
 
             const response = await apiService.addProduct(formData);
             

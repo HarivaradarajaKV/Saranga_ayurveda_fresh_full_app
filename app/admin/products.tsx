@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -23,10 +23,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../services/api';
 import { useCategories } from '../CategoryContext';
 import CategorySelector from './components/CategorySelector';
-import AddProductForm from './components/AddProductForm';
+import AddProductForm, { MediaAsset } from './components/AddProductForm';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import EditProductForm from './components/EditProductForm';
 import { ExpandableDescription } from '../components/ExpandableDescription';
+import { Video, ResizeMode } from 'expo-av';
 
 interface Product {
     id: number;
@@ -38,6 +39,7 @@ interface Product {
     image_url: string;
     image_url2?: string;
     image_url3?: string;
+    image_url4?: string;
     usage_instructions?: string;
     size?: string;
     benefits?: string;
@@ -46,7 +48,8 @@ interface Product {
     stock_quantity: number;
     created_at: string;
     offer_percentage: number;
-    categories?: { id: number; name: string }[]; // Added for multi-category support
+    categories?: { id: number; name: string }[];
+    media?: Array<{ url: string; type: 'image' | 'gif' | 'video' | 'document' }>;
 }
 
 interface AdminProductsProps {
@@ -181,7 +184,7 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
         product_details: '',
         offer_percentage: 0
     });
-    const [selectedImages, setSelectedImages] = useState<string[]>([]);
+    const [selectedImages, setSelectedImages] = useState<MediaAsset[]>([]);
     const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
     const [selectedImageUrls, setSelectedImageUrls] = useState<{ url: string }[]>([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -501,69 +504,8 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
         }
     }, [filteredProducts.length, products.length]);
 
-    const handleImagePick = async (index: number) => {
-        try {
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permissionResult.granted) {
-                Alert.alert('Permission Required', 'Please allow access to your photo library');
-                return;
-            }
-
-            // Show aspect ratio options for more flexible cropping
-            Alert.alert(
-                'Select Image Aspect Ratio',
-                'Choose the aspect ratio for your image crop:',
-                [
-                    {
-                        text: 'Square (1:1)',
-                        onPress: () => pickImageWithAspect(index, [1, 1])
-                    },
-                    {
-                        text: 'Landscape (4:3)',
-                        onPress: () => pickImageWithAspect(index, [4, 3])
-                    },
-                    {
-                        text: 'Portrait (3:4)',
-                        onPress: () => pickImageWithAspect(index, [3, 4])
-                    },
-                    {
-                        text: 'Wide (16:9)',
-                        onPress: () => pickImageWithAspect(index, [16, 9])
-                    },
-                    {
-                        text: 'Cancel',
-                        style: 'cancel'
-                    }
-                ]
-            );
-        } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image. Please try again.');
-        }
-    };
-
-    const pickImageWithAspect = async (index: number, aspect: [number, number]) => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: aspect, // Flexible aspect ratio based on user choice
-                quality: 0.95, // Higher quality for better images
-                allowsMultipleSelection: false,
-                exif: false, // Disable EXIF data to reduce file size
-                base64: false, // Don't include base64 to reduce memory usage
-            });
-
-            if (!result.canceled && result.assets[0]) {
-                const newImages = [...selectedImages];
-                newImages[index] = result.assets[0].uri;
-                setSelectedImages(newImages);
-                console.log('Image selected successfully:', result.assets[0].uri);
-            }
-        } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image. Please try again.');
-        }
+    const handleImagePick = (index: number) => {
+        // Deprecated: Media upload is now managed inline by AddProductForm
     };
 
     const handleAddProduct = async () => {
@@ -630,21 +572,70 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                 formData.append('product_details', String(newProduct.product_details).trim());
             }
 
-            // Handle images
-            if (selectedImages.length > 0) {
-                selectedImages.forEach((uri, index) => {
-                    if (uri) {
-                        const filename = uri.split('/').pop() || `image${index + 1}.jpg`;
-                        const match = /\.(\w+)$/.exec(filename);
-                        const type = match ? `image/${match[1]}` : 'image/jpeg';
+            let useDirectUpload = false;
+            let validMediaItems: Array<{ url: string; type: string }> = [];
 
-                        formData.append('images', {
-                            uri,
-                            type,
-                            name: filename
-                        } as any);
-                    }
-                });
+            try {
+                console.log('[Direct Upload] Attempting secure signed URL direct uploads for adding product...');
+                
+                const mediaItems = await Promise.all(
+                    selectedImages.map(async (item) => {
+                        if (item && item.uri) {
+                            console.log(`[Direct Upload] Requesting signed upload URL for: ${item.name}`);
+                            const signedRes = await apiService.post<{ signedUrl: string; publicUrl: string; path: string }>('/products/signed-upload-url', {
+                                fileName: item.name || 'image.jpg'
+                            });
+
+                            if (!signedRes.data || !signedRes.data.signedUrl || !signedRes.data.publicUrl) {
+                                throw new Error(signedRes.error || 'Failed to get signed URL');
+                            }
+
+                            console.log(`[Direct Upload] Uploading to signed URL: ${signedRes.data.signedUrl}`);
+                            const localFile = await fetch(item.uri);
+                            const blob = await localFile.blob();
+
+                            const uploadResponse = await fetch(signedRes.data.signedUrl, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': item.type || 'image/jpeg',
+                                },
+                                body: blob
+                            });
+
+                            if (!uploadResponse.ok) {
+                                const errorText = await uploadResponse.text();
+                                throw new Error(`Signed upload failed: ${errorText}`);
+                            }
+
+                            console.log(`[Direct Upload] Successfully uploaded directly to Supabase: ${signedRes.data.publicUrl}`);
+                            return { url: signedRes.data.publicUrl, type: item.type };
+                        }
+                        return null;
+                    })
+                );
+
+                validMediaItems = mediaItems.filter(Boolean) as Array<{ url: string; type: string }>;
+                useDirectUpload = true;
+                formData.append('existing_media', JSON.stringify(validMediaItems));
+                console.log('Sending direct stitched media order:', JSON.stringify(validMediaItems));
+            } catch (err) {
+                console.warn('[Direct Upload] Failed or not supported, falling back to backend multi-part upload:', err);
+                useDirectUpload = false;
+            }
+
+            if (!useDirectUpload) {
+                // Fallback: Retain original upload method
+                if (selectedImages.length > 0) {
+                    selectedImages.forEach((item) => {
+                        if (item && item.uri) {
+                            formData.append('images', {
+                                uri: item.uri,
+                                type: item.type,
+                                name: item.name
+                            } as any);
+                        }
+                    });
+                }
             }
 
             // Log the form data for debugging
@@ -775,11 +766,15 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
 
             if (response.error) {
                 // Handle specific error cases
-                if (response.error.includes('Unauthorized')) {
+                const errorMsg = typeof response.error === 'string'
+                    ? response.error
+                    : (response.error.message || JSON.stringify(response.error));
+
+                if (errorMsg.includes('Unauthorized')) {
                     Alert.alert('Session Expired', 'Please log in again to continue.');
                     return;
                 }
-                throw new Error(response.error);
+                throw new Error(errorMsg);
             }
 
             // Update the products list with the edited product
@@ -918,7 +913,9 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                         )}
                     </View>
                     <Text style={styles.productCardCategory} numberOfLines={1}>
-                        {product.category}
+                        {product.categories && product.categories.length > 0
+                            ? product.categories.map(c => c.name).join(', ')
+                            : product.category}
                     </Text>
                     <Text style={styles.productCardStock}>
                         Stock: {product.stock_quantity}
@@ -1108,8 +1105,10 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                 <CategorySelector
                     visible={showCategoryModal}
                     onClose={() => setShowCategoryModal(false)}
-                    onSelect={handleCategorySelect}
-                    selectedCategory={newProduct.category}
+                    onSelectMultiple={handleCategorySelect}
+                    selectedCategories={newProduct.selectedCategories?.map(c => c.name) || []}
+                    multiSelect={true}
+                    onSelect={() => { }}
                 />
             </Modal>
 
@@ -1230,28 +1229,85 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                         <ScrollView style={styles.productDetailsContent}>
                             <View style={styles.productDetailsImageContainer}>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScrollView}>
-                                    {[selectedProductForDetails.image_url, selectedProductForDetails.image_url2, selectedProductForDetails.image_url3]
-                                        .filter(Boolean)
-                                        .map((imageUrl, index) => (
-                                            <TouchableOpacity
-                                                key={index}
-                                                onPress={() => handleImagePress(selectedProductForDetails, index)}
-                                                style={styles.productDetailsImageWrapper}
-                                            >
-                                                <Image
-                                                    key={`${selectedProductForDetails.id}-${index}-${imageRefreshKey}`}
-                                                    source={{ uri: apiService.getFullImageUrl(imageUrl) + `?k=${imageRefreshKey}` }}
-                                                    style={styles.productDetailsImage}
-                                                    resizeMode="cover"
-                                                    progressiveRenderingEnabled
-                                                    onError={() => {
-                                                        console.log('Product details image load error for:', imageUrl);
-                                                    }}
-                                                />
-                                            </TouchableOpacity>
-                                        ))}
+                                    {(() => {
+                                        const mediaList = selectedProductForDetails.media && Array.isArray(selectedProductForDetails.media) && selectedProductForDetails.media.length > 0
+                                            ? selectedProductForDetails.media
+                                            : [
+                                                { url: selectedProductForDetails.image_url, type: 'image' },
+                                                { url: selectedProductForDetails.image_url2, type: 'image' },
+                                                { url: selectedProductForDetails.image_url3, type: 'image' },
+                                                { url: selectedProductForDetails.image_url4, type: 'image' }
+                                            ].filter(m => m.url);
+                                            
+                                        return mediaList.map((m: any, index: number) => {
+                                            const fullUrl = apiService.getFullImageUrl(m.url);
+                                            if (m.type === 'video') {
+                                                return (
+                                                    <View key={index} style={styles.productDetailsImageWrapper}>
+                                                        <Video
+                                                            source={{ uri: fullUrl }}
+                                                            rate={1.0}
+                                                            volume={1.0}
+                                                            isMuted={true}
+                                                            resizeMode={ResizeMode.CONTAIN}
+                                                            shouldPlay={false}
+                                                            useNativeControls
+                                                            style={styles.productDetailsImage}
+                                                        />
+                                                    </View>
+                                                );
+                                            } else if (m.type === 'document') {
+                                                const filename = m.url.split('/').pop() || 'document';
+                                                const handleOpenDoc = async () => {
+                                                    try {
+                                                        const Sharing = require('expo-sharing');
+                                                        const FileSystem = require('expo-file-system');
+                                                        const localUri = `${FileSystem.documentDirectory}${filename}`;
+                                                        await FileSystem.downloadAsync(fullUrl, localUri);
+                                                        if (await Sharing.isAvailableAsync()) {
+                                                            await Sharing.shareAsync(localUri);
+                                                        } else {
+                                                            Alert.alert('Open Document', `File downloaded: ${filename}`);
+                                                        }
+                                                    } catch (err) {
+                                                        console.error('Error opening document:', err);
+                                                        Alert.alert('Error', 'Could not open document.');
+                                                    }
+                                                };
+                                                
+                                                return (
+                                                    <TouchableOpacity key={index} onPress={handleOpenDoc} style={styles.productDetailsImageWrapper}>
+                                                        <View style={{ flex: 1, backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                                                            <Ionicons name="document-text" size={60} color="#2196F3" />
+                                                            <Text style={{ fontSize: 12, marginTop: 8, color: '#333', textAlign: 'center', fontWeight: 'bold' }}>{filename}</Text>
+                                                            <Text style={{ fontSize: 10, color: '#666', marginTop: 4 }}>Tap to Open / Share</Text>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            } else {
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={index}
+                                                        onPress={() => handleImagePress(selectedProductForDetails, index)}
+                                                        style={styles.productDetailsImageWrapper}
+                                                    >
+                                                        <Image
+                                                            key={`${selectedProductForDetails.id}-${index}-${imageRefreshKey}`}
+                                                            source={{ uri: fullUrl + `?k=${imageRefreshKey}` }}
+                                                            style={styles.productDetailsImage}
+                                                            resizeMode="cover"
+                                                            progressiveRenderingEnabled
+                                                            onError={() => {
+                                                                console.log('Product details image load error for:', m.url);
+                                                            }}
+                                                        />
+                                                    </TouchableOpacity>
+                                                );
+                                            }
+                                        });
+                                    })()}
                                 </ScrollView>
-                                {![selectedProductForDetails.image_url, selectedProductForDetails.image_url2, selectedProductForDetails.image_url3].some(Boolean) && (
+                                {!(selectedProductForDetails.media && selectedProductForDetails.media.length > 0) && ![selectedProductForDetails.image_url, selectedProductForDetails.image_url2, selectedProductForDetails.image_url3].some(Boolean) && (
                                     <View style={styles.noImagePlaceholder}>
                                         <Ionicons name="image-outline" size={48} color="#ccc" />
                                         <Text style={styles.noImageText}>No images available</Text>
@@ -1283,7 +1339,9 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                                 </View>
 
                                 <Text style={styles.productDetailsCategory}>
-                                    Category: {selectedProductForDetails.category}
+                                    Category: {selectedProductForDetails.categories && selectedProductForDetails.categories.length > 0
+                                        ? selectedProductForDetails.categories.map(c => c.name).join(', ')
+                                        : selectedProductForDetails.category}
                                 </Text>
                                 <Text style={styles.productDetailsStock}>
                                     Stock: {selectedProductForDetails.stock_quantity} units
