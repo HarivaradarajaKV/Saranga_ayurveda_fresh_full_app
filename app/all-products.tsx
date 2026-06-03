@@ -120,8 +120,10 @@ export default function AllProductsPage() {
 
   useEffect(() => {
     checkAuth();
-    fetchProducts();
-  }, []);
+    setProducts([]);
+    setPage(1);
+    fetchProducts(1, false);
+  }, [type]);
 
   const checkAuth = async () => {
     try {
@@ -134,17 +136,7 @@ export default function AllProductsPage() {
   };
 
   const handleAuthRequired = () => {
-    Alert.alert(
-      'Login Required',
-      'Please log in to perform this action.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Login', 
-          onPress: () => router.push('/auth/login')
-        }
-      ]
-    );
+    router.push('/auth/login');
   };
 
   const handleAddToCart = async (product: Product) => {
@@ -192,14 +184,26 @@ export default function AllProductsPage() {
         setIsLoadingMore(true);
       }
 
-      const response = await apiService.get(`/products?page=${pageNum}&limit=20`);
+      let endpoint = `/products?page=${pageNum}&limit=20`;
+      let isPaginated = true;
+
+      // Select specific endpoints for best sellers and new arrivals list requests
+      if (type === 'best-seller' || type === 'best-sellers') {
+        endpoint = '/products/best-sellers';
+        isPaginated = false;
+      } else if (type === 'new-arrival' || type === 'new-arrivals') {
+        endpoint = '/products/new-arrivals';
+        isPaginated = false;
+      }
+
+      const response = await apiService.get(endpoint);
       
       if (response.data) {
         const productsData = Array.isArray(response.data) ? response.data : 
                            response.data.products ? response.data.products : [];
         
-        // Update hasMore based on whether we received less items than requested
-        setHasMore(productsData.length === 20);
+        // Update hasMore based on pagination type
+        setHasMore(isPaginated ? productsData.length === 20 : false);
         
         setProducts(prev =>
           mergeProducts(prev, productsData, shouldAppend)

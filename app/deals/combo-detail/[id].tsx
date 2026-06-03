@@ -367,7 +367,7 @@ export default function ComboDetailPage() {
 
     try {
       setIsAddingToCart(true);
-      
+
       // Calculate combo prices
       const calculateTotalPrice = () => {
         if (!combo?.items) return 0;
@@ -390,14 +390,14 @@ export default function ComboDetailPage() {
 
       const comboTotalPrice = calculateTotalPrice();
       const comboDiscountedPrice = calculateDiscountedPrice();
-      
+
       // Add each item in the combo to cart with its quantity
       for (const item of combo.items || []) {
         const itemPrice = Number(item.price || 0);
         const itemQuantity = Number(item.quantity || 1);
         const itemTotalPrice = itemPrice * itemQuantity; // Total price for this item (with quantity)
         const offerPercentage = Number(item.offer_percentage || 0);
-        
+
         const product = {
           id: item.product_id,
           name: item.name || `Product ${item.product_id}`,
@@ -546,8 +546,8 @@ export default function ComboDetailPage() {
     status === 'active'
       ? '#4CAF50'
       : status === 'upcoming'
-      ? '#FF9800'
-      : '#999';
+        ? '#FF9800'
+        : '#999';
   const statusText =
     status === 'active' ? 'Active' : status === 'upcoming' ? 'Upcoming' : 'Expired';
 
@@ -568,14 +568,15 @@ export default function ComboDetailPage() {
         options={{
           title: combo.title || 'Combo Details',
           headerShown: true,
-          headerStyle: {
-            backgroundColor: '#694d21',
-          },
-          headerTintColor: '#fff',
+          headerStyle: { backgroundColor: '#fbf7f4' },
+          headerTintColor: '#2b3a1a',
+          headerTitleAlign: 'center',
           headerTitleStyle: {
-            fontWeight: '600',
-            color: '#fff',
+            fontFamily: 'CormorantGaramond-Bold',
+            fontSize: 22,
+            color: '#2b3a1a',
           },
+          headerShadowVisible: false,
         }}
       />
       <ScrollView
@@ -589,25 +590,19 @@ export default function ComboDetailPage() {
             transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
           }}
         >
-          {/* Images Section */}
+          {/* Images Section - 2-column square grid */}
           {comboImages.length > 0 && (
-            <Animated.View style={styles.imagesSection}>
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                style={styles.imagesScroll}
-              >
-                {comboImages.map((img, idx) => (
+            <View style={styles.imagesGrid}>
+              {comboImages.map((img, idx) => (
+                <View key={idx} style={styles.imageGridCell}>
                   <Image
-                    key={idx}
                     source={{ uri: apiService.getFullImageUrl(img) }}
-                    style={styles.comboImage}
+                    style={styles.imageGridImg}
                     resizeMode="cover"
                   />
-                ))}
-              </ScrollView>
-            </Animated.View>
+                </View>
+              ))}
+            </View>
           )}
 
           {/* Title and Status */}
@@ -637,31 +632,37 @@ export default function ComboDetailPage() {
             </Animated.View>
           )}
 
-          {/* Date Range */}
-          <Animated.View style={[styles.dateSection, { opacity: fadeAnim }]}>
-            <View style={styles.dateHeader}>
-              <Ionicons name="calendar" size={20} color="#694d21" />
-              <Text style={styles.dateSectionTitle}>Validity Period</Text>
-            </View>
-            <View style={styles.dateRow}>
-              <View style={[styles.dateIconContainer, { backgroundColor: '#E8F5E9' }]}>
-                <Ionicons name="play" size={16} color="#4CAF50" />
+          {/* Date Range — only show if dates are set */}
+          {(combo.start_date || combo.end_date) && (
+            <Animated.View style={[styles.dateSection, { opacity: fadeAnim }]}>
+              <View style={styles.dateHeader}>
+                <Ionicons name="calendar" size={20} color="#2b3a1a" />
+                <Text style={styles.dateSectionTitle}>Validity Period</Text>
               </View>
-              <View style={styles.dateInfo}>
-                <Text style={styles.dateLabel}>Start Date</Text>
-                <Text style={styles.dateValue}>{formatDate(combo.start_date)}</Text>
-              </View>
-            </View>
-            <View style={styles.dateRow}>
-              <View style={[styles.dateIconContainer, { backgroundColor: '#FFE4E1' }]}>
-                <Ionicons name="stop" size={16} color="#FF6B6B" />
-              </View>
-              <View style={styles.dateInfo}>
-                <Text style={styles.dateLabel}>End Date</Text>
-                <Text style={styles.dateValue}>{formatDate(combo.end_date)}</Text>
-              </View>
-            </View>
-          </Animated.View>
+              {combo.start_date && (
+                <View style={styles.dateRow}>
+                  <View style={[styles.dateIconContainer, { backgroundColor: '#E8F5E9' }]}>
+                    <Ionicons name="play" size={16} color="#4CAF50" />
+                  </View>
+                  <View style={styles.dateInfo}>
+                    <Text style={styles.dateLabel}>Start Date</Text>
+                    <Text style={styles.dateValue}>{formatDate(combo.start_date)}</Text>
+                  </View>
+                </View>
+              )}
+              {combo.end_date && (
+                <View style={styles.dateRow}>
+                  <View style={[styles.dateIconContainer, { backgroundColor: '#FFE4E1' }]}>
+                    <Ionicons name="stop" size={16} color="#FF6B6B" />
+                  </View>
+                  <View style={styles.dateInfo}>
+                    <Text style={styles.dateLabel}>End Date</Text>
+                    <Text style={styles.dateValue}>{formatDate(combo.end_date)}</Text>
+                  </View>
+                </View>
+              )}
+            </Animated.View>
+          )}
 
           {/* Products in Combo */}
           <Animated.View style={[styles.productsSection, { opacity: fadeAnim }]}>
@@ -698,7 +699,7 @@ export default function ComboDetailPage() {
                         uri: apiService.getFullImageUrl(item.image_url || ''),
                       }}
                       style={styles.productImage}
-                      resizeMode="cover"
+                      resizeMode="contain"
                     />
                     <View style={styles.quantityBadge}>
                       <Text style={styles.quantityText}>{itemQuantity}</Text>
@@ -793,35 +794,35 @@ export default function ComboDetailPage() {
                   disabled={isAddingToCart}
                   activeOpacity={0.95}
                 >
-                {isAddingToCart ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Animated.View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
+                  {isAddingToCart ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
                     <Animated.View
                       style={{
-                        transform: [
-                          {
-                            rotate: iconRotateAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: ['0deg', '360deg'],
-                            }),
-                          },
-                          { scale: iconScaleAnim },
-                        ],
-                        marginRight: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      <Ionicons name="cart" size={20} color="#fff" />
+                      <Animated.View
+                        style={{
+                          transform: [
+                            {
+                              rotate: iconRotateAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: ['0deg', '360deg'],
+                              }),
+                            },
+                            { scale: iconScaleAnim },
+                          ],
+                          marginRight: 8,
+                        }}
+                      >
+                        <Ionicons name="cart" size={20} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.addToCartText}>Add Combo to Cart</Text>
                     </Animated.View>
-                    <Text style={styles.addToCartText}>Add Combo to Cart</Text>
-                  </Animated.View>
-                )}
+                  )}
                 </TouchableOpacity>
               </Animated.View>
             </Animated.View>
@@ -863,7 +864,7 @@ export default function ComboDetailPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   contentContainer: {
     flexGrow: 1,
@@ -872,7 +873,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   loadingText: {
     marginTop: 16,
@@ -883,7 +884,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
     padding: 20,
   },
   errorText: {
@@ -893,7 +894,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -903,11 +904,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  /* Images grid — 2 columns, square cells */
+  imagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingTop: 16,
+    gap: 8,
+  },
+  imageGridCell: {
+    width: '48%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f5f0e8',
+  },
+  imageGridImg: {
+    width: '100%',
+    height: '100%',
+  },
+  /* legacy — keep for safety */
   imagesSection: {
     height: Dimensions.get('window').height * 0.35,
     maxHeight: 350,
     minHeight: 250,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fbf7f4',
   },
   imagesScroll: {
     flex: 1,
@@ -923,14 +944,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
     marginHorizontal: 12,
     marginTop: 12,
     borderRadius: 12,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
   },
   titleContainer: {
@@ -944,8 +965,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Platform.OS === 'ios' ? 20 : 18,
-    fontWeight: '600',
-    color: '#694d21',
+    fontFamily: 'CormorantGaramond-Bold',
+    color: '#2b3a1a',
     flex: 1,
     lineHeight: 26,
   },
@@ -997,7 +1018,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
   },
   dateHeader: {
@@ -1011,7 +1032,7 @@ const styles = StyleSheet.create({
   dateSectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#694d21',
+    color: '#2b3a1a',
     marginLeft: 8,
   },
   dateRow: {
@@ -1082,12 +1103,13 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 8,
+    backgroundColor: '#fff',
   },
   quantityBadge: {
     position: 'absolute',
     top: -6,
     right: -6,
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -1175,17 +1197,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 16,
     borderTopWidth: 1.5,
-    borderTopColor: '#694d21',
+    borderTopColor: '#2b3a1a',
   },
   finalPriceLabel: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#694d21',
+    color: '#2b3a1a',
   },
   finalPriceValue: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#694d21',
+    color: '#2b3a1a',
   },
   savingsBadge: {
     flexDirection: 'row',
@@ -1205,13 +1227,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   addToCartButton: {
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     marginHorizontal: 12,
     marginBottom: 8,
     marginTop: 16,
     borderRadius: 12,
     elevation: 2,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 4,
     minHeight: 52,

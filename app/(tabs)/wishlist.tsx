@@ -9,6 +9,8 @@ import {
   Dimensions,
   Animated,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { apiService } from '../services/api';
 import { useBottomTabBarHeight } from './_layout';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
+import ProductCard from '../components/ProductCard';
 
 const { width } = Dimensions.get('window');
 
@@ -179,13 +182,17 @@ export default function WishlistPage() {
             style={styles.backgroundGradient}
           />
           
+          <View style={styles.headerSection}>
+            <Text style={styles.brandTitle}>Wishlist</Text>
+          </View>
+          
           <Animated.View 
             style={[
               styles.emptyContainer,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
-                paddingTop: 80,
+                paddingTop: 40,
               }
             ]}
           >
@@ -221,82 +228,9 @@ export default function WishlistPage() {
   }
 
   const renderItem = ({ item }: { item: any }) => (
-    <Animated.View
-      style={[
-        styles.productCard,
-        {
-          transform: [{ scale: scaleAnim }],
-        },
-      ]}
-    >
-      <TouchableOpacity
-        onPress={() => router.push({
-          pathname: "/(product)/[id]",
-          params: { 
-            id: item.id.toString(),
-            productData: JSON.stringify({
-              ...item,
-              price: typeof item.price === 'string' ? parseFloat(item.price) : item.price,
-              stock_quantity: typeof item.stock_quantity === 'string' ? 
-                parseInt(item.stock_quantity) : item.stock_quantity,
-              offer_percentage: item.offer_percentage || 0
-            })
-          }
-        })}
-      >
-        <Image 
-          source={{ uri: apiService.getFullImageUrl(item.image_url) }} 
-          style={styles.productImage} 
-        />
-        <View style={styles.productInfo}>
-          <Text style={styles.category}>{item.category}</Text>
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{item.price}</Text>
-          </View>
-          <View style={styles.stockContainer}>
-            <Text style={[
-              styles.stockStatus,
-              item.stock_quantity > 0 ? styles.inStock : styles.outOfStock
-            ]}>
-              {item.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={[
-            styles.actionButton,
-            styles.moveToCartButton,
-            item.stock_quantity === 0 && styles.disabledButton
-          ]}
-          onPress={() => item.stock_quantity > 0 && handleAddToCart(item, true)}
-          disabled={item.stock_quantity === 0}
-        >
-          <LinearGradient
-            colors={item.stock_quantity === 0 ? ['#ccc', '#999'] : ['#694d21', '#5a3f1a']}
-            style={styles.actionButtonGradient}
-          >
-            <Ionicons name="cart" size={18} color="#fff" />
-            <Text style={styles.actionButtonText}>Move to Cart</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.removeButton]}
-          onPress={() => handleRemove(item)}
-        >
-          <LinearGradient
-            colors={['#ff4444', '#cc0000']}
-            style={styles.actionButtonGradient}
-          >
-            <Ionicons name="trash" size={18} color="#fff" />
-            <Text style={styles.actionButtonText}>Remove</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
+    <View style={styles.gridItem}>
+      <ProductCard product={item} showTrash={true} />
+    </View>
   );
 
   return (
@@ -318,13 +252,17 @@ export default function WishlistPage() {
           style={styles.backgroundGradient}
         />
         
+        <View style={styles.headerSection}>
+          <Text style={styles.brandTitle}>Wishlist</Text>
+        </View>
+        
         <Animated.View 
           style={[
             styles.content,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
-              paddingTop: 30,
+              paddingTop: 10,
             }
           ]}
         >
@@ -333,9 +271,11 @@ export default function WishlistPage() {
             data={wishlist}
             renderItem={renderItem}
             keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrapper}
             contentContainerStyle={{
               paddingBottom: bottomTabHeight + 20,
-              paddingHorizontal: 16,
+              paddingHorizontal: 8,
               paddingTop: 40,
             }}
             showsVerticalScrollIndicator={false}
@@ -350,6 +290,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight ?? 0) + 20,
+    paddingBottom: 6,
+    zIndex: 10,
+  },
+  brandTitle: {
+    fontSize: 42,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Bold',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
+  gridItem: {
+    flex: 0.5,
+    paddingHorizontal: 4,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -379,7 +340,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     shadowColor: '#694d21',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -399,17 +360,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   exploreButton: {
-    borderRadius: 16,
+    borderRadius: 20,
     shadowColor: '#694d21',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 6,
   },
   exploreButtonGradient: {
     paddingHorizontal: 32,
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -425,19 +386,21 @@ const styles = StyleSheet.create({
   },
   productCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
+    borderRadius: 24,
     marginBottom: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    padding: 24,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.05)',
   },
   productImage: {
     width: '100%',
-    height: 220,
-    borderRadius: 16,
+    height: 240,
+    borderRadius: 20,
     backgroundColor: '#F8F9FA',
   },
   productInfo: {
@@ -492,20 +455,20 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 16,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
   },
   actionButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 16,
   },
   moveToCartButton: {
     // Gradient handled by LinearGradient
@@ -518,9 +481,10 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: 4,
+    fontSize: 13,
     fontWeight: 'bold',
+    flexShrink: 1,
   },
   removeButton: {
     // Gradient handled by LinearGradient

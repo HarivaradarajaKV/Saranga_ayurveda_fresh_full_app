@@ -14,6 +14,8 @@ import {
   ActivityIndicator,
   Modal,
   StatusBar,
+  KeyboardAvoidingView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -59,7 +61,44 @@ export default function ProfilePage() {
   const [slideAnim] = useState(new Animated.Value(30));
   const [scaleAnim] = useState(new Animated.Value(0.9));
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{id: number; text: string; isBot: boolean}[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatScrollRef = useRef<ScrollView>(null);
   const bottomTabHeight = useBottomTabBarHeight();
+
+  const handleChatSend = () => {
+    if (!chatInput.trim()) return;
+    const userMsg = { id: Date.now(), text: chatInput.trim(), isBot: false };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    // First bot reply — acknowledgement
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        text: 'Thank you for contacting us! We have received your message. 🙏',
+        isBot: true,
+      }]);
+    }, 1000);
+    // Second bot reply — follow-up
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 2,
+        text: 'We are reviewing your query and will make sure to assist you as quickly as possible.',
+        isBot: true,
+      }]);
+    }, 2200);
+    // Third bot reply — handoff
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 3,
+        text: 'Our support team will reach out to you shortly. Have a great day! 😊',
+        isBot: true,
+      }]);
+    }, 3600);
+  };
+
   const scrollViewRef = useRef<ScrollView>(null);
   const isInitialMount = useRef(true);
   const lastFocusedState = useRef(false);
@@ -180,7 +219,7 @@ export default function ProfilePage() {
       id: 'addresses',
       title: 'My Addresses',
       icon: 'location-outline',
-      route: '/addresses',
+      route: '/profile/addresses',
     },
     {
       id: 'support',
@@ -193,24 +232,7 @@ export default function ProfilePage() {
   const handleNavigation = (route: string) => {
     try {
       if (route === '/support') {
-        Alert.alert(
-          'Contact Support',
-          'How would you like to contact our support team?',
-          [
-            {
-              text: 'Live Chat',
-              onPress: () => router.push('../components/Chatbot'),
-            },
-            {
-              text: 'Call Support',
-              onPress: () => router.push('/support/call'),
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
-        );
+        setShowSupportModal(true);
       } else {
         router.push(route as any);
       }
@@ -250,7 +272,7 @@ export default function ProfilePage() {
     return (
       <View style={styles.container}>
         <LinearGradient
-          colors={['#f8f9fa', '#ffffff', '#f1f3f4']}
+          colors={['#fbf7f4', '#fbf7f4', '#fbf7f4']}
           style={styles.backgroundGradient}
         />
         <View style={styles.floatingElements}>
@@ -303,7 +325,7 @@ export default function ProfilePage() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#f8f9fa', '#ffffff', '#f1f3f4']}
+        colors={['#fbf7f4', '#fbf7f4', '#fbf7f4']}
         style={styles.backgroundGradient}
       />
       <View style={styles.floatingElements}>
@@ -350,11 +372,10 @@ export default function ProfilePage() {
                     onPress={handleEditProfile}
                   >
                     <LinearGradient
-                      colors={['#694d21', '#5a3f1a']}
+                      colors={['#2b3a1a', '#2b3a1a']}
                       style={styles.editProfileGradient}
                     >
                       <Text style={styles.editProfileText}>Edit Profile</Text>
-                      <Ionicons name="create-outline" size={16} color="#fff" style={styles.editProfileIcon} />
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
@@ -460,6 +481,140 @@ export default function ProfilePage() {
             onSwipeDown={() => setIsImageViewerVisible(false)}
           />
         </Modal>
+
+        {/* Support Modal */}
+        <Modal
+          visible={showSupportModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSupportModal(false)}
+        >
+          <View style={styles.supportOverlay}>
+            <View style={styles.supportModal}>
+              <View style={styles.supportModalHeader}>
+                <Text style={styles.supportModalTitle}>Contact Support</Text>
+                <TouchableOpacity
+                  style={styles.supportCloseButton}
+                  onPress={() => setShowSupportModal(false)}
+                >
+                  <Ionicons name="close" size={22} color="#2b3a1a" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.supportModalSubtitle}>
+                How would you like to contact our support team?
+              </Text>
+              <TouchableOpacity
+                style={styles.supportOptionButton}
+                onPress={() => {
+                  setShowSupportModal(false);
+                  setTimeout(() => {
+                    setChatMessages([{ id: 1, text: 'Hi! 👋 How can I help you today?', isBot: true }]);
+                    setShowChatModal(true);
+                  }, 200);
+                }}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={22} color="#2b3a1a" />
+                <Text style={styles.supportOptionText}>Live Chat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.supportOptionButton}
+                onPress={() => {
+                  setShowSupportModal(false);
+                  router.push('/support/call');
+                }}
+              >
+                <Ionicons name="call-outline" size={22} color="#2b3a1a" />
+                <Text style={styles.supportOptionText}>Call Support</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Live Chat Modal */}
+        <Modal
+          visible={showChatModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowChatModal(false)}
+        >
+          <View style={styles.chatOverlay}>
+            <View style={styles.chatModalContainer}>
+              {/* Chat Header */}
+              <View style={styles.chatHeader}>
+                <View style={styles.chatHeaderLeft}>
+                  <View style={styles.chatAvatarDot} />
+                  <View>
+                    <Text style={styles.chatHeaderTitle}>Customer Support</Text>
+                    <Text style={styles.chatHeaderStatus}>Online</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.chatCloseButton}
+                  onPress={() => setShowChatModal(false)}
+                >
+                  <Ionicons name="close" size={22} color="#2b3a1a" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Messages */}
+              <ScrollView
+                ref={chatScrollRef}
+                style={styles.chatMessages}
+                contentContainerStyle={{ padding: 16 }}
+                onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
+              >
+                {chatMessages.map((msg) => (
+                  <View
+                    key={msg.id}
+                    style={[
+                      styles.chatBubbleWrapper,
+                      msg.isBot ? styles.chatBubbleWrapperBot : styles.chatBubbleWrapperUser,
+                    ]}
+                  >
+                    {msg.isBot && (
+                      <View style={styles.chatBotAvatar}>
+                        <Ionicons name="leaf" size={12} color="#fff" />
+                      </View>
+                    )}
+                    <View
+                      style={[
+                        styles.chatBubble,
+                        msg.isBot ? styles.chatBubbleBot : styles.chatBubbleUser,
+                      ]}
+                    >
+                      <Text style={[styles.chatBubbleText, msg.isBot ? styles.chatBubbleTextBot : styles.chatBubbleTextUser]}>
+                        {msg.text}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+
+              {/* Input Bar */}
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                <View style={styles.chatInputRow}>
+                  <TextInput
+                    style={styles.chatInput}
+                    value={chatInput}
+                    onChangeText={setChatInput}
+                    placeholder="Type your message..."
+                    placeholderTextColor="#aaa"
+                    multiline
+                    returnKeyType="send"
+                    onSubmitEditing={handleChatSend}
+                  />
+                  <TouchableOpacity
+                    style={styles.chatSendButton}
+                    onPress={handleChatSend}
+                  >
+                    <Ionicons name="send" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </KeyboardAvoidingView>
+            </View>
+          </View>
+        </Modal>
+
       </SafeAreaView>
     </View>
   );
@@ -468,7 +623,7 @@ export default function ProfilePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   backgroundGradient: {
     position: 'absolute',
@@ -594,7 +749,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -695,7 +850,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   statsCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -758,7 +913,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   menuItemCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
@@ -827,7 +982,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   version: {
     textAlign: 'center',
@@ -836,5 +991,185 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
     paddingHorizontal: 16,
+  },
+  supportOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  supportModal: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 24,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  supportModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  supportModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2b3a1a',
+  },
+  supportCloseButton: {
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: '#f3f5f0',
+  },
+  supportModalSubtitle: {
+    fontSize: 13,
+    color: '#7a7a7a',
+    marginBottom: 20,
+  },
+  supportOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#f3f5f0',
+    marginBottom: 10,
+  },
+  supportOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2b3a1a',
+  },
+  /* ── Live Chat Modal ── */
+  chatOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  chatModalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '80%',
+    overflow: 'hidden',
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fbf7f4',
+  },
+  chatHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  chatAvatarDot: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#2b3a1a',
+  },
+  chatHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2b3a1a',
+  },
+  chatHeaderStatus: {
+    fontSize: 12,
+    color: '#5a9a4a',
+    marginTop: 1,
+  },
+  chatCloseButton: {
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: '#f3f5f0',
+  },
+  chatMessages: {
+    flex: 1,
+    backgroundColor: '#fafafa',
+  },
+  chatBubbleWrapper: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  chatBubbleWrapperBot: {
+    justifyContent: 'flex-start',
+  },
+  chatBubbleWrapperUser: {
+    justifyContent: 'flex-end',
+    flexDirection: 'row-reverse',
+  },
+  chatBotAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2b3a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatBubble: {
+    maxWidth: '75%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+  },
+  chatBubbleBot: {
+    backgroundColor: '#f0f0f0',
+    borderBottomLeftRadius: 4,
+  },
+  chatBubbleUser: {
+    backgroundColor: '#2b3a1a',
+    borderBottomRightRadius: 4,
+  },
+  chatBubbleText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  chatBubbleTextBot: {
+    color: '#222',
+  },
+  chatBubbleTextUser: {
+    color: '#fff',
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    gap: 8,
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#f3f5f0',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#222',
+    maxHeight: 100,
+  },
+  chatSendButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#2b3a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 }); 

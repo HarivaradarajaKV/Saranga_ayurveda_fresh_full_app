@@ -18,6 +18,7 @@ export interface Product {
   final_price: number;
   average_rating?: number;
   review_count?: number;
+  is_new_arrival?: boolean;
 }
 
 export interface ProductWithQuantity extends Product {

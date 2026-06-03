@@ -33,7 +33,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -94,11 +94,11 @@ export default function LoginScreen() {
         try {
           const tokenData = JSON.parse(atob(token.split('.')[1]));
           console.log('User role:', tokenData.role);
-          
+
           // Store token and role
           await AsyncStorage.setItem('auth_token', token);
           await AsyncStorage.setItem('user_role', tokenData.role);
-          
+
           // Navigate based on role
           if (tokenData.role === 'admin') {
             router.replace('/admin/dashboard');
@@ -187,7 +187,7 @@ export default function LoginScreen() {
           colors={['#E3F2FD', '#F8F9FA', '#FFFFFF']}
           style={styles.backgroundGradient}
         />
-        
+
         {/* Floating Elements */}
         <View style={styles.floatingElements}>
           <Animated.View style={[styles.floatingCircle1, { opacity: fadeAnim }]} />
@@ -201,13 +201,13 @@ export default function LoginScreen() {
             style={styles.keyboardView}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           >
-            <ScrollView 
+            <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.contentContainer,
                   {
@@ -360,25 +360,21 @@ export default function LoginScreen() {
                       </LinearGradient>
                     </TouchableOpacity>
 
-                    <View style={styles.divider}>
-                      <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>or continue with</Text>
-                      <View style={styles.dividerLine} />
-                    </View>
+                    {Platform.OS === 'ios' && (
+                      <>
+                        <View style={styles.divider}>
+                          <View style={styles.dividerLine} />
+                          <Text style={styles.dividerText}>or continue with</Text>
+                          <View style={styles.dividerLine} />
+                        </View>
 
-                    <View style={styles.socialButtons}>
-                      <TouchableOpacity style={styles.socialButton}>
-                        <Ionicons name="logo-google" size={24} color="#DB4437" />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.socialButton}>
-                        <Ionicons name="logo-facebook" size={24} color="#4267B2" />
-                      </TouchableOpacity>
-                      {Platform.OS === 'ios' && (
-                        <TouchableOpacity style={styles.socialButton}>
-                          <Ionicons name="logo-apple" size={24} color="#000" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                        <View style={styles.socialButtons}>
+                          <TouchableOpacity style={styles.socialButton}>
+                            <Ionicons name="logo-apple" size={24} color="#000" />
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )}
 
                     <View style={styles.signupPrompt}>
                       <Text style={styles.signupText}>Don't have an account? </Text>

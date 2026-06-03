@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import WebView from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import { apiService } from './services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCart } from './CartContext';
@@ -79,6 +79,7 @@ interface RazorpayOptions {
   currency: string;
   name: string;
   description: string;
+  image?: string;
   order_id: string;
   prefill: {
     name: string;
@@ -566,15 +567,16 @@ const CheckoutPage = () => {
             key: razorpayOrderData.key || razorpayOrderData.key_id,
             amount: razorpayOrderData.amount,
             currency: razorpayOrderData.currency,
-            name: "Your Cosmetics Store",
+            name: "Saranga Ayurveda LLP",
             description: `Order #${order.id}`,
+            image: "https://sarangaayurveda.com/wp-content/uploads/2021/05/cropped-Saranga-Ayurveda-Logo-1.png",
             order_id: razorpayOrderData.id,
             prefill: {
               name: selectedAddress.full_name,
               contact: selectedAddress.phone || selectedAddress.phone_number || '',
             },
             theme: {
-              color: "#694d21"
+              color: "#2b3a1a"
             }
           };
 
@@ -701,7 +703,7 @@ const CheckoutPage = () => {
   if (pageLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF69B4" />
+        <ActivityIndicator size="large" color="#2b3a1a" />
       </SafeAreaView>
     );
   }
@@ -709,12 +711,20 @@ const CheckoutPage = () => {
   console.log('Selected Address:', selectedAddress);
 
   return (
-    <View style={{ flex: 1 }}>
-      <LinearGradient
-        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
-        style={StyleSheet.absoluteFill}
+    <View style={{ flex: 1, backgroundColor: '#fbf7f4' }}>
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
       />
       <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.headerSection, { paddingTop: insets.top > 0 ? insets.top : 12 }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2b3a1a" />
+          </TouchableOpacity>
+          <Text style={styles.brandTitle}>Checkout</Text>
+          <View style={{ width: 24 }} />
+        </View>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
             {/* Order Summary Section */}
@@ -815,7 +825,7 @@ const CheckoutPage = () => {
                       style={styles.viewCouponsButton}
                       onPress={() => setShowCouponsModal(true)}
                     >
-                      <Ionicons name="pricetag" size={20} color="#FF69B4" style={styles.couponIcon} />
+                      <Ionicons name="pricetag" size={20} color="#2b3a1a" style={styles.couponIcon} />
                       <Text style={styles.viewCouponsText}>
                         View Available Coupons ({availableCoupons.length})
                       </Text>
@@ -871,7 +881,7 @@ const CheckoutPage = () => {
                       <View style={styles.addressCard}>
                         <View style={styles.addressHeader}>
                           <View style={styles.addressType}>
-                            <Ionicons name="location" size={20} color="#FF69B4" />
+                            <Ionicons name="location" size={20} color="#2b3a1a" />
                             <Text style={styles.addressTypeText}>
                               {selectedAddress.address_type || 'Delivery Address'}
                             </Text>
@@ -902,7 +912,7 @@ const CheckoutPage = () => {
                       onPress={() => router.push('/profile/addresses/new')}
                     >
                       <View style={styles.addAddressContent}>
-                        <Ionicons name="add-circle-outline" size={24} color="#FF69B4" />
+                        <Ionicons name="add-circle-outline" size={24} color="#2b3a1a" />
                         <Text style={styles.addAddressText}>Add New Delivery Address</Text>
                       </View>
                     </TouchableOpacity>
@@ -955,7 +965,7 @@ const CheckoutPage = () => {
                               <Ionicons
                                 name={method.id === 'cod' ? 'lock-closed' : 'card'}
                                 size={24}
-                                color={selectedPayment?.id === method.id ? '#fff' : (isCOD ? '#757575' : '#694d21')}
+                                color={selectedPayment?.id === method.id ? '#fff' : (isCOD ? '#757575' : '#2b3a1a')}
                               />
                             </View>
                             <View style={styles.paymentMethodInfo}>
@@ -1008,7 +1018,8 @@ const CheckoutPage = () => {
                               fontSize: 12,
                               color: '#d32f2f',
                               flex: 1,
-                              lineHeight: 18
+                              lineHeight: 18,
+                              fontFamily: 'CormorantGaramond-Medium'
                             }}>
                               Cash on Delivery is currently unavailable for your PIN code. We’ll be enabling COD soon. Please use prepaid payment options to place your order.
                             </Text>
@@ -1145,7 +1156,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   scrollView: {
     flex: 1,
@@ -1183,6 +1194,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2c3e50',
     letterSpacing: 0.3,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   changeButton: {
     paddingHorizontal: 12,
@@ -1194,6 +1206,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#694d21',
     fontWeight: '500',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   orderItems: {
     marginBottom: 20,
@@ -1226,16 +1239,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 4,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   itemQuantity: {
     fontSize: 13,
     color: '#7f8c8d',
     marginBottom: 2,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   itemPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#694d21',
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   couponContainer: {
     marginBottom: 20,
@@ -1259,14 +1275,15 @@ const styles = StyleSheet.create({
     height: 40,
     paddingHorizontal: 10,
     fontSize: 16,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   applyCouponButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#FF69B4',
+    backgroundColor: '#2b3a1a',
     borderRadius: 10,
     marginLeft: 8,
-    shadowColor: '#FF69B4',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1276,12 +1293,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 14,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   errorText: {
     color: '#ff4444',
     fontSize: 14,
     marginTop: 8,
     marginBottom: 4,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   viewCouponsButton: {
     marginTop: 12,
@@ -1289,15 +1308,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewCouponsText: {
-    color: '#FF69B4',
+    color: '#2b3a1a',
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   noCouponsText: {
     marginTop: 12,
     textAlign: 'center',
     color: '#666',
     fontStyle: 'italic',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   appliedCouponContainer: {
     marginTop: 12,
@@ -1314,17 +1335,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   appliedCouponDesc: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   discountText: {
     fontSize: 14,
-    color: '#694d21',
+    color: '#2b3a1a',
     fontWeight: '600',
     marginTop: 4,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   removeCouponButton: {
     padding: 4,
@@ -1359,6 +1383,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   changeAddressButton: {
     backgroundColor: '#fef5e7',
@@ -1366,24 +1391,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#694d21',
+    borderColor: '#2b3a1a',
   },
   changeAddressText: {
-    color: '#694d21',
+    color: '#2b3a1a',
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   addressName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000',
     marginBottom: 4,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   addressText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
     lineHeight: 20,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   addressPhone: {
     fontSize: 14,
@@ -1391,13 +1419,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   addAddressButton: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#694d21',
+    borderColor: '#2b3a1a',
     borderStyle: 'dashed',
   },
   addAddressContent: {
@@ -1408,8 +1437,9 @@ const styles = StyleSheet.create({
   addAddressText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#694d21',
+    color: '#2b3a1a',
     fontWeight: '500',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   paymentMethodsContainer: {
     padding: 16,
@@ -1428,8 +1458,8 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   selectedPaymentCard: {
-    backgroundColor: '#694d21',
-    borderColor: '#694d21',
+    backgroundColor: '#2b3a1a',
+    borderColor: '#2b3a1a',
     borderWidth: 2.5,
   },
   paymentMethodContent: {
@@ -1460,10 +1490,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   paymentMethodDescription: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   selectedPaymentText: {
     color: '#fff',
@@ -1476,7 +1508,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#694d21',
+    borderColor: '#2b3a1a',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -1501,10 +1533,12 @@ const styles = StyleSheet.create({
   priceLabel: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   priceValue: {
     fontSize: 14,
     fontWeight: 'bold',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   totalRow: {
     borderTopWidth: 1,
@@ -1513,10 +1547,12 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   totalValue: {
     fontSize: 14,
     fontWeight: 'bold',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   footer: {
     flexDirection: 'row',
@@ -1528,7 +1564,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
     paddingBottom: Platform.OS === 'ios' ? 20 : 16,
   },
-
   totalContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1537,11 +1572,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   footerTotalLabel: {
     fontSize: 16,
     color: '#666',
     marginRight: 4,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   placeOrderButton: {
     flexDirection: 'row',
@@ -1549,10 +1586,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 28,
     paddingVertical: 14,
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     borderRadius: 12,
     minWidth: 160,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1566,6 +1603,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginRight: 8,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   placeOrderIcon: {
     marginLeft: 4,
@@ -1596,6 +1634,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   closeButton: {
     padding: 8,
@@ -1618,27 +1657,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   couponDiscount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FF69B4',
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   couponDescription: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   minPurchaseText: {
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   maxDiscountText: {
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
     marginTop: 4,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   applyCouponButtonDisabled: {
     backgroundColor: '#f0f0f0',
@@ -1652,6 +1696,27 @@ const styles = StyleSheet.create({
   appliedCouponDetails: {
     flex: 1,
     marginRight: 16,
+  },
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 10 : 10,
+    paddingBottom: 10,
+    backgroundColor: '#fbf7f4',
+  },
+  brandTitle: {
+    fontSize: 36,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Bold',
+    letterSpacing: 1,
+    flex: 1,
+    marginRight: 24,
+  },
+  backButton: {
+    padding: 4,
   },
 });
 

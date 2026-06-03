@@ -10,17 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
-
-WebBrowser.maybeCompleteAuthSession();
-
-const GOOGLE_CLIENT_ID = Platform.select({
-  ios: 'YOUR_IOS_CLIENT_ID',
-  android: 'YOUR_ANDROID_CLIENT_ID',
-});
 
 const AuthScreen = () => {
   const router = useRouter();
@@ -28,44 +18,11 @@ const AuthScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_CLIENT_ID,
-    iosClientId: GOOGLE_CLIENT_ID,
-    androidClientId: GOOGLE_CLIENT_ID,
-  });
-
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      handleGoogleSignIn(authentication.accessToken);
-    }
-  }, [response]);
-
-  const handleGoogleSignIn = async (accessToken: string) => {
-    try {
-      setLoading(true);
-      const response = await apiService.googleSignIn(accessToken);
-      
-      if (response.error) {
-        Alert.alert('Error', response.error);
-        return;
-      }
-
-      if (response.data) {
-        router.replace('/(tabs)');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to sign in with Google');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleEmailSignIn = async () => {
     try {
       setLoading(true);
       const response = await apiService.login(email, password);
-      
+
       if (response.error) {
         Alert.alert('Error', response.error);
         return;
@@ -102,7 +59,7 @@ const AuthScreen = () => {
           onChangeText={setPassword}
           secureTextEntry
         />
-        
+
         <TouchableOpacity
           style={styles.signInButton}
           onPress={handleEmailSignIn}
@@ -113,21 +70,6 @@ const AuthScreen = () => {
           ) : (
             <Text style={styles.signInButtonText}>Sign In</Text>
           )}
-        </TouchableOpacity>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <TouchableOpacity
-          style={styles.googleButton}
-          onPress={() => promptAsync()}
-          disabled={!request || loading}
-        >
-          <Ionicons name="logo-google" size={24} color="#fff" style={styles.googleIcon} />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -198,22 +140,6 @@ const styles = StyleSheet.create({
   dividerText: {
     color: '#666',
     paddingHorizontal: 10,
-  },
-  googleButton: {
-    backgroundColor: '#4285F4',
-    borderRadius: 8,
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleIcon: {
-    marginRight: 10,
-  },
-  googleButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   signUpLink: {
     marginTop: 20,

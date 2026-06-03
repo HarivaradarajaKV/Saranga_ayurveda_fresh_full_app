@@ -13,11 +13,16 @@ import {
   Keyboard,
   Animated,
   Dimensions,
+  Modal,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAddress } from '../../AddressContext';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 interface FormField {
   value: string;
@@ -77,6 +82,17 @@ export default function AddNewAddressPage() {
 
   const [formData, setFormData] = useState<AddressFormData>(initialFormState);
   const [addressType, setAddressType] = useState<'Home' | 'Work' | 'Other'>('Home');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [showCountryModal, setShowCountryModal] = useState(false);
+
+  const COUNTRY_CODES = [
+    { code: '+91', label: '🇮🇳 +91 (India)' },
+    { code: '+1', label: '🇺🇸 +1 (US/Canada)' },
+    { code: '+44', label: '🇬🇧 +44 (UK)' },
+    { code: '+971', label: '🇦🇪 +971 (UAE)' },
+    { code: '+61', label: '🇦🇺 +61 (Australia)' },
+    { code: '+65', label: '🇸🇬 +65 (Singapore)' },
+  ];
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -108,6 +124,35 @@ export default function AddNewAddressPage() {
     }));
   };
 
+  const handlePincodeChange = async (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    updateField('postal_code', cleaned);
+
+    if (cleaned.length === 6) {
+      try {
+        console.log('[Pincode Autoload] Fetching details for pincode:', cleaned);
+        const response = await fetch(`https://api.postalpincode.in/pincode/${cleaned}`);
+        const data = await response.json();
+        
+        if (data && data[0] && data[0].Status === 'Success') {
+          const postOffices = data[0].PostOffice;
+          if (postOffices && postOffices.length > 0) {
+            const { District, State } = postOffices[0];
+            console.log('[Pincode Autoload] Found details:', { District, State });
+            
+            setFormData(prev => ({
+              ...prev,
+              city: { ...prev.city, value: District, error: '' },
+              state: { ...prev.state, value: State, error: '' }
+            }));
+          }
+        }
+      } catch (error) {
+        console.warn('[Pincode Autoload] Error loading pincode details:', error);
+      }
+    }
+  };
+
   const validateForm = () => {
     let isValid = true;
     const newFormData = { ...formData };
@@ -137,13 +182,13 @@ export default function AddNewAddressPage() {
     return isValid;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     Keyboard.dismiss();
     
     if (validateForm()) {
       const addressData = {
         full_name: formData.full_name.value,
-        phone_number: formData.phone_number.value,
+        phone_number: `${countryCode} ${formData.phone_number.value}`,
         postal_code: formData.postal_code.value,
         address_line1: formData.address_line1.value,
         address_line2: formData.address_line2.value || '',
@@ -152,12 +197,8 @@ export default function AddNewAddressPage() {
         is_default: false
       };
 
-      addAddress(addressData);
-      Alert.alert(
-        'Success',
-        'Address added successfully!',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      await addAddress(addressData, false);
+      router.back();
     }
   };
 
@@ -166,29 +207,62 @@ export default function AddNewAddressPage() {
   };
 
   return (
-    <>
+    <SafeAreaView style={styles.safeArea}>
       <Stack.Screen
         options={{
-          title: 'Add New Address',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#f8f6f0',
-          },
-          headerTintColor: '#694d21',
-          headerTitleStyle: {
-            fontWeight: '700',
-            fontSize: 20,
-          },
+          headerShown: false,
         }}
       />
       <LinearGradient
         colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
         style={StyleSheet.absoluteFill}
       />
+      
+      <View style={styles.headerSection}>
+        <Text style={styles.brandTitle}>Add New Address</Text>
+      </View>
+
+      <Modal
+        visible={showCountryModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCountryModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCountryModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Country Code</Text>
+            {COUNTRY_CODES.map((item) => (
+              <TouchableOpacity
+                key={item.code}
+                style={[
+                  styles.countryItem,
+                  countryCode === item.code && styles.countryItemActive
+                ]}
+                onPress={() => {
+                  setCountryCode(item.code);
+                  setShowCountryModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.countryItemText,
+                  countryCode === item.code && styles.countryItemTextActive
+                ]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           style={styles.scrollView}
@@ -207,7 +281,7 @@ export default function AddNewAddressPage() {
           >
             <CustomInput
               ref={formData.full_name.ref}
-              label="Full Name"
+              label="Name"
               required
               value={formData.full_name.value}
               onChangeText={(text) => updateField('full_name', text)}
@@ -219,27 +293,46 @@ export default function AddNewAddressPage() {
               error={formData.full_name.error}
             />
 
-            <CustomInput
-              ref={formData.phone_number.ref}
-              label="Phone Number"
-              required
-              value={formData.phone_number.value}
-              onChangeText={(text) => updateField('phone_number', text)}
-              placeholder="Enter 10-digit mobile number"
-              keyboardType="numeric"
-              maxLength={10}
-              returnKeyType="next"
-              onSubmitEditing={() => focusNextField('postal_code')}
-              blurOnSubmit={false}
-              error={formData.phone_number.error}
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Phone Number *</Text>
+              <View style={styles.phoneInputRow}>
+                <TouchableOpacity
+                  style={styles.countryCodeSelector}
+                  onPress={() => setShowCountryModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.countryCodeText}>{countryCode}</Text>
+                  <Ionicons name="chevron-down" size={14} color="#2b3a1a" style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+                <TextInput
+                  ref={formData.phone_number.ref as any}
+                  style={[
+                    styles.input,
+                    { flex: 1, marginLeft: 8 },
+                    formData.phone_number.error ? styles.inputError : null
+                  ]}
+                  value={formData.phone_number.value}
+                  onChangeText={(text) => updateField('phone_number', text)}
+                  placeholder="Enter 10-digit mobile number"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  placeholderTextColor="#999"
+                  returnKeyType="next"
+                  onSubmitEditing={() => focusNextField('postal_code')}
+                  blurOnSubmit={false}
+                />
+              </View>
+              {formData.phone_number.error ? (
+                <Text style={styles.errorText}>{formData.phone_number.error}</Text>
+              ) : null}
+            </View>
 
             <CustomInput
               ref={formData.postal_code.ref}
               label="Postal Code"
               required
               value={formData.postal_code.value}
-              onChangeText={(text) => updateField('postal_code', text)}
+              onChangeText={handlePincodeChange}
               placeholder="Enter 6-digit postal code"
               keyboardType="numeric"
               maxLength={6}
@@ -350,7 +443,7 @@ export default function AddNewAddressPage() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#694d21', '#5a3f1a']}
+                colors={['#2b3a1a', '#1e2912']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.submitButtonGradient}
@@ -362,11 +455,39 @@ export default function AddNewAddressPage() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: Platform.OS === 'ios' ? 10 : (StatusBar.currentHeight ?? 0) + 10,
+    paddingBottom: 6,
+    zIndex: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    top: Platform.OS === 'ios' ? 18 : (StatusBar.currentHeight ?? 0) + 18,
+    padding: 8,
+    zIndex: 12,
+  },
+  brandTitle: {
+    fontFamily: 'CormorantGaramond-Bold',
+    fontSize: 42,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -384,6 +505,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   label: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 14,
     fontWeight: '600',
     color: '#2c3e50',
@@ -391,6 +513,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   input: {
+    fontFamily: 'CormorantGaramond-Medium',
     borderWidth: 1.5,
     borderColor: '#e0e0e0',
     borderRadius: 12,
@@ -410,6 +533,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   errorText: {
+    fontFamily: 'CormorantGaramond-Medium',
     color: '#ff4444',
     fontSize: 12,
     marginTop: 6,
@@ -418,6 +542,74 @@ const styles = StyleSheet.create({
   textArea: {
     height: 110,
     textAlignVertical: 'top',
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  countryCodeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+    minWidth: 70,
+    height: 52,
+  },
+  countryCodeText: {
+    fontFamily: 'CormorantGaramond-Bold',
+    fontSize: 16,
+    color: '#2b3a1a',
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    width: width - 80,
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontFamily: 'CormorantGaramond-Bold',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2b3a1a',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  countryItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  countryItemActive: {
+    backgroundColor: '#f2f4f0',
+  },
+  countryItemText: {
+    fontFamily: 'CormorantGaramond-Medium',
+    fontSize: 16,
+    color: '#555',
+  },
+  countryItemTextActive: {
+    fontFamily: 'CormorantGaramond-Bold',
+    color: '#2b3a1a',
+    fontWeight: '700',
   },
   addressTypeContainer: {
     flexDirection: 'row',
@@ -438,21 +630,23 @@ const styles = StyleSheet.create({
     borderColor: '#e5e5e5',
   },
   addressTypeButtonActive: {
-    backgroundColor: '#694d21',
-    borderColor: '#5a3f1a',
-    shadowColor: '#694d21',
+    backgroundColor: '#2b3a1a',
+    borderColor: '#1e2912',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
   },
   addressTypeText: {
+    fontFamily: 'CormorantGaramond-Bold',
     marginLeft: 8,
     color: '#666',
     fontWeight: '600',
     fontSize: 14,
   },
   addressTypeTextActive: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontWeight: '700',
   },
@@ -460,7 +654,7 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -474,6 +668,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   submitButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',

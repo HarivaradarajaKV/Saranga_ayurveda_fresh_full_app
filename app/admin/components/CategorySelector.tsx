@@ -34,16 +34,22 @@ export default function CategorySelector({
     // Local state for multi-select
     const [tempSelected, setTempSelected] = React.useState<string[]>([]);
 
+    // Sync state when opening
     React.useEffect(() => {
         if (visible && multiSelect) {
             setTempSelected(selectedCategories || []);
         }
+    }, [visible, multiSelect, JSON.stringify(selectedCategories)]);
 
-        // Force refresh categories when modal opens to ensure we have latest data
+    // Fetch only when becoming visible
+    React.useEffect(() => {
         if (visible) {
+            console.log('CategorySelector: Visible. Refreshing categories...');
             fetchCategories(true);
         }
-    }, [visible, multiSelect, selectedCategories]);
+    }, [visible]);
+
+    console.log('CategorySelector: Rendering. Visible:', visible, 'MainCats:', mainCategories.length, 'Loading:', loading, 'Error:', error);
 
     const handleToggle = (category: { id: number; name: string }) => {
         if (multiSelect) {
@@ -119,6 +125,15 @@ export default function CategorySelector({
                         ) : mainCategories.length === 0 ? (
                             <View style={styles.emptyContainer}>
                                 <Text style={styles.emptyText}>No categories available</Text>
+                                <Text style={{ fontSize: 10, color: '#999', marginTop: 8 }}>
+                                    Debug: MainCats: {mainCategories.length}, Loading: {String(loading)}, Err: {String(error)}
+                                </Text>
+                                <TouchableOpacity
+                                    style={[styles.retryButton, { marginTop: 12 }]}
+                                    onPress={() => fetchCategories(true)}
+                                >
+                                    <Text style={styles.retryButtonText}>Refresh</Text>
+                                </TouchableOpacity>
                             </View>
                         ) : (
                             mainCategories.map(category => (

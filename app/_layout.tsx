@@ -3,8 +3,89 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import * as RN from 'react-native';
 import 'react-native-reanimated';
+
+const DEFAULT_FONT = 'CormorantGaramond-Medium';
+
+const OriginalText = RN.Text;
+const OriginalTextInput = RN.TextInput;
+
+const mergeDefaultFont = (originalStyle: any) => {
+  const DEFAULT_FONT = 'CormorantGaramond-Medium';
+  const BOLD_FONT = 'CormorantGaramond-Bold';
+
+  try {
+    const flatStyle = RN.StyleSheet.flatten(originalStyle) || {};
+    if (flatStyle.fontFamily) {
+      return originalStyle;
+    }
+
+    const weight = flatStyle.fontWeight;
+    const isBold = weight === 'bold' || weight === '700' || weight === '800' || weight === '900' || weight === '600';
+    
+    return [
+      originalStyle,
+      {
+        fontFamily: isBold ? BOLD_FONT : DEFAULT_FONT,
+        fontWeight: undefined,
+      }
+    ];
+  } catch (e) {
+    return [{ fontFamily: DEFAULT_FONT }, originalStyle];
+  }
+};
+
+const CustomText = React.forwardRef((props: any, ref: any) => {
+  const { style, children, ...rest } = props;
+  return (
+    <OriginalText {...rest} ref={ref} style={mergeDefaultFont(style)}>
+      {children}
+    </OriginalText>
+  );
+});
+
+Object.keys(OriginalText).forEach((key) => {
+  try {
+    (CustomText as any)[key] = (OriginalText as any)[key];
+  } catch (e) {}
+});
+CustomText.displayName = 'Text';
+
+const CustomTextInput = React.forwardRef((props: any, ref: any) => {
+  const { style, ...rest } = props;
+  return (
+    <OriginalTextInput {...rest} ref={ref} style={mergeDefaultFont(style)} />
+  );
+});
+
+Object.keys(OriginalTextInput).forEach((key) => {
+  try {
+    (CustomTextInput as any)[key] = (OriginalTextInput as any)[key];
+  } catch (e) {}
+});
+CustomTextInput.displayName = 'TextInput';
+
+try {
+  (RN as any).Text = CustomText;
+  (RN as any).TextInput = CustomTextInput;
+} catch (e) {
+  try {
+    Object.defineProperty(RN, 'Text', {
+      value: CustomText,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(RN, 'TextInput', {
+      value: CustomTextInput,
+      writable: true,
+      configurable: true,
+    });
+  } catch (err) {
+    console.error('Failed to patch react-native exports:', err);
+  }
+}
 import CartProvider from './CartContext';
 import WishlistProvider from './WishlistContext';
 import { CategoryProvider } from './CategoryContext';
@@ -85,6 +166,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    'CormorantGaramond-Regular': require('../assets/fonts/CormorantGaramond-Regular.ttf'),
+    'CormorantGaramond-Medium': require('../assets/fonts/CormorantGaramond-Medium.ttf'),
+    'CormorantGaramond-Bold': require('../assets/fonts/CormorantGaramond-Bold.ttf'),
   });
 
   useEffect(() => {

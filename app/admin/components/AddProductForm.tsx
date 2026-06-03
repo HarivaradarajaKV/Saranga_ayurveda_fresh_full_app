@@ -9,9 +9,11 @@ import {
     Image,
     Platform,
     KeyboardAvoidingView,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import CategorySelector from './CategorySelector';
 import { useCategories } from '../../CategoryContext';
 
@@ -31,13 +33,31 @@ interface NewProductForm {
     offer_percentage: number;
 }
 
+export interface MediaAsset {
+    uri: string;
+    name: string;
+    type: string;
+}
+
+export const normalizeFileType = (uri: string, type?: string): 'image' | 'gif' | 'video' | 'document' => {
+    const typeStr = (type || '').toLowerCase();
+    const ext = (uri || '').split('.').pop()?.toLowerCase() || '';
+
+    if (typeStr.includes('gif') || ext === 'gif') return 'gif';
+    if (typeStr.includes('video') || ['mp4', 'mov', 'avi', 'webm'].includes(ext)) return 'video';
+    if (typeStr.includes('image') || ['jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext)) return 'image';
+    if (typeStr.includes('pdf') || typeStr.includes('word') || typeStr.includes('excel') || typeStr.includes('sheet') || typeStr.includes('text') || ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'].includes(ext)) return 'document';
+    
+    return 'image';
+};
+
 interface AddProductFormProps {
     onSubmit: () => void;
     newProduct: NewProductForm;
     setNewProduct: React.Dispatch<React.SetStateAction<NewProductForm>>;
-    selectedImages: string[];
-    setSelectedImages: React.Dispatch<React.SetStateAction<string[]>>;
-    handleImagePick: (index: number) => void;
+    selectedImages: MediaAsset[];
+    setSelectedImages: React.Dispatch<React.SetStateAction<MediaAsset[]>>;
+    handleImagePick?: (index: number) => void;
 }
 
 const AddProductForm: React.FC<AddProductFormProps> = ({
@@ -51,6 +71,166 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [activeSection, setActiveSection] = useState('basic');
     const { mainCategories, subCategories, loading, error, fetchCategories } = useCategories();
+
+    const getFileType = (uri: string) => {
+        if (!uri) return 'image';
+        const ext = uri.split('.').pop()?.toLowerCase();
+        if (ext === 'gif') return 'gif';
+        if (['mp4', 'mov', 'avi', 'webm'].includes(ext || '')) return 'video';
+        if (['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'].includes(ext || '')) return 'document';
+        return 'image';
+    };
+
+    const handleRemoveMedia = (index: number) => {
+        const newImages = selectedImages.filter((_, i) => i !== index);
+        setSelectedImages(newImages);
+    };
+
+    const handleMoveMediaLeft = (index: number) => {
+        if (index === 0) return;
+        const newImages = [...selectedImages];
+        const temp = newImages[index];
+        newImages[index] = newImages[index - 1];
+        newImages[index - 1] = temp;
+        setSelectedImages(newImages);
+    };
+
+    const handleMoveMediaRight = (index: number) => {
+        if (index === selectedImages.length - 1) return;
+        const newImages = [...selectedImages];
+        const temp = newImages[index];
+        newImages[index] = newImages[index + 1];
+        newImages[index + 1] = temp;
+        setSelectedImages(newImages);
+    };
+
+    const pickImage = async (isVideo: boolean) => {
+        try {
+            const currentCount = selectedImages.length;
+            const remainingSlots = 4 - currentCount;
+            
+            if (remainingSlots <= 0) {
+                Alert.alert('Limit Reached', 'Maximum 4 media files are allowed per product.');
+                return;
+            }
+
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                Alert.alert('Permission Required', 'Please allow access to your photo library');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: isVideo ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                selectionLimit: remainingSlots,
+                quality: 0.7,
+                exif: false,
+                base64: false,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                let assetsToAdd = result.assets;
+                if (assetsToAdd.length > remainingSlots) {
+                    Alert.alert(
+                        'Limit Exceeded',
+                        `Only the first ${remainingSlots} items were added to stay within the 4-file limit.`
+                    );
+                    assetsToAdd = assetsToAdd.slice(0, remainingSlots);
+                }
+
+                const mapped = assetsToAdd.map((asset, i) => {
+                    const uri = asset.uri;
+                    const filename = asset.fileName || uri.split('/').pop() || `media_${Date.now()}_${i}.${isVideo ? 'mp4' : 'jpg'}`;
+                    
+                    let type = asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
+                    if (filename.toLowerCase().endsWith('.gif')) {
+                        type = 'image/gif';
+                    }
+                    return { uri, name: filename, type };
+                });
+
+                setSelectedImages(prev => [
+                    ...prev.filter(x => x && x.uri),
+                    ...mapped
+                ]);
+            }
+        } catch (err) {
+            console.error('Error picking image/video:', err);
+            Alert.alert('Error', 'Failed to pick image/video');
+        }
+    };
+
+    const pickFromFiles = async () => {
+        try {
+            const currentCount = selectedImages.length;
+            const remainingSlots = 4 - currentCount;
+            
+            if (remainingSlots <= 0) {
+                Alert.alert('Limit Reached', 'Maximum 4 media files are allowed per product.');
+                return;
+            }
+
+            const result = await DocumentPicker.getDocumentAsync({
+                type: [
+                    'image/*',
+                    'video/*',
+                    'application/pdf',
+                    'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'text/plain',
+                    'application/vnd.ms-excel',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                ],
+                copyToCacheDirectory: true,
+                multiple: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                let assetsToAdd = result.assets;
+                if (assetsToAdd.length > remainingSlots) {
+                    Alert.alert(
+                        'Limit Exceeded',
+                        `Only the first ${remainingSlots} items were added to stay within the 4-file limit.`
+                    );
+                    assetsToAdd = assetsToAdd.slice(0, remainingSlots);
+                }
+
+                const mapped = assetsToAdd.map((asset) => {
+                    const uri = asset.uri;
+                    const filename = asset.name || uri.split('/').pop() || `file_${Date.now()}`;
+                    const type = asset.mimeType || 'application/octet-stream';
+                    return { uri, name: filename, type };
+                });
+
+                setSelectedImages(prev => [
+                    ...prev.filter(x => x && x.uri),
+                    ...mapped
+                ]);
+            }
+        } catch (err) {
+            console.error('Error picking file:', err);
+            Alert.alert('Error', 'Failed to browse files');
+        }
+    };
+
+    const handleUploadMedia = () => {
+        if (selectedImages.length >= 4) {
+            Alert.alert('Limit Reached', 'Maximum 4 media files are allowed per product.');
+            return;
+        }
+
+        Alert.alert(
+            'Upload Media',
+            'Select the source of your media file (Max 4 total):',
+            [
+                { text: 'Image', onPress: () => pickImage(false) },
+                { text: 'Video', onPress: () => pickImage(true) },
+                { text: 'Files', onPress: () => pickFromFiles() },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
+    };
 
     const handleCategorySelect = (categories: { id: number; name: string }[]) => {
         if (categories.length > 0) {
@@ -384,48 +564,89 @@ const AddProductForm: React.FC<AddProductFormProps> = ({
                     {/* Images Section */}
                     {activeSection === 'images' && (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Product Images</Text>
-                            <Text style={styles.imageUploadTitle}>Upload up to 3 images for your product</Text>
-                            <Text style={styles.imageUploadSubtitle}>Tap on any slot to add an image</Text>
-                            <View style={styles.imageUploadGrid}>
-                                {[0, 1, 2].map((index) => (
-                                    <TouchableOpacity
-                                        key={index}
-                                        style={[
-                                            styles.imageUploadButton,
-                                            selectedImages[index] && styles.imageUploadButtonFilled
-                                        ]}
-                                        onPress={() => handleImagePick(index)}
-                                    >
-                                        {selectedImages[index] ? (
-                                            <View style={styles.uploadedImageContainer}>
-                                                <Image
-                                                    source={{ uri: selectedImages[index] }}
-                                                    style={styles.uploadedImage}
-                                                />
+                            <Text style={styles.sectionTitle}>Product Media & Files</Text>
+                            <Text style={styles.imageUploadTitle}>Dynamic Media Upload (Images, GIFs, Videos, Documents)</Text>
+                            <Text style={styles.imageUploadSubtitle}>Manage up to 4 media items to display on the user product detail carousel</Text>
+                            
+                            <View style={styles.mediaGrid}>
+                                {selectedImages.filter(item => item && item.uri).map((item, index) => {
+                                    const uri = item.uri;
+                                    const filename = item.name || `File ${index + 1}`;
+                                    const fileType = normalizeFileType(uri, item.type);
+                                    
+                                    return (
+                                        <View key={index} style={styles.mediaCard}>
+                                            {fileType === 'image' || fileType === 'gif' ? (
+                                                <Image source={{ uri }} style={styles.uploadedImage} />
+                                            ) : fileType === 'video' ? (
+                                                <View style={styles.mediaPlaceholderContainer}>
+                                                    <Ionicons name="play-circle" size={40} color="#FF69B4" />
+                                                    <Text style={styles.mediaPlaceholderText} numberOfLines={1}>Video</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={styles.mediaPlaceholderContainer}>
+                                                    <Ionicons name="document-text" size={40} color="#2196F3" />
+                                                    <Text style={styles.mediaPlaceholderText} numberOfLines={1}>{filename}</Text>
+                                                </View>
+                                            )}
+                                            
+                                            <View style={styles.orderBadge}>
+                                                <Text style={styles.orderBadgeText}>{index + 1}</Text>
+                                            </View>
+
+                                            <View style={styles.mediaTypeBadge}>
+                                                <Text style={styles.mediaTypeBadgeText}>{fileType.toUpperCase()}</Text>
+                                            </View>
+                                            
+                                            <View style={styles.cardReorderBar}>
                                                 <TouchableOpacity
-                                                    style={styles.removeImageButton}
-                                                    onPress={() => {
-                                                        const newImages = [...selectedImages];
-                                                        newImages[index] = '';
-                                                        setSelectedImages(newImages);
-                                                    }}
+                                                    onPress={() => handleMoveMediaLeft(index)}
+                                                    disabled={index === 0}
+                                                    style={[styles.reorderBarBtn, index === 0 && styles.reorderBarBtnDisabled]}
                                                 >
-                                                    <Ionicons name="close-circle" size={20} color="#dc3545" />
+                                                    <Ionicons name="chevron-back" size={16} color={index === 0 ? "#888" : "#fff"} />
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    onPress={() => handleRemoveMedia(index)}
+                                                    style={styles.reorderBarBtn}
+                                                >
+                                                    <Ionicons name="trash" size={14} color="#ff4d4d" />
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    onPress={() => handleMoveMediaRight(index)}
+                                                    disabled={index === selectedImages.length - 1}
+                                                    style={[styles.reorderBarBtn, index === selectedImages.length - 1 && styles.reorderBarBtnDisabled]}
+                                                >
+                                                    <Ionicons name="chevron-forward" size={16} color={index === selectedImages.length - 1 ? "#888" : "#fff"} />
                                                 </TouchableOpacity>
                                             </View>
-                                        ) : (
-                                            <View style={styles.uploadPlaceholder}>
-                                                <Ionicons name="camera" size={32} color="#666" />
-                                                <Text style={styles.uploadText}>Tap to Upload</Text>
-                                                <Text style={styles.uploadSubtext}>Image {index + 1}</Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
+                                        </View>
+                                    );
+                                })}
+
+                                {selectedImages.filter(item => item && item.uri).length === 0 && (
+                                    <View style={styles.noMediaContainer}>
+                                        <Ionicons name="cloud-upload" size={48} color="#ccc" />
+                                        <Text style={styles.noMediaText}>No media added yet</Text>
+                                        <Text style={styles.noMediaSubtext}>Use the button below to upload images, gifs, videos, and documents.</Text>
+                                    </View>
+                                )}
                             </View>
+
+                            <View style={styles.addButtonRow}>
+                                <TouchableOpacity 
+                                    style={[styles.mediaActionButton, { backgroundColor: '#FF69B4', minWidth: 200, paddingVertical: 12 }]} 
+                                    onPress={handleUploadMedia}
+                                >
+                                    <Ionicons name="cloud-upload" size={22} color="#fff" />
+                                    <Text style={[styles.mediaActionButtonText, { fontSize: 14 }]}>Upload Media (Max 4)</Text>
+                                </TouchableOpacity>
+                            </View>
+
                             <Text style={styles.imageHelperText}>
-                                💡 Tip: Use high-quality images with good lighting for better product presentation
+                                💡 Tip: Standard images and static GIFs are center-squared and optimized to 2400x2400 on the backend. Videos and documents will keep their formats intact. Maximum 4 media items are allowed in total.
                             </Text>
                         </View>
                     )}
@@ -856,6 +1077,149 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 8,
         zIndex: 1001,
+    },
+    mediaGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 20,
+        justifyContent: 'flex-start',
+    },
+    mediaCard: {
+        width: 105,
+        height: 105,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    mediaPlaceholderContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 8,
+    },
+    mediaPlaceholderText: {
+        fontSize: 10,
+        color: '#666',
+        marginTop: 4,
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    mediaTypeBadge: {
+        position: 'absolute',
+        bottom: 4,
+        left: 4,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    mediaTypeBadgeText: {
+        color: '#fff',
+        fontSize: 8,
+        fontWeight: 'bold',
+    },
+    noMediaContainer: {
+        width: '100%',
+        padding: 30,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#e9ecef',
+        borderStyle: 'dashed',
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
+    },
+    noMediaText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#666',
+        marginTop: 10,
+    },
+    noMediaSubtext: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+        textAlign: 'center',
+    },
+    addButtonRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 20,
+        flexWrap: 'wrap',
+    },
+    mediaActionButton: {
+        flex: 1,
+        minWidth: 100,
+        backgroundColor: '#FF69B4',
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    mediaActionButtonText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    orderBadge: {
+        position: 'absolute',
+        top: 6,
+        left: 6,
+        backgroundColor: '#FF69B4',
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        zIndex: 100,
+    },
+    orderBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    cardReorderBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 28,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        borderBottomLeftRadius: 11,
+        borderBottomRightRadius: 11,
+        zIndex: 10,
+    },
+    reorderBarBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    reorderBarBtnDisabled: {
+        opacity: 0.3,
     },
 });
 

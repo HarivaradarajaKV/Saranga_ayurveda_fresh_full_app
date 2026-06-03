@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, TouchableHighlight, Dimensions, StyleSheet, Platform, ActivityIndicator, Modal, Animated, TouchableWithoutFeedback, Linking, Easing, Switch, Keyboard } from 'react-native';
+import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, TouchableHighlight, Dimensions, StyleSheet, Platform, ActivityIndicator, Modal, Animated, TouchableWithoutFeedback, Linking, Easing, Switch, Keyboard, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Stack, useRouter } from 'expo-router';
@@ -23,6 +23,28 @@ import { useBottomTabBarHeight } from './_layout';
 
 const screenWidth = Dimensions.get('window').width;
 
+// Header Logo Images placeholders - Swap logo.png and name_logo.png in app/assets/images/ with your actual logo files!
+const HEADER_LOGO_URI = require('../assets/images/logo.png');
+const HEADER_NAME_LOGO_URI = require('../assets/images/name_logo.png');
+
+const SLIDE_DATA = [
+  {
+    image: require('../assets/images/slide1.jpg'),
+    title: "Helping Feed the Hungry",
+    description: "Nourishing lives with love and compassion.",
+  },
+  {
+    image: require('../assets/images/slide2.jpg'),
+    title: "Educate Students",
+    description: "Empowering minds today for a brighter tomorrow.",
+  },
+  {
+    image: require('../assets/images/slide3.jpg'),
+    title: "Provide Medical Care",
+    description: "Bringing quality healthcare to those who need it most.",
+  },
+];
+
 interface ProductCardProps {
   product: Product;
 }
@@ -45,6 +67,7 @@ interface CategoryNavigationProps {
     id: number;
     name: string;
     image?: string;
+    image_url?: string;
   }>;
   selectedCategory: number;
   onSelectCategory: (category: number) => void;
@@ -126,7 +149,6 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => {
         { transform: [{ scale: scaleAnim }] }
       ]}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        <Ionicons name="arrow-forward" size={20} color="#000" />
       </Animated.View>
     </TouchableWithoutFeedback>
   );
@@ -253,7 +275,9 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
       contentContainerStyle={styles.categoryScrollContainer}
     >
       {categories.map((category, index) => {
-        const imageUrl = getCategoryImage(normalizeCategoryName(category.name), 'tile');
+        const imageUrl = category.image_url
+          ? apiService.getFullImageUrl(category.image_url)
+          : getCategoryImage(normalizeCategoryName(category.name), 'tile');
         const isSelected = selectedCategory === category.id;
 
         return (
@@ -275,10 +299,7 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
             ]}
           >
             <TouchableOpacity
-              style={[
-                styles.categoryCircle,
-                isSelected && styles.selectedCategoryCircle
-              ]}
+              style={styles.categoryCircle}
               onPress={() => handleCategoryPress(category.id, index)}
               activeOpacity={0.8}
             >
@@ -425,13 +446,187 @@ const LegalInformation: React.FC = () => {
   );
 };
 
+const categoryMarginHorizontal = 4;
+const categoryCircleWidth = Math.min((screenWidth - 30) / 4 - (categoryMarginHorizontal * 2), 85);
+const categoryIconSize = categoryCircleWidth - 4;
+const categoryRadius = categoryIconSize / 2;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
+  },
+  customFoundationSection: {
+    backgroundColor: '#FAF4EB',
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.06)',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+  },
+  customFoundationLogo: {
+    width: 220,
+    height: 48,
+    marginBottom: 16,
+  },
+  customFoundationSubText: {
+    fontSize: 13,
+    color: '#555',
+    fontWeight: '500',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  customFoundationName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  customFoundationBigText: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: '#2d2d2d',
+    textAlign: 'center',
+    marginBottom: 28,
+    letterSpacing: -1,
+  },
+  customFoundationButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  customFoundationDonateButton: {
+    backgroundColor: '#25c469',
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    marginRight: 16,
+    elevation: 2,
+    shadowColor: '#25c469',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  customFoundationDonateButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  customFoundationHelpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customFoundationHelpButtonText: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginRight: 6,
+    letterSpacing: 0.5,
+  },
+  customFoundationArrowCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.01)',
+  },
+  foundationSlideshowContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.06)',
+    position: 'relative',
+  },
+  slideshowScrollView: {
+    width: '100%',
+    height: screenWidth - 34,
+  },
+  slideTouch: {
+    width: screenWidth - 34,
+    height: screenWidth - 34,
+    position: 'relative',
+  },
+  slideImage: {
+    width: '100%',
+    height: '100%',
+  },
+  slideTextContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(251, 247, 244, 0.92)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(43, 58, 26, 0.08)',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  slideTitleText: {
+    fontFamily: 'CormorantGaramond-Bold',
+    fontSize: 18,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  slideDescText: {
+    fontFamily: 'CormorantGaramond-Medium',
+    fontSize: 13,
+    color: '#556C3A',
+    textAlign: 'center',
+  },
+  slideshowDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    bottom: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  slideshowDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginHorizontal: 4,
+  },
+  slideshowDotActive: {
+    backgroundColor: '#fff',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   fixedHeader: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
@@ -443,30 +638,32 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
-    marginBottom: 16,
+    marginBottom: 8,
     marginTop: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
   },
   titleContainer: {
+    flex: 1,
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    backgroundColor: '#fbf7f4',
   },
   title: {
-    fontSize: 34,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '800',
     color: '#694d21',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    letterSpacing: 1.2,
+    marginBottom: 2,
     textAlign: 'center',
-    paddingTop: 8,
+    paddingTop: 10,
     width: '100%',
     overflow: 'hidden',
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadowColor: 'rgba(105, 77, 33, 0.15)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   subtitle: {
     fontSize: 15,
@@ -477,6 +674,15 @@ const styles = StyleSheet.create({
     marginTop: -2,
     textTransform: 'uppercase',
     opacity: 0.9,
+  },
+  logo: {
+    width: 260,
+    height: 70,
+  },
+  nameLogo: {
+    width: 190,
+    height: 28,
+    marginTop: 2,
   },
   notificationButton: {
     padding: 19,
@@ -495,7 +701,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 4,
     height: 42,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
     justifyContent: 'space-between',
   },
   menuIcon: {
@@ -534,34 +740,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f7f7f7',
-    borderRadius: 20,
-    padding: 6,
-    borderWidth: 1.5,
-    elevation: 2,
+    backgroundColor: '#ffffff',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    elevation: 4,
     flex: 1,
-    width: 340,
-    maxWidth: '75%',
-    height: 34,
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    maxWidth: '80%',
+    height: 42,
+    marginHorizontal: 8,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   searchIcon: {
-    marginRight: 9,
-    color: '#333333',
+    marginRight: 10,
+    color: '#694d21',
   },
   searchInput: {
     flex: 1,
     color: '#333333',
-    fontSize: 14,
-    paddingVertical: 4,
-    height: 34,
-    textAlign: 'center',
-    paddingLeft: 0,
-    paddingRight: 0,
+    fontSize: 15,
+    paddingVertical: 8,
+    height: 42,
+    textAlign: 'left',
   },
   clearButton: {
     padding: 4,
@@ -803,20 +1007,22 @@ const styles = StyleSheet.create({
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     marginBottom: 12,
     marginTop: 8,
+    width: '100%',
   },
   categoryHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 26,
     color: '#694d21',
-    marginLeft: 8,
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   categoryArrow: {
     marginLeft: 4,
@@ -829,54 +1035,48 @@ const styles = StyleSheet.create({
   },
   categoryCircle: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 6,
-    width: 80,
+    justifyContent: 'flex-start',
+    marginHorizontal: categoryMarginHorizontal,
+    width: categoryCircleWidth,
+    height: categoryCircleWidth + 32,
   },
   categoryIconContainer: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
-    backgroundColor: '#ffffff',
+    width: categoryIconSize,
+    height: categoryIconSize,
+    borderRadius: categoryRadius,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    marginBottom: 8,
     overflow: 'hidden',
   },
   categoryImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 32.5,
+    borderRadius: categoryRadius,
   },
   selectedOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(105, 77, 33, 0.3)',
-    borderRadius: 32.5,
+    backgroundColor: 'rgba(105, 77, 33, 0.25)',
+    borderRadius: categoryRadius,
   },
   selectedCategoryCircle: {
     borderColor: '#694d21',
     borderWidth: 2,
+    borderRadius: categoryRadius,
   },
   categoryText: {
-    fontSize: 12,
-    color: '#333',
+    fontSize: 10,
+    color: '#333333',
     textAlign: 'center',
-    maxWidth: 70,
-    fontWeight: '400',
+    width: categoryIconSize,
+    fontWeight: '500',
+    lineHeight: 13,
+    marginTop: 2,
   },
   selectedCategoryText: {
     color: '#694d21',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   floatingNatureButton: {
     position: 'absolute',
@@ -963,29 +1163,31 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     width: screenWidth - 64,
-    marginRight: 15,
+    marginRight: 20,
     backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#f0f0f0'
+    borderColor: 'rgba(105, 77, 33, 0.05)'
   },
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
+    width: '100%',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 26,
     color: '#694d21',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   searchResultsContainer: {
     flex: 1,
@@ -1003,76 +1205,90 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     flex: 1,
-    backgroundColor: '#694d21',
+    backgroundColor: '#809E5B',
   },
   menuHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 50 : 25,
+    padding: 14,
+    paddingTop: Platform.OS === 'ios' ? 44 : 18,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   menuTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 22,
     color: '#f5f5f5',
     letterSpacing: 0.5,
+    fontFamily: 'CormorantGaramond-Bold',
   },
   menuContent: {
     flex: 1,
-    paddingTop: 20,
+    paddingTop: 10,
   },
   menuScrollContent: {
     flexGrow: 1,
-    paddingBottom: 20,
+    paddingBottom: 10,
   },
   menuSpacer: {
-    height: 20,
+    height: 8,
   },
   menuUserSection: {
     alignItems: 'center',
-    paddingBottom: 20,
+    paddingBottom: 10,
   },
   menuUserIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#8B6B43',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#556C3A',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   menuUserText: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#f5f5f5',
-    fontWeight: '500',
+    fontFamily: 'CormorantGaramond-Bold',
+    textAlign: 'center',
+  },
+  menuUserNameText: {
+    fontSize: 24,
+    color: '#f5f5f5',
+    fontFamily: 'CormorantGaramond-Bold',
+    textAlign: 'center',
+  },
+  menuUserWelcomeText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontFamily: 'CormorantGaramond-Medium',
+    marginTop: 2,
+    textAlign: 'center',
   },
   menuDivider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 15,
+    marginVertical: 8,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    marginBottom: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 20,
+    marginBottom: 2,
     backgroundColor: 'transparent',
     borderRadius: 8,
     marginHorizontal: 10,
   },
   menuItemText: {
-    marginLeft: 15,
+    marginLeft: 12,
     fontSize: 16,
     color: '#f5f5f5',
-    fontWeight: '500',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   logoutItem: {
-    marginTop: 10,
-    backgroundColor: '#8B6B43',
+    marginTop: 6,
+    backgroundColor: '#556C3A',
     borderRadius: 8,
     marginHorizontal: 10,
   },
@@ -1188,15 +1404,17 @@ const styles = StyleSheet.create({
   },
   comboCard: {
     backgroundColor: '#fff',
-    borderRadius: 15,
+    borderRadius: 20,
     marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginBottom: 20,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.05)',
   },
   comboHeader: {
     flexDirection: 'row',
@@ -1217,12 +1435,15 @@ const styles = StyleSheet.create({
   comboProductsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 12,
   },
   comboProductImage: {
-    width: '48%',
-    height: 120,
+    flex: 1,
+    height: 130,
     borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#f5f0e8',
   },
   comboPriceRow: {
     flexDirection: 'row',
@@ -1241,7 +1462,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   viewComboButton: {
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
@@ -1390,21 +1611,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   concernIconContainer: {
-    width: screenWidth * 0.22,
-    height: screenWidth * 0.22,
+    width: screenWidth * 0.24,
+    height: screenWidth * 0.24,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    borderWidth: 1,
-    borderColor: '#694d21',
+    elevation: 5,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(105, 77, 33, 0.1)',
     overflow: 'hidden',
     borderRadius: 1000,
   },
@@ -1511,7 +1729,6 @@ const styles = StyleSheet.create({
   allProductsSection: {
     marginTop: 24,
     marginBottom: 24,
-    paddingHorizontal: 16,
   },
   allProductsHeader: {
     flexDirection: 'row',
@@ -1537,6 +1754,15 @@ const styles = StyleSheet.create({
   productItem: {
     width: '48%',
     marginBottom: 16,
+  },
+  horizontalProductItem: {
+    width: (screenWidth - 44) / 2,
+    marginRight: 0,
+  },
+  horizontalScrollContent: {
+    paddingLeft: 10,
+    paddingRight: 10,
+    paddingBottom: 8,
   },
   pillarsSection: {
     marginBottom: 24,
@@ -1892,12 +2118,37 @@ const Page = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [newArrivalProducts, setNewArrivalProducts] = useState<Product[]>([]);
+  const [bestSellerProducts, setBestSellerProducts] = useState<Product[]>([]);
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>('');
-  const [showNewDealsPopup, setShowNewDealsPopup] = useState(true);
+  const [showNewDealsPopup, setShowNewDealsPopup] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const slideshowRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const nextSlide = (activeSlide + 1) % SLIDE_DATA.length;
+      slideshowRef.current?.scrollTo({
+        x: nextSlide * (screenWidth - 34),
+        animated: true,
+      });
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [activeSlide]);
+
+  const handleScroll = (event: any) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const offset = event.nativeEvent.contentOffset.x;
+    if (slideSize > 0) {
+      const index = Math.round(offset / slideSize);
+      setActiveSlide(index);
+    }
+  };
   const [activeCombos, setActiveCombos] = useState<any[]>([]);
   const [coreProductsOffset, setCoreProductsOffset] = useState(0);
   const coreProductsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1908,7 +2159,9 @@ const Page = () => {
   const mainCategoriesWithImages = mainCategories && Array.isArray(mainCategories)
     ? mainCategories.map(cat => ({
       ...cat,
-      image: getCategoryImage(normalizeCategoryName(cat.name), 'tile'),
+      image: cat.image_url
+        ? apiService.getFullImageUrl(cat.image_url)
+        : getCategoryImage(normalizeCategoryName(cat.name), 'tile'),
     }))
     : [];
 
@@ -2301,6 +2554,46 @@ const Page = () => {
     fetchProducts();
   }, []);
 
+  // Fetch new arrivals from dedicated endpoint
+  useEffect(() => {
+    const fetchNewArrivals = async () => {
+      try {
+        const response = await apiService.get('/products/new-arrivals');
+        let arrivals: Product[] = [];
+        if (response.data?.products) {
+          arrivals = response.data.products;
+        } else if (Array.isArray(response.data)) {
+          arrivals = response.data;
+        }
+        setNewArrivalProducts(arrivals);
+      } catch (error) {
+        console.error('Error fetching new arrivals:', error);
+        setNewArrivalProducts([]);
+      }
+    };
+    fetchNewArrivals();
+  }, []);
+
+  // Fetch best sellers from dedicated endpoint
+  useEffect(() => {
+    const fetchBestSellers = async () => {
+      try {
+        const response = await apiService.get('/products/best-sellers');
+        let sellers: Product[] = [];
+        if (response.data?.products) {
+          sellers = response.data.products;
+        } else if (Array.isArray(response.data)) {
+          sellers = response.data;
+        }
+        setBestSellerProducts(sellers);
+      } catch (error) {
+        console.error('Error fetching best sellers:', error);
+        setBestSellerProducts([]);
+      }
+    };
+    fetchBestSellers();
+  }, []);
+
   // Update core products display to cycle through all products circularly
   useEffect(() => {
     // Clear any existing interval first
@@ -2634,7 +2927,8 @@ const Page = () => {
               <View style={styles.menuUserIcon}>
                 <Ionicons name="person" size={32} color="#f5f5f5" />
               </View>
-              <Text style={styles.menuUserText}>Welcome{userName ? ` ${userName}` : ''}</Text>
+              <Text style={styles.menuUserWelcomeText}>Welcome!</Text>
+              <Text style={styles.menuUserNameText}>{userName || 'User'}</Text>
             </View>
             <View style={styles.menuDivider} />
             <TouchableOpacity
@@ -2652,6 +2946,18 @@ const Page = () => {
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
+                console.log('Orders button pressed');
+                handleDrawerClose();
+                router.push('/profile/orders');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="bag-outline" size={22} color="#f5f5f5" />
+              <Text style={styles.menuItemText}>My Orders</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
                 console.log('Cart button pressed');
                 handleDrawerClose();
                 router.push('/cart');
@@ -2664,18 +2970,6 @@ const Page = () => {
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
-                console.log('Orders button pressed');
-                handleDrawerClose();
-                router.push('/profile/orders');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="bag-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>Track Order</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
                 console.log('Wishlist button pressed');
                 handleDrawerClose();
                 router.push('/wishlist');
@@ -2684,6 +2978,18 @@ const Page = () => {
             >
               <Ionicons name="heart-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Wishlist</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                console.log('Notifications button pressed');
+                handleDrawerClose();
+                router.push('/profile/notifications');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="notifications-outline" size={22} color="#f5f5f5" />
+              <Text style={styles.menuItemText}>Notifications</Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
             <TouchableOpacity
@@ -2736,32 +3042,20 @@ const Page = () => {
               <View style={styles.menuUserIcon}>
                 <Ionicons name="person-outline" size={32} color="#f5f5f5" />
               </View>
-              <Text style={styles.menuUserText}>Welcome Guest</Text>
+              <Text style={styles.menuUserText}>Welcome to Saranga Ayurveda</Text>
             </View>
             <View style={styles.menuDivider} />
             <TouchableOpacity
-              style={[styles.menuItem, { backgroundColor: '#8B6B43' }]}
+              style={[styles.menuItem, { backgroundColor: '#556C3A' }]}
               onPress={() => {
-                console.log('Login button pressed');
+                console.log('Sign In or Sign Up button pressed');
                 handleDrawerClose();
                 router.push('/auth/login');
               }}
               activeOpacity={0.7}
             >
               <Ionicons name="log-in-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>Login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                console.log('Register button pressed');
-                handleDrawerClose();
-                router.push('/auth/signup');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="person-add-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>Register</Text>
+              <Text style={styles.menuItemText}>Sign In / Sign Up</Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
             <TouchableOpacity
@@ -2792,9 +3086,7 @@ const Page = () => {
           </>
         )}
       </ScrollView>
-      <View style={styles.menuFooter}>
-        <Text style={styles.menuFooterText}>Version 1.0.0</Text>
-      </View>
+      {/* Footer version removed */}
     </View>
   );
 
@@ -2941,85 +3233,47 @@ const Page = () => {
           paddingBottom: bottomTabHeight + 20 // Add extra 20 for spacing
         }}
       >
-        <Animated.View style={[styles.fixedHeader, {
-          opacity: fadeAnim,
-          transform: [
-            { translateY: headerSlideAnim },
-            { scale: pulseAnim }
-          ]
-        }]}>
+        <View style={styles.fixedHeader}>
           <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Animated.Text style={[styles.title, {
-                transform: [{ scale: pulseAnim }]
-              }]}>Saranga Ayurveda</Animated.Text>
-              <Animated.Text style={[styles.subtitle, {
-                transform: [{ translateX: searchSlideAnim }]
-              }]}>
-                <Text style={{ color: '#176e14' }}>Natural</Text>
-                <Text> Skin Care </Text>
-                <Ionicons name="leaf" size={14} color="#176e14" />
-              </Animated.Text>
-            </View>
-          </View>
+            <TouchableOpacity
+              style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
+              onPress={handleDrawerOpen}
+              disabled={isMenuLoading}
+              activeOpacity={0.7}
+            >
+              {isMenuLoading ? (
+                <ActivityIndicator size="small" color="#694d21" />
+              ) : (
+                <Ionicons name="menu" size={28} color="#694d21" />
+              )}
+            </TouchableOpacity>
 
-          <Animated.View style={[styles.searchRow, {
-            transform: [{ translateY: searchSlideAnim }]
-          }]}>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
-                style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
-                onPress={handleDrawerOpen}
-                disabled={isMenuLoading}
-                activeOpacity={0.7}
-              >
-                {isMenuLoading ? (
-                  <ActivityIndicator size="small" color="#694d21" />
-                ) : (
-                  <Ionicons name="menu" size={28} color="#694d21" />
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
-                style={styles.searchIconButton}
-                onPress={() => router.push('/search')}
-              >
-                <Ionicons name="search" size={28} color="#694d21" />
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
-                style={styles.natureButton}
-                onPress={handleNatureTouch}
-                activeOpacity={0.7}
-                delayPressIn={0}
-                pressRetentionOffset={{ top: 20, left: 20, right: 20, bottom: 20 }}
-                hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="leaf-outline" size={20} color="#176e14" />
-                  <Text style={styles.natureButtonText}>Nature's Touch</Text>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => router.push('/profile/notifications')}
-              >
-                <Ionicons name="notifications-outline" size={24} color="#694d21" />
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => router.push('/cart')}
-              >
-                <Ionicons name="cart-outline" size={24} color="#694d21" />
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
+            <View style={styles.titleContainer}>
+              <Image
+                source={typeof HEADER_LOGO_URI === 'string' ? { uri: HEADER_LOGO_URI } : HEADER_LOGO_URI}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Image
+                source={typeof HEADER_NAME_LOGO_URI === 'string' ? { uri: HEADER_NAME_LOGO_URI } : HEADER_NAME_LOGO_URI}
+                style={styles.nameLogo}
+                resizeMode="contain"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => {
+                if (!isAuthenticated) {
+                  router.push('/auth/login');
+                } else {
+                  router.push('/cart');
+                }
+              }}
+            >
+              <Ionicons name="cart-outline" size={24} color="#694d21" />
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.offersHeader}>
             <View style={styles.offersContainer}>
@@ -3045,7 +3299,7 @@ const Page = () => {
               </Animated.View>
             </View>
           </View>
-        </Animated.View>
+        </View>
 
         {loading ? (
           <Animated.View style={[styles.loadingContainer, {
@@ -3126,8 +3380,8 @@ const Page = () => {
             <View style={styles.categorySection}>
               <View style={styles.categoryHeader}>
                 <View style={styles.categoryHeaderLeft}>
-                  <Ionicons name="water-outline" size={24} color="#694d21" />
-                  <Text style={styles.categoryTitle}>Tap in, Into the Deep...</Text>
+
+                  <Text style={styles.categoryTitle}>Trusted Experts in</Text>
                 </View>
               </View>
               {categoriesLoading ? (
@@ -3182,6 +3436,37 @@ const Page = () => {
               </ScrollView>
             )}
 
+            {/* Best Seller Section */}
+            <View style={styles.allProductsSection}>
+              <SectionHeader title="Best Seller" />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScrollContent}
+                snapToInterval={(screenWidth - 44) / 2}
+                snapToAlignment="start"
+                decelerationRate="fast"
+              >
+                {(bestSellerProducts.length > 0 ? bestSellerProducts : allProducts).map((product, index) => (
+                  <Animated.View
+                    key={`bestseller-${product.id}-${index}`}
+                    style={[
+                      styles.horizontalProductItem,
+                      {
+                        opacity: fadeAnim,
+                        transform: [
+                          { translateY: productSlideAnim },
+                          { scale: scaleAnim }
+                        ]
+                      }
+                    ]}
+                  >
+                    <ProductCard product={product} />
+                  </Animated.View>
+                ))}
+              </ScrollView>
+            </View>
+
             {/* New Combo Offers Section */}
             <View style={styles.comboSection}>
               <TouchableWithoutFeedback
@@ -3189,197 +3474,181 @@ const Page = () => {
               >
                 <Animated.View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Combo Offers</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#000" />
                 </Animated.View>
               </TouchableWithoutFeedback>
 
-              {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
-              {activeCombos.length > 0 ? (
-                activeCombos.map((combo, index) => {
-                  // Calculate prices
-                  const calculateTotalPrice = () => {
-                    return (combo.items || []).reduce((sum: number, item: any) => {
-                      const price = Number(item.price || 0);
-                      const quantity = Number(item.quantity || 1);
-                      return sum + (price * quantity);
-                    }, 0);
-                  };
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
+                {activeCombos.length > 0 ? (
+                  activeCombos.map((combo, index) => {
+                    // Calculate prices
+                    const calculateTotalPrice = () => {
+                      return (combo.items || []).reduce((sum: number, item: any) => {
+                        const price = Number(item.price || 0);
+                        const quantity = Number(item.quantity || 1);
+                        return sum + (price * quantity);
+                      }, 0);
+                    };
 
-                  const calculateDiscountedPrice = () => {
-                    const total = calculateTotalPrice();
-                    const discountValue = Number(combo.discount_value || 0);
-                    if (combo.discount_type === 'percentage') {
-                      return total - (total * (discountValue / 100));
-                    } else {
-                      return Math.max(0, total - discountValue);
-                    }
-                  };
+                    const calculateDiscountedPrice = () => {
+                      const total = calculateTotalPrice();
+                      const discountValue = Number(combo.discount_value || 0);
+                      if (combo.discount_type === 'percentage') {
+                        return total - (total * (discountValue / 100));
+                      } else {
+                        return Math.max(0, total - discountValue);
+                      }
+                    };
 
-                  const totalPrice = calculateTotalPrice();
-                  const discountedPrice = calculateDiscountedPrice();
-                  const savings = totalPrice - discountedPrice;
+                    const totalPrice = calculateTotalPrice();
+                    const discountedPrice = calculateDiscountedPrice();
+                    const savings = totalPrice - discountedPrice;
 
-                  // Get combo images (up to 2 for display)
-                  const comboImages = [
-                    combo.image_url,
-                    combo.image_url2,
-                    combo.image_url3,
-                    combo.image_url4
-                  ].filter(img => img && typeof img === 'string').slice(0, 2);
+                    // Get combo images (up to 2 for display)
+                    const comboImages = [
+                      combo.image_url,
+                      combo.image_url2,
+                      combo.image_url3,
+                      combo.image_url4
+                    ].filter(img => img && typeof img === 'string').slice(0, 2);
 
-                  const handleComboPress = () => {
-                    router.push({
-                      pathname: '/deals/combo-detail/[id]',
-                      params: {
-                        id: combo.id.toString(),
-                        comboData: JSON.stringify(combo),
-                      },
-                    });
-                  };
+                    const handleComboPress = () => {
+                      router.push({
+                        pathname: '/deals/combo-detail/[id]',
+                        params: {
+                          id: combo.id.toString(),
+                          comboData: JSON.stringify(combo),
+                        },
+                      });
+                    };
 
-                  // Apply different animations to each card
-                  const isFirstCard = index === 0;
-                  const rotate = isFirstCard ? comboCard1Rotate : comboCard2Rotate;
-                  const translateX = isFirstCard ? comboCard1TranslateX : comboCard2TranslateX;
-                  const translateY = isFirstCard ? comboCard1TranslateY : comboCard2TranslateY;
-                  const scale = isFirstCard ? comboCard1Scale : comboCard2Scale;
+                    // Apply animations only for first 2 cards; rest render without transform
+                    const isFirstCard = index === 0;
+                    const isSecondCard = index === 1;
+                    const rotate = isFirstCard ? comboCard1Rotate : isSecondCard ? comboCard2Rotate : new Animated.Value(0);
+                    const translateX = isFirstCard ? comboCard1TranslateX : isSecondCard ? comboCard2TranslateX : new Animated.Value(0);
+                    const translateY = isFirstCard ? comboCard1TranslateY : isSecondCard ? comboCard2TranslateY : new Animated.Value(0);
+                    const scale = isFirstCard ? comboCard1Scale : isSecondCard ? comboCard2Scale : new Animated.Value(1);
 
-                  return (
-                    <Animated.View
-                      key={combo.id}
-                      style={{
-                        transform: [
-                          {
-                            rotate: rotate.interpolate({
-                              inputRange: [-15, 0, 15],
-                              outputRange: ['-15deg', '0deg', '15deg']
-                            })
-                          },
-                          { translateX },
-                          { translateY },
-                          { scale }
-                        ],
-                      }}
-                    >
-                      <TouchableOpacity
-                        style={styles.comboCard}
-                        onPress={handleComboPress}
-                        activeOpacity={0.7}
+                    return (
+                      <Animated.View
+                        key={combo.id}
+                        style={{
+                          transform: [
+                            {
+                              rotate: rotate.interpolate({
+                                inputRange: [-15, 0, 15],
+                                outputRange: ['-15deg', '0deg', '15deg']
+                              })
+                            },
+                            { translateX },
+                            { translateY },
+                            { scale }
+                          ],
+                        }}
                       >
-                        <View style={styles.comboHeader}>
-                          <Ionicons name="gift-outline" size={24} color="#694d21" />
-                          <Text style={styles.comboTitle}>{combo.title || 'Combo Offer'}</Text>
-                        </View>
-                        {combo.description && (
-                          <Text style={styles.comboDescription} numberOfLines={2}>
-                            {combo.description}
-                          </Text>
-                        )}
-                        <View style={styles.comboProductsRow}>
-                          {comboImages.length > 0 ? (
-                            comboImages.map((img, idx) => (
-                              <Image
-                                key={idx}
-                                source={{ uri: apiService.getFullImageUrl(img) }}
-                                style={styles.comboProductImage}
-                                resizeMode="cover"
-                              />
-                            ))
-                          ) : (
-                            <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                              <Ionicons name="image-outline" size={32} color="#999" />
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.comboPriceRow}>
-                          <Text style={styles.comboPrice}>₹{discountedPrice.toFixed(2)}</Text>
-                          <Text style={styles.comboSaveText}>
-                            Save {combo.discount_type === 'percentage'
-                              ? `${Number(combo.discount_value || 0)}%`
-                              : `₹${Number(combo.discount_value || 0)}`}
-                          </Text>
-                        </View>
                         <TouchableOpacity
-                          style={styles.viewComboButton}
+                          style={[styles.comboCard, { width: 280, marginHorizontal: 8, marginBottom: 10 }]}
                           onPress={handleComboPress}
+                          activeOpacity={0.7}
                         >
-                          <Text style={styles.viewComboButtonText}>View Combo</Text>
+                          <View style={styles.comboHeader}>
+                            <Ionicons name="gift-outline" size={24} color="#694d21" />
+                            <Text style={styles.comboTitle}>{combo.title || 'Combo Offer'}</Text>
+                          </View>
+                          {combo.description && (
+                            <Text style={styles.comboDescription} numberOfLines={2}>
+                              {combo.description}
+                            </Text>
+                          )}
+                          <View style={styles.comboProductsRow}>
+                            {comboImages.length > 0 ? (
+                              comboImages.map((img, idx) => (
+                                <View key={idx} style={styles.comboProductImage}>
+                                  <Image
+                                    source={{ uri: apiService.getFullImageUrl(img) }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="cover"
+                                  />
+                                </View>
+                              ))
+                            ) : (
+                              <View style={[styles.comboProductImage, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <Ionicons name="image-outline" size={32} color="#999" />
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.comboPriceRow}>
+                            <Text style={styles.comboPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                            <Text style={styles.comboSaveText}>
+                              Save {combo.discount_type === 'percentage'
+                                ? `${Number(combo.discount_value || 0)}%`
+                                : `₹${Number(combo.discount_value || 0)}`}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.viewComboButton}
+                            onPress={handleComboPress}
+                          >
+                            <Text style={styles.viewComboButtonText}>View Combo</Text>
+                          </TouchableOpacity>
                         </TouchableOpacity>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  );
-                })
-              ) : (
-                // Fallback: Show placeholder when no active combos
-                <TouchableOpacity
-                  style={styles.comboCard}
-                  onPress={() => router.push('/deals/combo-offers')}
-                >
-                  <View style={styles.comboHeader}>
-                    <Ionicons name="gift-outline" size={24} color="#694d21" />
-                    <Text style={styles.comboTitle}>Check Out Our Combo Offers</Text>
-                  </View>
-                  <Text style={styles.comboDescription}>
-                    Discover amazing combo deals and save more on your favorite products
-                  </Text>
-                  <View style={styles.comboProductsRow}>
-                    <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                      <Ionicons name="gift" size={32} color="#999" />
-                    </View>
-                    <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                      <Ionicons name="star" size={32} color="#999" />
-                    </View>
-                  </View>
+                      </Animated.View>
+                    );
+                  })
+                ) : (
+                  // Fallback: Show placeholder when no active combos
                   <TouchableOpacity
-                    style={styles.viewComboButton}
+                    style={[styles.comboCard, { width: 300, marginHorizontal: 8, marginBottom: 10 }]}
                     onPress={() => router.push('/deals/combo-offers')}
                   >
-                    <Text style={styles.viewComboButtonText}>View All Combo Offers</Text>
+                    <View style={styles.comboHeader}>
+                      <Ionicons name="gift-outline" size={24} color="#694d21" />
+                      <Text style={styles.comboTitle}>Check Out Our Combo Offers</Text>
+                    </View>
+                    <Text style={styles.comboDescription}>
+                      Discover amazing combo deals and save more on your favorite products
+                    </Text>
+                    <View style={styles.comboProductsRow}>
+                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="gift" size={32} color="#999" />
+                      </View>
+                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="star" size={32} color="#999" />
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.viewComboButton}
+                      onPress={() => router.push('/deals/combo-offers')}
+                    >
+                      <Text style={styles.viewComboButtonText}>View All Combo Offers</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              )}
+                )}
+              </ScrollView>
             </View>
 
-            {/* All Products Section */}
+            {/* New Arrival Section */}
             <View style={styles.allProductsSection}>
-              <View style={styles.allProductsHeader}>
-                <Text style={styles.allProductsTitle}>Core Collection</Text>
-                <TouchableOpacity
-                  style={styles.viewAllButton}
-                  onPress={() => router.push('/all-products')}
-                >
-                  <Text style={styles.viewAllText}>View All</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#694d21" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.productsGrid}>
-                {(() => {
-                  // Get current 4 products circularly from all products in backend
-                  // This works for ANY number of products - 5, 10, 50, 100, 1000, etc.
-                  if (allProducts.length === 0) {
-                    return null;
-                  }
-
-                  const totalProducts = allProducts.length;
-                  const currentProducts: Product[] = [];
-
-                  // Always show 4 products, using modulo to wrap around
-                  // This ensures we cycle through ALL products regardless of total count
-                  for (let i = 0; i < 4; i++) {
-                    // Use modulo to wrap around when we reach the end of the array
-                    // This works for any number of products in the backend
-                    const index = (coreProductsOffset + i) % totalProducts;
-                    currentProducts.push(allProducts[index]);
-                  }
-
-                  // Log current display state for debugging (only when offset changes)
-                  // Note: This may log on every render, but that's expected with React re-renders
-
-                  return currentProducts.map((product, index) => (
+              <SectionHeader title="New Arrival" />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScrollContent}
+                snapToInterval={(screenWidth - 44) / 2}
+                snapToAlignment="start"
+                decelerationRate="fast"
+              >
+                {newArrivalProducts.length > 0 ? (
+                  newArrivalProducts.map((product, index) => (
                     <Animated.View
-                      key={`${product.id}-${coreProductsOffset}-${index}`}
+                      key={`newarrival-${product.id}-${index}`}
                       style={[
-                        styles.productItem,
+                        styles.horizontalProductItem,
                         {
                           opacity: fadeAnim,
                           transform: [
@@ -3391,417 +3660,490 @@ const Page = () => {
                     >
                       <ProductCard product={product} />
                     </Animated.View>
-                  ));
-                })()}
-              </View>
+                  ))
+                ) : (
+                  // Fallback: show most recent products if no new arrivals configured yet
+                  [...allProducts]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(0, 15)
+                    .map((product, index) => (
+                      <Animated.View
+                        key={`newarrival-fallback-${product.id}-${index}`}
+                        style={[
+                          styles.horizontalProductItem,
+                          {
+                            opacity: fadeAnim,
+                            transform: [
+                              { translateY: productSlideAnim },
+                              { scale: scaleAnim }
+                            ]
+                          }
+                        ]}
+                      >
+                        <ProductCard product={product} />
+                      </Animated.View>
+                    ))
+                )}
+              </ScrollView>
             </View>
 
-            {/* Pillars of Beauty Section */}
-            <View style={styles.pillarsSection}>
-              <View style={styles.pillarsHeader}>
-                <Text style={styles.pillarsTitle}>Pillars of Beauty in Ayurveda</Text>
-                <Text style={styles.pillarsSubtitle}>
-                  Discover the ancient wisdom of Ayurvedic beauty rituals
-                </Text>
-              </View>
-              <View style={[styles.pillarsGrid, {
-                alignItems: 'center',
-                paddingVertical: 40,
-                backgroundColor: '#fff',
-                borderRadius: 20,
-                marginHorizontal: 16
-              }]}>
-                {/* First row - 2 items */}
-                <View style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-around',
-                  width: '90%',
-                  marginBottom: 60
-                }}>
-                  <View style={{ width: '42%', alignItems: 'center' }}>
-                    <View style={{
-                      width: 110,
-                      height: 110,
-                      borderRadius: 55,
-                      marginBottom: 16,
-                      borderWidth: 2,
-                      borderColor: '#694d21',
-                      backgroundColor: '#fff',
-                      elevation: 4,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 4,
-                      overflow: 'hidden'
-                    }}>
-                      <Image
-                        source={{ uri: 'https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                      />
-                    </View>
-                    <Text style={{
-                      fontSize: 18,
-                      marginBottom: 8,
-                      color: '#694d21',
-                      fontWeight: '600',
-                      textAlign: 'center'
-                    }}>Roopam</Text>
-                    <Text style={{
-                      fontSize: 14,
-                      color: '#666',
-                      textAlign: 'center',
-                      paddingHorizontal: 4
-                    }}>Outer Beauty & Radiance</Text>
-                  </View>
-                  <View style={{ width: '42%', alignItems: 'center' }}>
-                    <View style={{
-                      width: 110,
-                      height: 110,
-                      borderRadius: 55,
-                      marginBottom: 16,
-                      borderWidth: 2,
-                      borderColor: '#694d21',
-                      backgroundColor: '#fff',
-                      elevation: 4,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 4,
-                      overflow: 'hidden'
-                    }}>
-                      <Image
-                        source={{ uri: 'https://images.pexels.com/photos/3762890/pexels-photo-3762890.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                      />
-                    </View>
-                    <Text style={{
-                      fontSize: 18,
-                      marginBottom: 8,
-                      color: '#694d21',
-                      fontWeight: '600',
-                      textAlign: 'center'
-                    }}>Gunam</Text>
-                    <Text style={{
-                      fontSize: 14,
-                      color: '#666',
-                      textAlign: 'center',
-                      paddingHorizontal: 4
-                    }}>Inner Beauty & Wellness</Text>
-                  </View>
-                </View>
-                {/* Second row - 1 item centered */}
-                <View style={{
-                  width: '42%',
-                  alignItems: 'center',
-                  transform: [{ translateY: -20 }]
-                }}>
-                  <View style={{
-                    width: 110,
-                    height: 110,
-                    borderRadius: 55,
-                    marginBottom: 16,
-                    borderWidth: 2,
-                    borderColor: '#694d21',
-                    backgroundColor: '#fff',
-                    elevation: 4,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 4,
-                    overflow: 'hidden'
-                  }}>
-                    <Image
-                      source={{ uri: 'https://images.pexels.com/photos/3762880/pexels-photo-3762880.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
+            {/* Custom Saranga Anugraha Foundation Section */}
+            <View style={styles.customFoundationSection}>
+              <Image
+                source={HEADER_NAME_LOGO_URI}
+                style={styles.customFoundationLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.customFoundationSubText}>In association with</Text>
+              <Text style={styles.customFoundationName}>Saranga Anugraha Foundation</Text>
+              <Text style={styles.customFoundationBigText}>is support</Text>
+
+              <View style={styles.customFoundationButtonsRow}>
+                <TouchableOpacity
+                  style={styles.customFoundationDonateButton}
+                  onPress={() => router.push('/donate')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.customFoundationDonateButtonText}>DONATE</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customFoundationHelpButton}
+                  onPress={() => Alert.alert('Support Request', 'Our team will contact you shortly to provide assistance.')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.customFoundationHelpButtonText}>I NEED HELP</Text>
+                  <View style={styles.customFoundationArrowCircle}>
+                    <Ionicons
+                      name="arrow-up-outline"
+                      size={14}
+                      color="#333"
+                      style={{ transform: [{ rotate: '45deg' }] }}
                     />
                   </View>
-                  <Text style={{
-                    fontSize: 18,
-                    marginBottom: 8,
-                    color: '#694d21',
-                    fontWeight: '600',
-                    textAlign: 'center'
-                  }}>Vayastyag</Text>
-                  <Text style={{
-                    fontSize: 14,
-                    color: '#666',
-                    textAlign: 'center',
-                    paddingHorizontal: 4
-                  }}>Lasting Beauty & Grace</Text>
-                </View>
+                </TouchableOpacity>
               </View>
             </View>
 
-            <View style={styles.tipsContainer}>
-              <View style={styles.tipsHeader}>
-                <Ionicons name="bulb" size={32} color="#694d21" />
-                <Text style={styles.tipsTitle}>Daily Skincare Tips:</Text>
-              </View>
+            {/* Foundation Graphic Slideshow */}
+            <View style={styles.foundationSlideshowContainer}>
               <ScrollView
+                ref={slideshowRef}
                 horizontal
+                pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                style={styles.tipsScrollView}
-                contentContainerStyle={{ paddingHorizontal: 8 }}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                style={styles.slideshowScrollView}
               >
-                {skincareTips.map((tip, index) => (
-                  <Animated.View
-                    key={tip.id}
-                    style={[
-                      styles.tipCard,
-                      {
-                        opacity: tipCardAnims[index],
-                        transform: [
-                          {
-                            scale: tipCardAnims[index].interpolate({
-                              inputRange: [0, 9],
-                              outputRange: [0.8, 2]
-                            })
-                          }
-                        ]
-                      }
-                    ]}
+                {SLIDE_DATA.map((slide, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.9}
+                    onPress={() => router.push('/donate')}
+                    style={styles.slideTouch}
                   >
-                    <LinearGradient
-                      colors={[tip.backgroundColor, '#ffffff']}
-                      style={styles.tipGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 1 }}
-                    >
-                      <View style={[styles.tipIcon, { backgroundColor: tip.backgroundColor }]}>
-                        <Ionicons name={tip.icon as any} size={36} color="#694d21" />
-                      </View>
-                      <Text style={styles.tipTitle}>{tip.title}</Text>
-                      <Text style={styles.tipDescription}>{tip.description}</Text>
-                    </LinearGradient>
-                  </Animated.View>
+                    <Image
+                      source={slide.image}
+                      style={styles.slideImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.slideTextContainer}>
+                      <Text style={styles.slideTitleText}>{slide.title}</Text>
+                      <Text style={styles.slideDescText}>{slide.description}</Text>
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
 
+            {/* Pillars of Beauty Section */}
+            {false && (
+              <View style={styles.pillarsSection}>
+                <View style={styles.pillarsHeader}>
+                  <Text style={styles.pillarsTitle}>Pillars of Beauty in Ayurveda</Text>
+                  <Text style={styles.pillarsSubtitle}>
+                    Discover the ancient wisdom of Ayurvedic beauty rituals
+                  </Text>
+                </View>
+                <View style={[styles.pillarsGrid, {
+                  alignItems: 'center',
+                  paddingVertical: 40,
+                  backgroundColor: '#fff',
+                  borderRadius: 20,
+                  marginHorizontal: 16
+                }]}>
+                  {/* First row - 2 items */}
+                  <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-around',
+                    width: '90%',
+                    marginBottom: 60
+                  }}>
+                    <View style={{ width: '42%', alignItems: 'center' }}>
+                      <View style={{
+                        width: 110,
+                        height: 110,
+                        borderRadius: 55,
+                        marginBottom: 16,
+                        borderWidth: 2,
+                        borderColor: '#694d21',
+                        backgroundColor: '#fff',
+                        elevation: 4,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        overflow: 'hidden'
+                      }}>
+                        <Image
+                          source={{ uri: 'https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text style={{
+                        fontSize: 18,
+                        marginBottom: 8,
+                        color: '#694d21',
+                        fontWeight: '600',
+                        textAlign: 'center'
+                      }}>Roopam</Text>
+                      <Text style={{
+                        fontSize: 14,
+                        color: '#666',
+                        textAlign: 'center',
+                        paddingHorizontal: 4
+                      }}>Outer Beauty & Radiance</Text>
+                    </View>
+                    <View style={{ width: '42%', alignItems: 'center' }}>
+                      <View style={{
+                        width: 110,
+                        height: 110,
+                        borderRadius: 55,
+                        marginBottom: 16,
+                        borderWidth: 2,
+                        borderColor: '#694d21',
+                        backgroundColor: '#fff',
+                        elevation: 4,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        overflow: 'hidden'
+                      }}>
+                        <Image
+                          source={{ uri: 'https://images.pexels.com/photos/3762890/pexels-photo-3762890.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text style={{
+                        fontSize: 18,
+                        marginBottom: 8,
+                        color: '#694d21',
+                        fontWeight: '600',
+                        textAlign: 'center'
+                      }}>Gunam</Text>
+                      <Text style={{
+                        fontSize: 14,
+                        color: '#666',
+                        textAlign: 'center',
+                        paddingHorizontal: 4
+                      }}>Inner Beauty & Wellness</Text>
+                    </View>
+                  </View>
+                  {/* Second row - 1 item centered */}
+                  <View style={{
+                    width: '42%',
+                    alignItems: 'center',
+                    transform: [{ translateY: -20 }]
+                  }}>
+                    <View style={{
+                      width: 110,
+                      height: 110,
+                      borderRadius: 55,
+                      marginBottom: 16,
+                      borderWidth: 2,
+                      borderColor: '#694d21',
+                      backgroundColor: '#fff',
+                      elevation: 4,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                      overflow: 'hidden'
+                    }}>
+                      <Image
+                        source={{ uri: 'https://images.pexels.com/photos/3762880/pexels-photo-3762880.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
+                    <Text style={{
+                      fontSize: 18,
+                      marginBottom: 8,
+                      color: '#694d21',
+                      fontWeight: '600',
+                      textAlign: 'center'
+                    }}>Vayastyag</Text>
+                    <Text style={{
+                      fontSize: 14,
+                      color: '#666',
+                      textAlign: 'center',
+                      paddingHorizontal: 4
+                    }}>Lasting Beauty & Grace</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Daily Skincare Tips Section */}
+            {false && (
+              <View style={styles.tipsContainer}>
+                <View style={styles.tipsHeader}>
+                  <Ionicons name="bulb" size={32} color="#694d21" />
+                  <Text style={styles.tipsTitle}>Daily Skincare Tips:</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.tipsScrollView}
+                  contentContainerStyle={{ paddingHorizontal: 8 }}
+                >
+                  {skincareTips.map((tip, index) => (
+                    <Animated.View
+                      key={tip.id}
+                      style={[
+                        styles.tipCard,
+                        {
+                          opacity: tipCardAnims[index],
+                          transform: [
+                            {
+                              scale: tipCardAnims[index].interpolate({
+                                inputRange: [0, 9],
+                                outputRange: [0.8, 2]
+                              })
+                            }
+                          ]
+                        }
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[tip.backgroundColor, '#ffffff']}
+                        style={styles.tipGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                      >
+                        <View style={[styles.tipIcon, { backgroundColor: tip.backgroundColor }]}>
+                          <Ionicons name={tip.icon as any} size={36} color="#694d21" />
+                        </View>
+                        <Text style={styles.tipTitle}>{tip.title}</Text>
+                        <Text style={styles.tipDescription}>{tip.description}</Text>
+                      </LinearGradient>
+                    </Animated.View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {/* Your Concern, Our Collections Section */}
-            <View style={styles.concernSection}>
-              <View style={styles.concernHeader}>
-                <Text style={styles.concernTitle}>Your Concern, Our Collections</Text>
-                <Text style={styles.concernSubtitle}>Find solutions for your specific needs</Text>
-              </View>
-              <View style={styles.concernContainer}>
-                {/* First row - 2 items */}
-                <View style={styles.concernRow}>
-                  {mainCategoriesWithImages.slice(0, 2).map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={styles.concernCircle}
-                      onPress={() => router.push({
-                        pathname: '/category/[id]',
-                        params: { id: category.id, name: category.name }
-                      })}
-                    >
-                      <View style={styles.concernIconContainer}>
-                        <Image
-                          source={{ uri: category.image }}
-                          style={styles.concernCircleImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={styles.concernText}>{category.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+            {/* Your Concern, Our Collections Section */}
+            {false && (
+              <View style={styles.concernSection}>
+                <View style={styles.concernHeader}>
+                  <Text style={styles.concernTitle}>Your Concern, Our Collections</Text>
+                  <Text style={styles.concernSubtitle}>Find solutions for your specific needs</Text>
                 </View>
+                <View style={styles.concernContainer}>
+                  {(() => {
+                    const pattern = [2, 3]; // Alternating 2 and 3 items per row
+                    let currentIndex = 0;
+                    const rows = [];
+                    let patternIndex = 0;
 
-                {/* Second row - 3 items */}
-                <View style={styles.concernRow}>
-                  {mainCategoriesWithImages.slice(2, 5).map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={styles.concernCircle}
-                      onPress={() => router.push({
-                        pathname: '/category/[id]',
-                        params: { id: category.id, name: category.name }
-                      })}
-                    >
-                      <View style={styles.concernIconContainer}>
-                        <Image
-                          source={{ uri: category.image }}
-                          style={styles.concernCircleImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={styles.concernText}>{category.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                    while (currentIndex < mainCategoriesWithImages.length) {
+                      const count = pattern[patternIndex % pattern.length];
+                      const chunk = mainCategoriesWithImages.slice(currentIndex, currentIndex + count);
 
-                {/* Third row - 3 items */}
-                <View style={styles.concernRow}>
-                  {mainCategoriesWithImages.slice(5, 8).map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={styles.concernCircle}
-                      onPress={() => router.push({
-                        pathname: '/category/[id]',
-                        params: { id: category.id, name: category.name }
-                      })}
-                    >
-                      <View style={styles.concernIconContainer}>
-                        <Image
-                          source={{ uri: category.image }}
-                          style={styles.concernCircleImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={styles.concernText}>{category.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      if (chunk.length > 0) {
+                        rows.push(
+                          <View key={currentIndex} style={styles.concernRow}>
+                            {chunk.map((category) => (
+                              <TouchableOpacity
+                                key={category.id}
+                                style={styles.concernCircle}
+                                onPress={() => router.push({
+                                  pathname: '/category/[id]',
+                                  params: { id: category.id.toString(), name: category.name }
+                                })}
+                              >
+                                <View style={styles.concernIconContainer}>
+                                  <Image
+                                    source={{ uri: category.image }}
+                                    style={styles.concernCircleImage}
+                                    resizeMode="cover"
+                                  />
+                                </View>
+                                <Text style={styles.concernText}>{category.name}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        );
+                      }
 
-                {/* Fourth row - 2 items */}
-                <View style={styles.concernRow}>
-                  {mainCategoriesWithImages.slice(8, 10).map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={styles.concernCircle}
-                      onPress={() => router.push({
-                        pathname: '/category/[id]',
-                        params: { id: category.id, name: category.name }
-                      })}
-                    >
-                      <View style={styles.concernIconContainer}>
-                        <Image
-                          source={{ uri: category.image }}
-                          style={styles.concernCircleImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={styles.concernText}>{category.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+                      currentIndex += count;
+                      patternIndex++;
+                    }
+                    return rows;
+                  })()}
                 </View>
               </View>
-            </View>
+            )}
 
-            <View style={styles.section}>
-              {/* Add Charity and Donations Section */}
-              <View style={styles.charitySection}>
-                <View style={styles.charityHeader}>
-                  <Text style={styles.charityTitle}>With every tap, we give life.</Text>
-                  <Text style={styles.charitySubtitle}>Making a difference together</Text>
-                </View>
-
-                <View style={styles.donationStatsContainer}>
-                  <View style={styles.donationCard}>
-                    <Ionicons name="heart" size={32} color="#694d21" />
-                    <Text style={styles.donationAmount}>₹1,25,000</Text>
-                    <Text style={styles.donationLabel}>Total Donations</Text>
+            {/* Charity, Foundation, and Brand Reviews Sections */}
+            {false && (
+              <View style={styles.section}>
+                {/* Add Charity and Donations Section */}
+                <View style={styles.charitySection}>
+                  <View style={styles.charityHeader}>
+                    <Text style={styles.charityTitle}>With every tap, we give life.</Text>
+                    <Text style={styles.charitySubtitle}>Making a difference together</Text>
                   </View>
 
-                  <View style={styles.donationCard}>
-                    <Ionicons name="people" size={32} color="#694d21" />
-                    <Text style={styles.donationAmount}>250+</Text>
-                    <Text style={styles.donationLabel}>Lives Impacted</Text>
+                  <View style={styles.donationStatsContainer}>
+                    <View style={styles.donationCard}>
+                      <Ionicons name="heart" size={32} color="#694d21" />
+                      <Text style={styles.donationAmount}>₹1,25,000</Text>
+                      <Text style={styles.donationLabel}>Total Donations</Text>
+                    </View>
+
+                    <View style={styles.donationCard}>
+                      <Ionicons name="people" size={32} color="#694d21" />
+                      <Text style={styles.donationAmount}>250+</Text>
+                      <Text style={styles.donationLabel}>Lives Impacted</Text>
+                    </View>
+
+                    <View style={styles.donationCard}>
+                      <Ionicons name="leaf" size={32} color="#694d21" />
+                      <Text style={styles.donationAmount}>15</Text>
+                      <Text style={styles.donationLabel}>Projects Funded</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.donationCard}>
-                    <Ionicons name="leaf" size={32} color="#694d21" />
-                    <Text style={styles.donationAmount}>15</Text>
-                    <Text style={styles.donationLabel}>Projects Funded</Text>
-                  </View>
-                </View>
+                  <View style={styles.donationChartContainer}>
+                    <View style={styles.chartHeader}>
+                      <Text style={styles.chartTitle}>We don't just collect—we deliver hope.</Text>
+                      <Text style={styles.chartSubtitle}>Last 6 months</Text>
+                    </View>
 
-                <View style={styles.donationChartContainer}>
-                  <View style={styles.chartHeader}>
-                    <Text style={styles.chartTitle}>We don't just collect—we deliver hope.</Text>
-                    <Text style={styles.chartSubtitle}>Last 6 months</Text>
+                    <View style={styles.barChart}>
+                      {[45, 60, 75, 55, 80, 65].map((height, index) => (
+                        <View key={index} style={styles.barContainer}>
+                          <View style={[styles.bar, { height: height }]} />
+                          <Text style={styles.barLabel}>
+                            {['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'][index]}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
 
-                  <View style={styles.barChart}>
-                    {[45, 60, 75, 55, 80, 65].map((height, index) => (
-                      <View key={index} style={styles.barContainer}>
-                        <View style={[styles.bar, { height: height }]} />
-                        <Text style={styles.barLabel}>
-                          {['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'][index]}
-                        </Text>
+                  <View style={styles.impactCategories}>
+                    <View style={styles.impactCategory}>
+                      <View style={[styles.impactIcon, { backgroundColor: '#FFE4E1' }]}>
+                        <Ionicons name="medkit" size={24} color="#694d21" />
                       </View>
-                    ))}
+                      <Text style={styles.impactTitle}>Healthcare</Text>
+                      <Text style={styles.impactAmount}>₹45,000</Text>
+                    </View>
+
+                    <View style={styles.impactCategory}>
+                      <View style={[styles.impactIcon, { backgroundColor: '#E0FFFF' }]}>
+                        <Ionicons name="book" size={24} color="#694d21" />
+                      </View>
+                      <Text style={styles.impactTitle}>Education</Text>
+                      <Text style={styles.impactAmount}>₹35,000</Text>
+                    </View>
+
+                    <View style={styles.impactCategory}>
+                      <View style={[styles.impactIcon, { backgroundColor: '#F0FFF0' }]}>
+                        <Ionicons name="nutrition" size={24} color="#694d21" />
+                      </View>
+                      <Text style={styles.impactTitle}>Food & Nutrition</Text>
+                      <Text style={styles.impactAmount}>₹45,000</Text>
+                    </View>
                   </View>
+
+                  {/* Remove donation button */}
                 </View>
 
-                <View style={styles.impactCategories}>
-                  <View style={styles.impactCategory}>
-                    <View style={[styles.impactIcon, { backgroundColor: '#FFE4E1' }]}>
-                      <Ionicons name="medkit" size={24} color="#694d21" />
-                    </View>
-                    <Text style={styles.impactTitle}>Healthcare</Text>
-                    <Text style={styles.impactAmount}>₹45,000</Text>
-                  </View>
-
-                  <View style={styles.impactCategory}>
-                    <View style={[styles.impactIcon, { backgroundColor: '#E0FFFF' }]}>
-                      <Ionicons name="book" size={24} color="#694d21" />
-                    </View>
-                    <Text style={styles.impactTitle}>Education</Text>
-                    <Text style={styles.impactAmount}>₹35,000</Text>
-                  </View>
-
-                  <View style={styles.impactCategory}>
-                    <View style={[styles.impactIcon, { backgroundColor: '#F0FFF0' }]}>
-                      <Ionicons name="nutrition" size={24} color="#694d21" />
-                    </View>
-                    <Text style={styles.impactTitle}>Food & Nutrition</Text>
-                    <Text style={styles.impactAmount}>₹45,000</Text>
-                  </View>
-                </View>
-
-                {/* Remove donation button */}
+                <FoundationSection />
+                <BrandReviews />
               </View>
-
-              <FoundationSection />
-              <BrandReviews />
-            </View>
+            )}
 
             <View style={styles.footerContainer}>
-              {/* Quick Links Section */}
-              <View style={styles.footerSection}>
-                <Text style={styles.footerTitle}>Quick Links</Text>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/profile')}>
-                  <Ionicons name="person-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>My Account</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/profile/orders')}>
-                  <Ionicons name="bag-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>Track Order</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/wishlist')}>
-                  <Ionicons name="heart-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>Wishlist</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/explore')}>
-                  <Ionicons name="pricetag-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>Offers & Deals</Text>
-                </TouchableOpacity>
-              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+                {/* Quick Links Section */}
+                <View style={[styles.footerSection, { flex: 1, paddingRight: 8 }]}>
+                  <Text style={[styles.footerTitle, { fontSize: 16 }]}>Quick Links</Text>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => {
+                    if (!isAuthenticated) {
+                      router.push('/auth/login');
+                    } else {
+                      router.push('/profile');
+                    }
+                  }}>
+                    <Ionicons name="person-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>My Account</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => {
+                    if (!isAuthenticated) {
+                      router.push('/auth/login');
+                    } else {
+                      router.push('/profile/orders');
+                    }
+                  }}>
+                    <Ionicons name="bag-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>Track Order</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => {
+                    if (!isAuthenticated) {
+                      router.push('/auth/login');
+                    } else {
+                      router.push('/wishlist');
+                    }
+                  }}>
+                    <Ionicons name="heart-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>Wishlist</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/explore')}>
+                    <Ionicons name="pricetag-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>Offers & Deals</Text>
+                  </TouchableOpacity>
+                </View>
 
-              {/* Customer Service Section */}
-              <View style={styles.footerSection}>
-                <Text style={styles.footerTitle}>Customer Service</Text>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/contact')}>
-                  <Ionicons name="call-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>Contact Us</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/faq')}>
-                  <Ionicons name="help-circle-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>FAQs</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/shipping-info')}>
-                  <Ionicons name="car-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>Shipping Information</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/return-policy')}>
-                  <Ionicons name="refresh-outline" size={20} color="#694d21" />
-                  <Text style={styles.footerLinkText}>Return Policy</Text>
-                </TouchableOpacity>
+                {/* Customer Service Section */}
+                <View style={[styles.footerSection, { flex: 1, paddingLeft: 8 }]}>
+                  <Text style={[styles.footerTitle, { fontSize: 16 }]}>Customer Service</Text>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/contact')}>
+                    <Ionicons name="call-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>Contact Us</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/faq')}>
+                    <Ionicons name="help-circle-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>FAQs</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/shipping-info')}>
+                    <Ionicons name="car-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>Shipping Info</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/return-policy')}>
+                    <Ionicons name="refresh-outline" size={20} color="#694d21" />
+                    <Text style={styles.footerLinkText}>Return Policy</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Social Links */}
@@ -3866,10 +4208,6 @@ const Page = () => {
           </>
         )}
       </ScrollView>
-
-      <View style={[styles.chatbotContainer, { bottom: bottomTabHeight + 20 }]}>
-        <Chatbot />
-      </View>
 
       {/* New Deals Popup Modal */}
       <Modal

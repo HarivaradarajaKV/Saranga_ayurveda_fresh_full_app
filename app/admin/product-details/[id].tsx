@@ -146,9 +146,9 @@ export default function AdminProductDetails() {
         );
     };
 
-    const handleEditSubmit = async (updatedProduct: Partial<Product>) => {
+    const handleEditSubmit = async (formData: FormData) => {
         try {
-            await apiService.put(`${apiService.ENDPOINTS.PRODUCTS}/${id}`, updatedProduct);
+            await apiService.updateProduct(Number(id), formData);
             setShowEditModal(false);
             fetchProductDetails();
             Alert.alert('Success', 'Product updated successfully');

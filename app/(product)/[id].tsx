@@ -14,10 +14,14 @@ import {
   Platform,
   StatusBar,
   Modal,
+  Animated,
+  Share,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewer from 'react-native-image-zoom-viewer';
+import { Video, ResizeMode } from 'expo-av';
 import { useWishlist } from '../WishlistContext';
 import { useCart } from '../CartContext';
 import { apiService } from '../services/api';
@@ -46,6 +50,7 @@ interface Product {
   image_url: string;
   image_url2?: string;
   image_url3?: string;
+  media?: Array<{ url: string; type: 'image' | 'gif' | 'video' }>;
   usage_instructions?: string | string[];
   size?: string;
   benefits?: string | string[];
@@ -110,7 +115,13 @@ export default function ProductPage() {
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<{[key: number]: boolean}>({});
+  const [isDescExpanded, setIsDescExpanded] = useState(false);
+  const [isHowToUseExpanded, setIsHowToUseExpanded] = useState(false);
+  const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(false);
+  const [isBenefitsExpanded, setIsBenefitsExpanded] = useState(false);
+  const [isAutoScrollDisabled, setIsAutoScrollDisabled] = useState(false);
   const scrollViewRef = useRef(null);
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   const handleScroll = (event: any) => {
     const contentOffset = event.nativeEvent.contentOffset;
@@ -123,20 +134,81 @@ export default function ProductPage() {
     checkAuth();
     loadProductData();
     fetchReviews();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
+
+  // Function to get all media items for the main details carousel
+  const getMediaList = () => {
+    if (!productData) return [];
+    
+    if (productData.media && Array.isArray(productData.media) && productData.media.length > 0) {
+      return productData.media;
+    }
+    
+    // Fallback to legacy structure
+    const legacyList = [
+      { url: productData.image_url, type: 'image' }
+    ];
+    if (productData.image_url2) legacyList.push({ url: productData.image_url2, type: 'image' });
+    if (productData.image_url3) legacyList.push({ url: productData.image_url3, type: 'image' });
+    
+    return legacyList;
+  };
 
   // Preload next images when current image index changes
   useEffect(() => {
     if (productData) {
-      const imageUrls = [
-        productData.image_url,
-        productData.image_url2,
-        productData.image_url3
-      ].filter(Boolean).map(url => apiService.getFullImageUrl(url));
+      const imageUrls = getMediaList()
+        .filter(item => item.type !== 'video')
+        .map(item => apiService.getFullImageUrl(item.url));
       
       imagePreloader.preloadCarouselImages(imageUrls, currentImageIndex);
     }
   }, [currentImageIndex, productData]);
+
+  // Auto-scroll images every 8 seconds
+  useEffect(() => {
+    if (!productData || isImageViewerVisible || isAutoScrollDisabled) return;
+    
+    const mediaList = getMediaList();
+    const numItems = mediaList.length;
+
+    if (numItems <= 1) return;
+
+    const intervalId = setInterval(() => {
+      // Pause auto-scroll if current item is a video
+      const currentItem = mediaList[currentImageIndex];
+      if (currentItem && currentItem.type === 'video') {
+        return;
+      }
+
+      const nextIndex = (currentImageIndex + 1) % numItems;
+      if (scrollViewRef.current) {
+        // @ts-ignore
+        scrollViewRef.current.scrollTo({
+          x: nextIndex * Dimensions.get('window').width,
+          animated: true,
+        });
+      }
+      setCurrentImageIndex(nextIndex);
+    }, 8000);
+
+    return () => clearInterval(intervalId);
+  }, [productData, currentImageIndex, isImageViewerVisible, isAutoScrollDisabled]);
 
   const checkAuth = async () => {
     try {
@@ -239,17 +311,7 @@ export default function ProductPage() {
   };
 
   const handleAuthRequired = () => {
-    Alert.alert(
-      'Login Required',
-      'Please log in to perform this action.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Login', 
-          onPress: () => router.push('/auth/login')
-        }
-      ]
-    );
+    router.push('/auth/login');
   };
 
   const checkDelivery = async () => {
@@ -293,28 +355,10 @@ export default function ProductPage() {
       return;
     }
 
-    // Check if product has sizes and if size is selected
-    if (productToAdd.sizes && productToAdd.sizes.length > 0 && !selectedSize) {
-      Alert.alert('Error', 'Please select a size before adding to cart');
-      return;
-    }
-
     setIsAddingToCart(true);
     try {
-      // Add the selected size to the product when adding to cart
-      const productWithSize = {
-        ...productToAdd,
-        selected_size: selectedSize
-      };
-      await addItem(productWithSize);
-      Alert.alert(
-        'Success',
-        'Item added to cart successfully',
-        [
-          { text: 'Continue Shopping', style: 'cancel' },
-          { text: 'View Cart', onPress: () => router.push('/cart') }
-        ]
-      );
+      await addItem(productToAdd);
+      router.navigate('/cart');
     } catch (error) {
       console.error('Add to cart error:', error);
       Alert.alert('Error', 'Failed to add item to cart');
@@ -437,6 +481,23 @@ export default function ProductPage() {
   const handleImagePress = (index: number) => {
     setCurrentImageIndex(index);
     setIsImageViewerVisible(true);
+    setIsAutoScrollDisabled(true);
+  };
+
+  // Function to handle product sharing
+  const handleShare = async () => {
+    if (!productData) return;
+    try {
+      const shareUrl = `https://sarangaayurveda.com/product/${productData.id}`;
+      const message = `Check out this amazing product from Saranga Ayurveda: ${productData.name}\n\nPrice: ₹${productData.price}\n\nLink: ${shareUrl}`;
+      await Share.share({
+        message: message,
+        title: productData.name,
+        url: shareUrl,
+      });
+    } catch (error) {
+      console.error('Error sharing product:', error);
+    }
   };
 
   // Function to handle image errors
@@ -445,23 +506,20 @@ export default function ProductPage() {
     setImageErrors(prev => ({ ...prev, [imageIndex]: true }));
   };
 
-  // Function to get image URLs for the viewer
+  // Function to get image URLs for the viewer (images and gifs, excluding videos)
   const getImageUrls = () => {
     if (!productData) return [];
     
-    const urls = [
-      { url: imageErrors[0] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url) }
-    ];
+    const mediaList = getMediaList();
+    const imagesOnly = mediaList.filter(m => m.type !== 'video');
     
-    if (productData.image_url2) {
-      urls.push({ url: imageErrors[1] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url2) });
+    if (imagesOnly.length > 0) {
+      return imagesOnly.map((m, idx) => ({
+        url: imageErrors[idx] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(m.url)
+      }));
     }
     
-    if (productData.image_url3) {
-      urls.push({ url: imageErrors[2] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(productData.image_url3) });
-    }
-    
-    return urls;
+    return [];
   };
 
   if (isLoading) {
@@ -484,7 +542,6 @@ export default function ProductPage() {
           <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>{productData.name}</Text>
           <TouchableOpacity onPress={handleWishlistPress} style={styles.headerButton}>
             <Ionicons 
               name={isInWishlist(productData.id) ? "heart" : "heart-outline"} 
@@ -510,82 +567,48 @@ export default function ProductPage() {
             }}
             scrollEventThrottle={16}
           >
-            <TouchableOpacity 
-              onPress={() => handleImagePress(0)}
-              style={styles.imageWrapper}
-              activeOpacity={0.9}
-            >
-              <OptimizedImage
-                source={{ uri: apiService.getFullImageUrl(productData.image_url) }}
-                style={styles.productImage}
-                resizeMode="contain"
-                placeholderColor="#f8f9fa"
-                showLoader={true}
-                priority="high"
-                onError={() => handleImageError(0)}
-              />
-              <View style={styles.imageOverlay}>
-                <Ionicons name="expand" size={24} color="rgba(255,255,255,0.8)" />
+            {getMediaList().map((item, index) => (
+              <View key={index} style={styles.imageWrapper}>
+                {item.type === 'video' ? (
+                  <Video
+                    source={{ uri: apiService.getFullImageUrl(item.url) }}
+                    rate={1.0}
+                    volume={1.0}
+                    isMuted={true}
+                    resizeMode={ResizeMode.CONTAIN}
+                    shouldPlay={currentImageIndex === index}
+                    isLooping
+                    useNativeControls
+                    style={styles.productVideo}
+                  />
+                ) : (
+                  <TouchableOpacity 
+                    onPress={() => handleImagePress(index)}
+                    activeOpacity={0.9}
+                    style={{ width: '100%', height: '100%' }}
+                  >
+                    <OptimizedImage
+                      source={{ uri: apiService.getFullImageUrl(item.url) }}
+                      style={styles.productImage}
+                      resizeMode="contain"
+                      placeholderColor="#f8f9fa"
+                      showLoader={true}
+                      priority={index === 0 ? "high" : "normal"}
+                      onError={() => handleImageError(index)}
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
-            </TouchableOpacity>
-            {productData.image_url2 && (
-              <TouchableOpacity 
-                onPress={() => handleImagePress(1)}
-                style={styles.imageWrapper}
-                activeOpacity={0.9}
-              >
-                <OptimizedImage
-                  source={{ uri: apiService.getFullImageUrl(productData.image_url2) }}
-                  style={styles.productImage}
-                  resizeMode="contain"
-                  placeholderColor="#f8f9fa"
-                  showLoader={true}
-                  priority="normal"
-                  onError={() => handleImageError(1)}
-                />
-                <View style={styles.imageOverlay}>
-                  <Ionicons name="expand" size={24} color="rgba(255,255,255,0.8)" />
-                </View>
-              </TouchableOpacity>
-            )}
-            {productData.image_url3 && (
-              <TouchableOpacity 
-                onPress={() => handleImagePress(2)}
-                style={styles.imageWrapper}
-                activeOpacity={0.9}
-              >
-                <OptimizedImage
-                  source={{ uri: apiService.getFullImageUrl(productData.image_url3) }}
-                  style={styles.productImage}
-                  resizeMode="contain"
-                  placeholderColor="#f8f9fa"
-                  showLoader={true}
-                  priority="normal"
-                  onError={() => handleImageError(2)}
-                />
-                <View style={styles.imageOverlay}>
-                  <Ionicons name="expand" size={24} color="rgba(255,255,255,0.8)" />
-                </View>
-              </TouchableOpacity>
-            )}
+            ))}
           </ScrollView>
-          
-          {/* Image Counter */}
-          <View style={styles.imageCounter}>
-            <Text style={styles.imageCounterText}>
-              {currentImageIndex + 1} / {getImageUrls().length}
-            </Text>
-          </View>
-        </View>
 
-        {/* Image Pagination Dots */}
-        <View style={styles.paginationDots}>
-          <View style={[styles.dot, currentImageIndex === 0 && styles.activeDot]} />
-          {productData.image_url2 && (
-            <View style={[styles.dot, currentImageIndex === 1 && styles.activeDot]} />
-          )}
-          {productData.image_url3 && (
-            <View style={[styles.dot, currentImageIndex === 2 && styles.activeDot]} />
+          {/* Image Pagination Dots on Image */}
+          {getMediaList().length > 1 && !isImageViewerVisible && (
+            <View style={styles.paginationDots}>
+              {getMediaList().map((_, idx) => (
+                <View key={idx} style={[styles.dot, currentImageIndex === idx && styles.activeDot]} />
+              ))}
+            </View>
           )}
         </View>
 
@@ -600,31 +623,34 @@ export default function ProductPage() {
             <ImageViewer
               imageUrls={getImageUrls()}
               index={currentImageIndex}
+              onChange={(index) => {
+                if (index !== undefined) {
+                  setCurrentImageIndex(index);
+                }
+              }}
               enableSwipeDown={true}
               onSwipeDown={() => setIsImageViewerVisible(false)}
-              renderHeader={() => (
-                <View style={styles.imageViewerHeader}>
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={() => setIsImageViewerVisible(false)}
-                  >
-                    <Ionicons name="close" size={28} color="white" />
-                  </TouchableOpacity>
-                  <View style={styles.imageViewerCounter}>
-                    <Text style={styles.imageViewerCounterText}>
-                      {currentImageIndex + 1} / {getImageUrls().length}
-                    </Text>
-                  </View>
-                </View>
-              )}
+              renderHeader={() => null}
               renderIndicator={() => null}
             />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsImageViewerVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={28} color="white" />
+            </TouchableOpacity>
           </View>
         </Modal>
 
         {/* Product Info */}
         <View style={styles.productInfo}>
-          <Text style={styles.productName}>{productData.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.productName, { flex: 1, marginBottom: 0 }]}>{productData.name}</Text>
+            <TouchableOpacity onPress={handleShare} style={styles.shareButton} activeOpacity={0.7}>
+              <Ionicons name="share-social-outline" size={24} color="#2b3a1a" />
+            </TouchableOpacity>
+          </View>
           <View style={styles.priceContainer}>
             {productData.offer_percentage > 0 ? (
               <>
@@ -642,15 +668,18 @@ export default function ProductPage() {
           </View>
 
           {/* Stock Indicator */}
-          <View style={styles.stockContainer}>
-            {productData.stock_quantity === 0 ? (
+          {productData.stock_quantity === 0 ? (
+            <View style={styles.stockContainer}>
               <Text style={[styles.stockText, styles.outOfStock]}>Out of Stock</Text>
-            ) : productData.stock_quantity <= 3 ? (
-              <Text style={[styles.stockText, styles.lowStock]}>Only {productData.stock_quantity} left in stock</Text>
-            ) : (
-              <Text style={[styles.stockText, styles.inStock]}>In Stock</Text>
-            )}
-          </View>
+            </View>
+          ) : productData.stock_quantity < 10 ? (
+            <View style={styles.stockContainer}>
+              <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="flame" size={16} color="#e74c3c" style={{ marginRight: 4 }} />
+                <Text style={[styles.stockText, styles.lowStock]}>Only few left!</Text>
+              </Animated.View>
+            </View>
+          ) : null}
 
           {/* Rating Section */}
           <View style={styles.ratingContainer}>
@@ -665,37 +694,133 @@ export default function ProductPage() {
             )}
           </View>
 
-          {/* Product Description */}
-          {productData.description && (
-            <View style={styles.descriptionSection}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <ExpandableDescription 
-                description={productData.description}
-                maxLines={4}
-                textStyle={styles.descriptionText}
-                expandLabel="See more"
-                collapseLabel="See less"
-              />
-            </View>
-          )}
+          {/* Collapsible Accordions (Description, Ingredients, How to Use) */}
+          <View style={styles.accordionContainer}>
+            {/* Description Accordion */}
+            {productData.description && (
+              <View style={styles.accordionSection}>
+                <TouchableOpacity 
+                  style={styles.accordionHeader} 
+                  onPress={() => setIsDescExpanded(!isDescExpanded)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={isDescExpanded ? "remove" : "add"} 
+                    size={18} 
+                    color="#694d21" 
+                    style={styles.accordionIcon} 
+                  />
+                  <Text style={styles.accordionTitle}>Description</Text>
+                </TouchableOpacity>
+                {isDescExpanded && (
+                  <View style={styles.accordionContent}>
+                    <Text style={styles.descriptionText}>{productData.description}</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
-          {/* Size Selection */}
-          {(() => {
-            const availableSizes: string[] = [];
-            if (productData.sizes && Array.isArray(productData.sizes)) {
-              availableSizes.push(...productData.sizes);
-            }
-            if (productData.size && typeof productData.size === 'string') {
-              availableSizes.push(productData.size);
-            }
-            return availableSizes.length > 0 ? (
-              <ProductSize
-                sizes={availableSizes}
-                selectedSize={selectedSize}
-                onSelectSize={setSelectedSize}
-              />
-            ) : null;
-          })()}
+            {/* Benefits Accordion */}
+            {productData.benefits && (
+              <View style={styles.accordionSection}>
+                <TouchableOpacity 
+                  style={styles.accordionHeader} 
+                  onPress={() => setIsBenefitsExpanded(!isBenefitsExpanded)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={isBenefitsExpanded ? "remove" : "add"} 
+                    size={18} 
+                    color="#694d21" 
+                    style={styles.accordionIcon} 
+                  />
+                  <Text style={styles.accordionTitle}>Benefits</Text>
+                </TouchableOpacity>
+                {isBenefitsExpanded && (
+                  <View style={styles.accordionContent}>
+                    <Text style={styles.descriptionText}>
+                      {Array.isArray(productData.benefits) 
+                        ? productData.benefits.join('\n') 
+                        : productData.benefits}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Ingredients Accordion */}
+            {productData.ingredients && (
+              <View style={styles.accordionSection}>
+                <TouchableOpacity 
+                  style={styles.accordionHeader} 
+                  onPress={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={isIngredientsExpanded ? "remove" : "add"} 
+                    size={18} 
+                    color="#694d21" 
+                    style={styles.accordionIcon} 
+                  />
+                  <Text style={styles.accordionTitle}>Ingredients</Text>
+                </TouchableOpacity>
+                {isIngredientsExpanded && (
+                  <View style={styles.accordionContent}>
+                    <Text style={styles.descriptionText}>
+                      {Array.isArray(productData.ingredients) 
+                        ? productData.ingredients.join(', ') 
+                        : productData.ingredients}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* How to Use Accordion */}
+            {productData.usage_instructions && (
+              <View style={styles.accordionSection}>
+                <TouchableOpacity 
+                  style={styles.accordionHeader} 
+                  onPress={() => setIsHowToUseExpanded(!isHowToUseExpanded)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={isHowToUseExpanded ? "remove" : "add"} 
+                    size={18} 
+                    color="#694d21" 
+                    style={styles.accordionIcon} 
+                  />
+                  <Text style={styles.accordionTitle}>How to Use</Text>
+                </TouchableOpacity>
+                {isHowToUseExpanded && (
+                  <View style={styles.accordionContent}>
+                    {(Array.isArray(productData.usage_instructions) 
+                      ? productData.usage_instructions.map((instruction, index) => ({
+                          step: index + 1,
+                          instruction: instruction.trim()
+                        }))
+                      : productData.usage_instructions.split('\n')
+                          .filter(instruction => instruction.trim())
+                          .map((instruction, index) => ({
+                            step: index + 1,
+                            instruction: instruction.trim()
+                          }))
+                    ).map((step) => (
+                      <View key={step.step} style={styles.stepContainer}>
+                        <View style={styles.stepNumberContainer}>
+                          <Ionicons name="information-circle" size={18} color="#694d21" />
+                        </View>
+                        <View style={styles.stepContent}>
+                          <Text style={styles.stepTitle}>Step {step.step}</Text>
+                          <Text style={styles.stepInstruction}>{step.instruction}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
 
           {/* Check Delivery */}
           <View style={styles.deliveryCheck}>
@@ -721,70 +846,6 @@ export default function ProductPage() {
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            {productData.stock_quantity > 0 ? (
-              <> 
-                <TouchableOpacity 
-                  style={[styles.button, styles.addToCartButton]} 
-                  onPress={() => handleAddToCart()}
-                  disabled={isAddingToCart}
-                >
-                  <Ionicons name="cart-outline" size={20} color="#007AFF" />
-                  <Text style={styles.addToCartText}>
-                    {isAddingToCart ? 'Adding...' : 'Add to Cart'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.button, styles.buyNowButton]} 
-                  onPress={async () => {
-                    if (!isAuthenticated) {
-                      handleAuthRequired();
-                      return;
-                    }
-
-                    // Check if product has sizes and if size is selected
-                    if (productData.sizes && productData.sizes.length > 0 && !selectedSize) {
-                      Alert.alert('Error', 'Please select a size before proceeding');
-                      return;
-                    }
-
-                    const existingItem = await getCartItems().find(cartItem => cartItem.id === productData.id);
-                    if (existingItem) {
-                      Alert.alert('Item already in cart', 'You can view it in your cart.');
-                      router.push('/cart');
-                    } else {
-                      // Add the selected size to the product when adding to cart
-                      const productWithSize = {
-                        ...productData,
-                        selected_size: selectedSize
-                      };
-                      await addItem(productWithSize);
-                      Alert.alert(
-                        'Added to Cart',
-                        'Item added to cart successfully',
-                        [{ text: 'View Cart', onPress: () => router.push('/cart') }]
-                      );
-                    }
-                  }}
-                >
-                  <Ionicons name="flash" size={20} color="#fff" />
-                  <Text style={styles.buyNowText}>Buy Now</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <View style={styles.outOfStockContainer}>
-                <Text style={styles.outOfStockMessage}>Stay tuned for this item to be back in stock.</Text>
-                <TouchableOpacity 
-                  style={styles.notifyButton}
-                  onPress={handleNotifyMe}
-                >
-                  <Text style={styles.notifyButtonText}>Notify Me When Available</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
           {/* Frequently Bought Together */}
           {productData && (
             <FrequentlyBoughtTogether 
@@ -793,46 +854,9 @@ export default function ProductPage() {
             />
           )}
 
-          {/* Benefits */}
-          {productData.benefits && (
-            <Benefits 
-              benefits={
-                Array.isArray(productData.benefits) 
-                  ? productData.benefits 
-                  : productData.benefits.split('\n').filter(benefit => benefit.trim())
-              } 
-            />
-          )}
 
-          {/* Ingredients */}
-          {productData.ingredients && (
-            <Ingredients 
-              ingredients={
-                Array.isArray(productData.ingredients) 
-                  ? productData.ingredients 
-                  : productData.ingredients.split('\n').filter(ingredient => ingredient.trim())
-              } 
-            />
-          )}
 
-          {/* How to Use */}
-          {productData.usage_instructions && (
-            <HowToUse 
-              steps={
-                Array.isArray(productData.usage_instructions) 
-                  ? productData.usage_instructions.map((instruction, index) => ({
-                      step: index + 1,
-                      instruction: instruction.trim()
-                    }))
-                  : productData.usage_instructions.split('\n')
-                      .filter(instruction => instruction.trim())
-                      .map((instruction, index) => ({
-                        step: index + 1,
-                        instruction: instruction.trim()
-                      }))
-              } 
-            />
-          )}
+          {/* Expandable details replaced by global accordion above */}
 
           {/* FAQ */}
           {productData.faqs && productData.faqs.length > 0 && (
@@ -853,6 +877,59 @@ export default function ProductPage() {
           />
         </View>
       </ScrollView>
+
+      {/* Sticky Action Buttons */}
+      <View style={styles.actionButtons}>
+        {productData.stock_quantity > 0 ? (
+          <> 
+            <TouchableOpacity 
+              style={[styles.button, styles.addToCartButton]} 
+              onPress={() => handleAddToCart()}
+              disabled={isAddingToCart}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addToCartText}>
+                {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.button, styles.buyNowButton]} 
+              onPress={async () => {
+                if (!isAuthenticated) {
+                  handleAuthRequired();
+                  return;
+                }
+
+                const existingItem = await getCartItems().find(cartItem => cartItem.id === productData.id);
+                if (!existingItem) {
+                  await addItem(productData);
+                }
+                router.navigate('/cart');
+              }}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={['#2b3a1a', '#2b3a1a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.buyNowGradient}
+              >
+                <Text style={styles.buyNowText}>Buy Now</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.outOfStockContainer}>
+            <Text style={styles.outOfStockMessage}>Stay tuned for this item to be back in stock.</Text>
+            <TouchableOpacity 
+              style={styles.notifyButton}
+              onPress={handleNotifyMe}
+            >
+              <Text style={styles.notifyButtonText}>Notify Me When Available</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -860,39 +937,35 @@ export default function ProductPage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fbf7f4',
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    backgroundColor: '#fbf7f4',
+    zIndex: 10,
   },
   headerButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
+    padding: 6,
+    borderRadius: 24,
+    backgroundColor: '#f3f4f6',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
     flex: 1,
@@ -900,15 +973,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   imageSection: {
-    backgroundColor: '#f8f9fa',
-    marginBottom: 16,
-    borderRadius: 12,
+    backgroundColor: '#fbf7f4',
+    marginBottom: 20,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   imageContainer: {
     width: Dimensions.get('window').width,
@@ -920,12 +989,17 @@ const styles = StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   productImage: {
-    width: Dimensions.get('window').width - 40,
+    width: Dimensions.get('window').width,
     height: 400,
     resizeMode: 'contain',
+  },
+  productVideo: {
+    width: Dimensions.get('window').width,
+    height: 400,
+    backgroundColor: '#000',
   },
   imageOverlay: {
     position: 'absolute',
@@ -951,102 +1025,92 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   paginationDots: {
+    position: 'absolute',
+    bottom: 32,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
+    zIndex: 10,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    marginHorizontal: 6,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    marginHorizontal: 4,
   },
   activeDot: {
-    backgroundColor: '#007AFF',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    elevation: 2,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    backgroundColor: '#2b3a1a',
+    width: 24,
+    height: 8,
+    borderRadius: 4,
   },
   productInfo: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+    backgroundColor: '#fbf7f4',
   },
   productName: {
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
     marginBottom: 12,
-    color: '#1a1a1a',
-    lineHeight: 32,
+    color: '#111827',
+    lineHeight: 26,
+    letterSpacing: -0.5,
   },
   priceContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'baseline',
+    marginBottom: 20,
     flexWrap: 'wrap',
   },
   price: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '900',
     marginRight: 12,
-    color: '#2c3e50',
+    color: '#111827',
   },
   originalPrice: {
-    fontSize: 20,
+    fontSize: 14,
     textDecorationLine: 'line-through',
-    color: '#95a5a6',
+    color: '#9ca3af',
     marginRight: 12,
   },
   discount: {
-    fontSize: 16,
-    color: '#27ae60',
-    fontWeight: '700',
-    backgroundColor: '#d5f4e6',
-    paddingHorizontal: 8,
+    fontSize: 14,
+    color: '#ef4444',
+    fontWeight: '800',
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 12,
+    marginBottom: 24,
+    backgroundColor: '#efede4',
+    borderWidth: 0,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 24,
     alignSelf: 'flex-start',
   },
   rating: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     marginRight: 6,
-    color: '#f39c12',
+    color: '#2e3e1d',
   },
   reviews: {
     fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
+    color: '#2e3e1d',
+    marginLeft: 6,
+    fontWeight: '600',
   },
   descriptionSection: {
     marginVertical: 16,
@@ -1072,18 +1136,21 @@ const styles = StyleSheet.create({
   },
   pincodeInput: {
     flex: 1,
-    height: 40,
+    height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginRight: 12,
+    backgroundColor: '#ebe8da',
+    fontSize: 16,
   },
   checkButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#2b3a1a',
+    paddingHorizontal: 24,
+    height: 48,
+    justifyContent: 'center',
+    borderRadius: 12,
   },
   checkButtonText: {
     color: '#fff',
@@ -1092,40 +1159,51 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 24,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    backgroundColor: '#fbf7f4',
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
     gap: 12,
   },
   button: {
     flex: 1,
-    height: 52,
-    borderRadius: 16,
+    height: 56,
+    borderRadius: 28,
+  },
+  addToCartButton: {
+    backgroundColor: '#ebe8da',
+    borderWidth: 2,
+    borderColor: '#2b3a1a',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  addToCartButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#007AFF',
   },
   addToCartText: {
-    color: '#007AFF',
-    fontWeight: '700',
-    marginLeft: 8,
+    color: '#2b3a1a',
+    fontWeight: '800',
+    marginLeft: 0,
     fontSize: 16,
   },
   buyNowButton: {
-    backgroundColor: '#007AFF',
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  buyNowGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   buyNowText: {
     color: '#fff',
-    fontWeight: '700',
-    marginLeft: 8,
+    fontWeight: '800',
+    marginLeft: 0,
     fontSize: 16,
   },
   stockContainer: {
@@ -1174,10 +1252,12 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'ios' ? 50 : 25,
     right: 20,
-    zIndex: 1000,
+    zIndex: 9999,
     padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 24,
   },
   imageViewerContainer: {
     flex: 1,
@@ -1212,5 +1292,81 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  accordionContainer: {
+    marginVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  accordionSection: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+  },
+  accordionIcon: {
+    marginRight: 10,
+  },
+  accordionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  accordionContent: {
+    paddingBottom: 16,
+    paddingHorizontal: 4,
+  },
+  ingredientsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  ingredientItem: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  ingredientText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  stepContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  stepNumberContainer: {
+    marginRight: 12,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  stepInstruction: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
+  shareButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#efede4',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

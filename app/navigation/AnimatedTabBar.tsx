@@ -9,6 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { springConfig } from '../animations/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 const TAB_WIDTH = width / 5;
@@ -43,7 +45,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: TAB_WIDTH,
     height: 6,
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     top: 56,
     borderRadius: 3,
   },
@@ -97,7 +99,19 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
         return (
           <TouchableOpacity
             key={route.key}
-            onPress={() => {
+            onPress={async () => {
+              if (route.name === 'cart' || route.name === 'wishlist' || route.name === 'profile') {
+                try {
+                  const token = await AsyncStorage.getItem('auth_token');
+                  if (!token) {
+                    router.push('/auth/login');
+                    return;
+                  }
+                } catch (e) {
+                  console.error('Error checking auth token in TabBar:', e);
+                }
+              }
+
               const event = navigation.emit({
                 type: 'tabPress',
                 target: route.key,
@@ -115,7 +129,7 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
               {options.tabBarIcon && 
                 options.tabBarIcon({
                   focused: isFocused,
-                  color: isFocused ? '#007AFF' : '#8E8E93',
+                  color: isFocused ? '#2b3a1a' : '#2b3a1a',
                   size: 24,
                 })}
             </Animated.View>

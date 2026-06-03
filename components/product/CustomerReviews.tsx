@@ -167,6 +167,10 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
     setIsModalVisible(true);
   };
 
+  if (!reviews || reviews.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>

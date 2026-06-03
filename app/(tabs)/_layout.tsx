@@ -24,8 +24,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: '#2b3a1a',
+        tabBarInactiveTintColor: '#2b3a1a',
         tabBarStyle: {
           position: 'absolute',
           bottom: 0,
@@ -46,7 +46,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
               size={24}
-              color={'#694d21'}
+              color={'#2b3a1a'}
             />
           ),
         }}
@@ -59,7 +59,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? 'search' : 'search-outline'}
               size={24}
-              color={'#694d21'}
+              color={'#2b3a1a'}
             />
           ),
         }}
@@ -73,7 +73,7 @@ export default function TabLayout() {
               <Ionicons
                 name={focused ? 'heart' : 'heart-outline'}
                 size={24}
-                color={'#694d21'}
+                color={'#2b3a1a'}
               />
               {wishlist?.length > 0 && (
                 <View style={{
@@ -103,7 +103,7 @@ export default function TabLayout() {
               <Ionicons
                 name={focused ? 'cart' : 'cart-outline'}
                 size={24}
-                color={'#694d21'}
+                color={'#2b3a1a'}
               />
               {getItemCount() > 0 && (
                 <View style={{
@@ -132,7 +132,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
               size={24}
-              color={'#694d21'}
+              color={'#2b3a1a'}
             />
           ),
         }}

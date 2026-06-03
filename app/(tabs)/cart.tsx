@@ -23,6 +23,7 @@ import { apiService } from '../services/api';
 import type { CartItem } from '../CartContext';
 import { useBottomTabBarHeight } from './_layout';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
+import ProductCard from '../components/ProductCard';
 
 const { width } = Dimensions.get('window');
 
@@ -73,6 +74,7 @@ export default function CartPage() {
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef<ScrollView>(null);
   const isInitialMount = useRef(true);
   const lastFocusedState = useRef(false);
@@ -229,6 +231,22 @@ export default function CartPage() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Pulse animation for free delivery text
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ])
+    ).start();
   }, []);
 
   // Scroll to top function
@@ -270,13 +288,17 @@ export default function CartPage() {
       />
 
       <SafeAreaView style={styles.safeArea}>
+        <View style={styles.headerSection}>
+          <Text style={styles.brandTitle}>Cart</Text>
+        </View>
+
         <Animated.View
           style={[
             styles.content,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
-              paddingTop: 30,
+              paddingTop: 10,
             }
           ]}
         >
@@ -316,6 +338,8 @@ export default function CartPage() {
               </View>
             ) : (
               <>
+
+
                 {/* Cart Items */}
                 <BlurView intensity={20} style={styles.cartItemsContainer}>
                   {items.map((item: CartItem) => {
@@ -333,19 +357,26 @@ export default function CartPage() {
 
                     const formattedPrice = finalPrice.toFixed(2);
                     return (
-                      <View key={`${item.id}-${item.variant || 'no-variant'}-${item.quantity}`} style={styles.cartItem}>
+                      <View key={`${item.id}-${item.variant || 'no-variant'}-${item.quantity}`} style={[styles.cartItem, item.stock_quantity === 0 && { opacity: 0.5 }]}>
                         <TouchableOpacity
                           style={styles.checkboxContainer}
                           onPress={() => toggleItemSelection(item.id)}
+                          disabled={item.stock_quantity === 0}
                         >
-                          <LinearGradient
-                            colors={selectedItems.includes(item.id) ? ['#694d21', '#5a3f1a'] : ['#f0f0f0', '#e0e0e0']}
-                            style={styles.checkbox}
+                          <View
+                            style={[
+                              styles.checkbox,
+                              {
+                                backgroundColor: '#fff',
+                                borderWidth: 1.5,
+                                borderColor: selectedItems.includes(item.id) && item.stock_quantity > 0 ? '#2b3a1a' : '#ccc'
+                              }
+                            ]}
                           >
-                            {selectedItems.includes(item.id) && (
-                              <Ionicons name="checkmark" size={16} color="#fff" />
+                            {selectedItems.includes(item.id) && item.stock_quantity > 0 && (
+                              <Ionicons name="checkmark" size={16} color="#2b3a1a" />
                             )}
-                          </LinearGradient>
+                          </View>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.itemContentContainer}
@@ -373,41 +404,45 @@ export default function CartPage() {
                                 <Text style={styles.originalPrice}>₹{displayPrice.toFixed(2)}</Text>
                               )}
                             </View>
-                            <View style={styles.stockContainer}>
-                              <Ionicons
-                                name={item.stock_quantity > 3 ? "checkmark-circle" : "warning"}
-                                size={16}
-                                color={item.stock_quantity > 3 ? "#28a745" : "#ff4444"}
-                              />
-                              <Text style={[
-                                styles.stockText,
-                                item.stock_quantity <= 3 && styles.lowStockText
-                              ]}>
-                                {item.stock_quantity > 3
-                                  ? 'In Stock'
-                                  : `Only ${item.stock_quantity} left`
-                                }
-                              </Text>
-                            </View>
+                            {item.stock_quantity === 0 && (
+                              <View style={styles.stockContainer}>
+                                <Ionicons
+                                  name="warning"
+                                  size={16}
+                                  color="#ff4444"
+                                />
+                                <Text style={[styles.stockText, styles.lowStockText]}>
+                                  Out of Stock
+                                </Text>
+                              </View>
+                            )}
                             <View style={styles.quantityContainer}>
                               <TouchableOpacity
-                                style={styles.quantityButton}
+                                style={[
+                                  styles.quantityButton,
+                                  item.stock_quantity === 0 && styles.quantityButtonDisabled
+                                ]}
                                 onPress={(e) => {
                                   e.stopPropagation();
                                   updateQuantity(item.id, false);
                                 }}
+                                disabled={item.stock_quantity === 0}
                               >
-                                <Ionicons name="remove" size={16} color="#666" />
+                                <Ionicons name="remove" size={16} color="#2b3a1a" />
                               </TouchableOpacity>
                               <Text style={styles.quantityText}>{item.quantity}</Text>
                               <TouchableOpacity
-                                style={styles.quantityButton}
+                                style={[
+                                  styles.quantityButton,
+                                  item.stock_quantity === 0 && styles.quantityButtonDisabled
+                                ]}
                                 onPress={(e) => {
                                   e.stopPropagation();
                                   updateQuantity(item.id, true);
                                 }}
+                                disabled={item.stock_quantity === 0}
                               >
-                                <Ionicons name="add" size={16} color="#666" />
+                                <Ionicons name="add" size={16} color="#2b3a1a" />
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -416,12 +451,7 @@ export default function CartPage() {
                           style={styles.deleteButton}
                           onPress={() => removeItem(item.id)}
                         >
-                          <LinearGradient
-                            colors={['#ff4444', '#cc0000']}
-                            style={styles.deleteButtonGradient}
-                          >
-                            <Ionicons name="trash" size={18} color="#fff" />
-                          </LinearGradient>
+                          <Ionicons name="trash" size={22} color="#ff4444" />
                         </TouchableOpacity>
                       </View>
                     );
@@ -438,43 +468,9 @@ export default function CartPage() {
                       contentContainerStyle={styles.suggestedProductsContainer}
                     >
                       {suggestedProducts.map((product) => (
-                        <TouchableOpacity
-                          key={product.id}
-                          style={styles.suggestedProduct}
-                          onPress={() => router.push({
-                            pathname: '/(product)/[id]',
-                            params: { id: product.id }
-                          })}
-                        >
-                          <Image
-                            source={{ uri: apiService.getFullImageUrl(product.image_url) }}
-                            style={styles.suggestedProductImage}
-                          />
-                          <View style={styles.suggestedProductDetails}>
-                            <Text style={styles.suggestedProductName} numberOfLines={2}>
-                              {product.name}
-                            </Text>
-                            <Text style={styles.suggestedProductPrice}>
-                              ₹{product.price}
-                            </Text>
-                            {product.offer_percentage > 0 && (
-                              <View style={styles.offerBadge}>
-                                <Text style={styles.offerText}>
-                                  {product.offer_percentage}% OFF
-                                </Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={styles.addToCartButton}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                addItem(product);
-                              }}
-                            >
-                              <Text style={styles.addToCartText}>Add to Cart</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </TouchableOpacity>
+                        <View key={product.id} style={{ width: 160, marginRight: 8 }}>
+                          <ProductCard product={product} />
+                        </View>
                       ))}
                     </ScrollView>
                   </View>
@@ -482,33 +478,55 @@ export default function CartPage() {
 
                 {/* Selected Items Summary */}
                 <View style={styles.summaryContainer}>
-                  <Text style={styles.summaryText}>
-                    Selected Items ({selectedItems.length})
-                  </Text>
-
-                  <View style={{ marginTop: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ color: '#666' }}>Subtotal</Text>
-                      <Text style={{ fontWeight: '600' }}>₹{subtotal.toFixed(2)}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text style={{ color: '#666' }}>Delivery</Text>
-                      <Text style={{ color: deliveryCharge === 0 ? '#00a65a' : '#000', fontWeight: '600' }}>
-                        {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge}`}
-                      </Text>
-                    </View>
-                    <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 4 }} />
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                      <Text style={[styles.summaryTotal, { fontSize: 16 }]}>Total Amount</Text>
-                      <Text style={styles.summaryTotal}>
-                        ₹{total.toFixed(2)}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 10, color: '#999', marginTop: 4, fontStyle: 'italic', textAlign: 'right' }}>
-                      (Inc. GST)
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <Text style={[styles.summaryText, { fontSize: 16, fontWeight: '700', color: '#1a1a1a' }]}>
+                      Order Summary
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#666', fontWeight: '500' }}>
+                      {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''} Selected
                     </Text>
                   </View>
+
+                  <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 12 }} />
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ color: '#666', fontSize: 14 }}>Subtotal</Text>
+                    <Text style={{ fontWeight: '600', fontSize: 14, color: '#1a1a1a' }}>₹{subtotal.toFixed(2)}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <Text style={{ color: '#666', fontSize: 14 }}>Delivery</Text>
+                    <Text style={{ color: deliveryCharge === 0 ? '#28a745' : '#1a1a1a', fontWeight: '600', fontSize: 14 }}>
+                      {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge}`}
+                    </Text>
+                  </View>
+
+                  <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 12 }} />
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1a1a1a' }}>Total Amount</Text>
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2b3a1a' }}>
+                      ₹{total.toFixed(2)}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 10, color: '#999', marginTop: 4, fontStyle: 'italic', textAlign: 'right' }}>
+                    (Inc. GST)
+                  </Text>
                 </View>
+
+                {/* Free Delivery Message */}
+                {subtotal > 0 && subtotal < 500 && (
+                  <Animated.View
+                    style={[
+                      styles.freeDeliveryContainer,
+                      { transform: [{ scale: pulseAnim }] }
+                    ]}
+                  >
+                    <Text style={styles.freeDeliveryText}>
+                      Add ₹{(500 - subtotal).toFixed(2)} more to enjoy FREE delivery!
+                    </Text>
+                  </Animated.View>
+                )}
 
                 {/* Address Display */}
                 {addresses && addresses.length > 0 ? (
@@ -517,13 +535,13 @@ export default function CartPage() {
                       padding: 16,
                       backgroundColor: '#fff',
                       borderRadius: 16,
-                      shadowColor: '#694d21',
+                      shadowColor: '#2b3a1a',
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.08,
                       shadowRadius: 12,
                       elevation: 4,
                       borderWidth: 1,
-                      borderColor: 'rgba(105, 77, 33, 0.1)',
+                      borderColor: 'rgba(43, 58, 26, 0.1)',
                       flexDirection: 'column',
                       alignItems: 'stretch'
                     }]}
@@ -534,15 +552,15 @@ export default function CartPage() {
                         width: 36,
                         height: 36,
                         borderRadius: 18,
-                        backgroundColor: '#fdf3e6',
+                        backgroundColor: '#f2f4f0',
                         justifyContent: 'center',
                         alignItems: 'center',
                         marginRight: 12
                       }}>
-                        <Ionicons name="location" size={20} color="#694d21" />
+                        <Ionicons name="location" size={20} color="#2b3a1a" />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, color: '#694d21', fontWeight: '600', marginBottom: 2 }}>
+                        <Text style={{ fontSize: 12, color: '#2b3a1a', fontWeight: '600', marginBottom: 2 }}>
                           DELIVER TO
                         </Text>
                         <Text style={{ fontSize: 15, fontWeight: '700', color: '#1a1a1a' }}>
@@ -552,9 +570,9 @@ export default function CartPage() {
                       <View style={{
                         paddingHorizontal: 16,
                         paddingVertical: 8,
-                        backgroundColor: '#694d21',
+                        backgroundColor: '#2b3a1a',
                         borderRadius: 20,
-                        shadowColor: '#694d21',
+                        shadowColor: '#2b3a1a',
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.2,
                         shadowRadius: 4,
@@ -594,14 +612,14 @@ export default function CartPage() {
                         width: 40,
                         height: 40,
                         borderRadius: 20,
-                        backgroundColor: '#f0f9f4',
+                        backgroundColor: '#f2f4f0',
                         justifyContent: 'center',
                         alignItems: 'center',
                         marginRight: 12
                       }}>
-                        <Ionicons name="add" size={24} color="#00a65a" />
+                        <Ionicons name="add" size={24} color="#2b3a1a" />
                       </View>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#00a65a' }}>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#2b3a1a' }}>
                         Add Delivery Address
                       </Text>
                     </View>
@@ -618,7 +636,7 @@ export default function CartPage() {
                   disabled={selectedItems.length === 0}
                 >
                   <LinearGradient
-                    colors={selectedItems.length === 0 ? ['#ccc', '#999'] : ['#694d21', '#5a3f1a']}
+                    colors={selectedItems.length === 0 ? ['#ccc', '#999'] : ['#2b3a1a', '#1e2912']}
                     style={styles.proceedButtonGradient}
                   >
                     <Text style={styles.proceedButtonText}>
@@ -633,7 +651,7 @@ export default function CartPage() {
                   style={styles.deselectButton}
                   onPress={() => setSelectedItems([])}
                 >
-                  <Ionicons name="close-circle-outline" size={20} color="#694d21" />
+                  <Ionicons name="close-circle-outline" size={20} color="#2b3a1a" />
                   <Text style={styles.deselectButtonText}>Deselect all items</Text>
                 </TouchableOpacity>
               </>
@@ -649,6 +667,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight ?? 0) + 20,
+    paddingBottom: 6,
+    zIndex: 10,
+    position: 'relative',
+  },
+  headerBackButton: {
+    position: 'absolute',
+    left: 16,
+    bottom: 14,
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(43,58,26,0.08)',
+    zIndex: 20,
+  },
+  brandTitle: {
+    fontSize: 42,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Bold',
+    letterSpacing: 1,
+    marginBottom: 16,
   },
   backgroundGradient: {
     position: 'absolute',
@@ -684,7 +725,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: '#694d21',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -704,17 +745,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   shopButton: {
-    borderRadius: 16,
+    borderRadius: 20,
     shadowColor: '#694d21',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 6,
   },
   shopButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -729,17 +770,19 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   cartItemsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    marginHorizontal: 12,
-    marginTop: 16,
-    marginBottom: 6,
-    borderRadius: 16,
-    padding: 12,
-    shadowColor: '#000',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+    borderRadius: 24,
+    padding: 16,
+    shadowColor: '#694d21',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.05)',
   },
   cartItem: {
     flexDirection: 'row',
@@ -842,6 +885,8 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#2b3a1a',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -849,6 +894,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#ccc',
   },
   quantityText: {
     paddingHorizontal: 12,
@@ -893,19 +942,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   proceedButton: {
-    marginHorizontal: 12,
-    marginVertical: 12,
-    borderRadius: 14,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderRadius: 20,
+    shadowColor: '#2b3a1a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 6,
   },
   proceedButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 14,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -931,24 +980,25 @@ const styles = StyleSheet.create({
   },
   deselectButtonText: {
     fontSize: 13,
-    color: '#694d21',
+    color: '#2b3a1a',
     fontWeight: '600',
     marginLeft: 6,
   },
   summaryContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 12,
-    marginHorizontal: 12,
-    marginVertical: 6,
-    borderRadius: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 20,
+    marginHorizontal: 16,
+    marginVertical: 10,
+    borderRadius: 20,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    shadowColor: '#2b3a1a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(43, 58, 26, 0.05)',
   },
   summaryText: {
     fontSize: 14,
@@ -958,20 +1008,22 @@ const styles = StyleSheet.create({
   summaryTotal: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#694d21',
+    color: '#2b3a1a',
   },
   section: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 6,
-    padding: 16,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 10,
+    padding: 20,
+    borderRadius: 24,
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.05)',
   },
   sectionTitle: {
     fontSize: 16,
@@ -1035,5 +1087,29 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  freeDeliveryContainer: {
+    backgroundColor: '#fffbeb',
+    marginHorizontal: 12,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#694d21',
+    shadowColor: '#694d21',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 8,
+  },
+  freeDeliveryText: {
+    color: '#694d21',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 }); 

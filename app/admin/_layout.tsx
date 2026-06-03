@@ -70,6 +70,27 @@ export default function AdminLayout() {
                 }} 
             />
             <Stack.Screen 
+                name="reviews" 
+                options={{ 
+                    title: 'Manage Reviews',
+                    animation: 'slide_from_right',
+                }} 
+            />
+            <Stack.Screen 
+                name="new-arrivals" 
+                options={{ 
+                    title: 'Manage New Arrivals',
+                    animation: 'slide_from_right',
+                }} 
+            />
+            <Stack.Screen 
+                name="best-sellers" 
+                options={{ 
+                    title: 'Manage Best Sellers',
+                    animation: 'slide_from_right',
+                }} 
+            />
+            <Stack.Screen 
                 name="profile" 
                 options={{ 
                     title: 'Admin Profile',

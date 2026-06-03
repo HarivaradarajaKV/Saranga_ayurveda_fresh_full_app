@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiService } from '../../app/services/api';
 import { OptimizedImage } from '../../app/components/OptimizedImage';
+import ProductCard from '../../app/components/ProductCard';
 
 interface Product {
   id: number;
@@ -82,59 +83,15 @@ export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> =
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Frequently Bought Together</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContainer}
+      >
         {relatedProducts.map((product) => (
-          <TouchableOpacity 
-            key={product.id} 
-            style={styles.productCard}
-            onPress={() => handleProductPress(product)}
-          >
-            <OptimizedImage
-              source={{ uri: apiService.getFullImageUrl(product.image_url) }}
-              style={styles.productImage}
-              placeholderColor="#f8f9fa"
-              showLoader={true}
-              priority="low"
-              resizeMode="cover"
-            />
-            <View style={styles.productInfo}>
-              <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-              <View style={styles.priceContainer}>
-                {product.offer_percentage > 0 ? (
-                  <>
-                    <Text style={styles.price}>
-                      ₹{((typeof product.price === 'number' ? product.price : parseFloat(String(product.price || 0))) * (1 - (product.offer_percentage || 0) / 100)).toFixed(2)}
-                    </Text>
-                    <Text style={styles.originalPrice}>
-                      ₹{(typeof product.price === 'number' ? product.price : parseFloat(String(product.price || 0))).toFixed(2)}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.price}>₹{(typeof product.price === 'number' ? product.price : parseFloat(String(product.price || 0))).toFixed(2)}</Text>
-                )}
-              </View>
-              {product.rating && (
-                <View style={styles.ratingContainer}>
-                  <Text style={styles.rating}>{product.rating.toFixed(1)}</Text>
-                  <Ionicons name="star" size={12} color="#FFD700" />
-                  {product.review_count && (
-                    <Text style={styles.reviews}>({product.review_count})</Text>
-                  )}
-                </View>
-              )}
-              <TouchableOpacity 
-                style={[
-                  styles.addButton,
-                  !product.stock_quantity && styles.disabledButton
-                ]}
-                disabled={!product.stock_quantity}
-              >
-                <Text style={styles.addButtonText}>
-                  {product.stock_quantity ? 'Add' : 'Out of Stock'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+          <View key={product.id} style={styles.productCardWrapper}>
+            <ProductCard product={product as any} />
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -154,72 +111,13 @@ const styles = StyleSheet.create({
   loader: {
     marginVertical: 20,
   },
-  productCard: {
-    width: 160,
-    marginLeft: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
-    overflow: 'hidden',
+  scrollContainer: {
+    paddingLeft: 16,
+    paddingRight: 4,
+    paddingVertical: 8,
   },
-  productImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  productInfo: {
-    padding: 8,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-    height: 40,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  price: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginRight: 4,
-    color: '#007AFF',
-  },
-  originalPrice: {
-    fontSize: 12,
-    textDecorationLine: 'line-through',
-    color: '#666',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  rating: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginRight: 2,
-  },
-  reviews: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 2,
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 6,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+  productCardWrapper: {
+    width: (Dimensions.get('window').width - 44) / 2,
+    marginRight: 12,
   },
 }); 

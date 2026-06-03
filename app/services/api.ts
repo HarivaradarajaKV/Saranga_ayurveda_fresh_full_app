@@ -20,10 +20,10 @@ const isNetworkError = (error: unknown): error is AxiosError => {
 
 const isAuthEndpoint = (url: string | undefined): boolean => {
     if (!url) return false;
-    return url.includes('/auth/') || 
-           url.includes('/login') || 
-           url.includes('/register') || 
-           url.includes('/health');
+    return url.includes('/auth/') ||
+        url.includes('/login') ||
+        url.includes('/register') ||
+        url.includes('/health');
 };
 
 const isPublicEndpoint = (url: string | undefined): boolean => {
@@ -44,7 +44,7 @@ const retryRequest = async <T>(
     retryDelay = 1000
 ): Promise<AxiosResponse<T>> => {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             return await requestFn();
@@ -58,7 +58,7 @@ const retryRequest = async <T>(
             }
         }
     }
-    
+
     throw lastError;
 };
 
@@ -80,9 +80,9 @@ export class Api implements ApiService {
         if (DEBUG_API) {
             try {
                 console.log('[API Service] Initializing with base URL:', String(baseURL).slice(0, 120));
-            } catch {}
+            } catch { }
         }
-        
+
         this.client = axios.create({
             baseURL,
             timeout: API_CONFIG.TIMEOUT,
@@ -143,7 +143,7 @@ export class Api implements ApiService {
                             ? response.data
                             : JSON.stringify(response.data);
                         dataPreview = str.length > 200 ? `${str.slice(0, 200)}… (+${str.length - 200} chars)` : str;
-                    } catch {}
+                    } catch { }
                     console.debug('[API] Response:', {
                         status: response.status,
                         statusText: response.statusText,
@@ -163,7 +163,7 @@ export class Api implements ApiService {
                                 : JSON.stringify(error.response.data);
                             responsePreview = str.length > 200 ? `${str.slice(0, 200)}… (+${str.length - 200} chars)` : str;
                         }
-                    } catch {}
+                    } catch { }
                     const cfg = {
                         url: error.config?.url,
                         method: error.config?.method,
@@ -183,7 +183,7 @@ export class Api implements ApiService {
                     try {
                         await AsyncStorage.multiRemove(['auth_token', 'user_id', 'user_name']);
                         this.userId = null;
-                        
+
                         if (error.response?.data?.details?.error === "Invalid token") {
                             return { data: null };
                         }
@@ -232,12 +232,12 @@ export class Api implements ApiService {
 
     private async retryConnection(attempts: number) {
         if (attempts <= 0) return;
-        
+
         if (process.env.NODE_ENV === 'development') {
             console.debug(`Retrying connection... (${attempts} attempts remaining)`);
         }
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         try {
             const success = await this.testConnection();
             if (!success && attempts > 1) {
@@ -258,7 +258,7 @@ export class Api implements ApiService {
             const response = await this.client.request(config);
             return response;
         } catch (error: unknown) {
-            if (retries > 0 && error instanceof Error && 
+            if (retries > 0 && error instanceof Error &&
                 ((error as any).code === 'ECONNABORTED' || !(error as any).response)) {
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
                 return this.retryRequest(config, retries - 1);
@@ -278,7 +278,7 @@ export class Api implements ApiService {
                         baseURL: String(this.client.defaults.baseURL).slice(0, 120),
                         url: endpoint,
                     });
-                } catch {}
+                } catch { }
             }
 
             // Special handling for brand-reviews endpoint
@@ -307,7 +307,7 @@ export class Api implements ApiService {
                         status: response.status,
                         dataPreview: preview.length > 400 ? `${preview.slice(0, 400)}… (+${preview.length - 400} chars)` : preview
                     });
-                } catch {}
+                } catch { }
             }
 
             return { data: response.data };
@@ -351,9 +351,9 @@ export class Api implements ApiService {
                 console.debug('Making POST request to:', endpoint);
                 console.debug('Request payload:', JSON.stringify(data, null, 2));
             }
-            
+
             const response = await this.client.post<T>(endpoint, data);
-            
+
             if (process.env.NODE_ENV === 'development') {
                 console.debug('POST response:', {
                     status: response.status,
@@ -361,7 +361,7 @@ export class Api implements ApiService {
                     data: response.data
                 });
             }
-            
+
             return { data: response.data };
         } catch (error: any) {
             if (process.env.NODE_ENV === 'development') {
@@ -375,7 +375,7 @@ export class Api implements ApiService {
             }
 
             if (!error.response || error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-                return { 
+                return {
                     error: 'Unable to connect to the server. Please check your internet connection and try again.'
                 };
             }
@@ -412,11 +412,11 @@ export class Api implements ApiService {
     async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
         try {
             const response = await this.client.post<AuthResponse>(this.ENDPOINTS.LOGIN, { email, password });
-            
+
             if (response.data?.token) {
                 await AsyncStorage.setItem('auth_token', response.data.token);
                 this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-                
+
                 // Decode token to check role
                 try {
                     const decodedToken = JSON.parse(atob(response.data.token.split('.')[1]));
@@ -427,10 +427,10 @@ export class Api implements ApiService {
                         console.debug('[API] Token decode error');
                     }
                 }
-                
+
                 return { data: response.data };
             }
-            
+
             return {
                 data: null,
                 error: 'Invalid email or password'
@@ -439,25 +439,25 @@ export class Api implements ApiService {
             // Handle errors silently without logging to console
             if (axios.isAxiosError(error)) {
                 if (!error.response || error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-                    return { 
+                    return {
                         error: 'Unable to connect to the server. Please check your internet connection.'
                     };
                 }
-                
+
                 // Always return a user-friendly message for 400 status
                 if (error.response?.status === 400) {
                     return {
                         error: 'Invalid email or password'
                     };
                 }
-                
+
                 if (error.response?.status === 429) {
                     return {
                         error: 'Too many login attempts. Please try again later.'
                     };
                 }
             }
-            
+
             return {
                 error: 'Unable to log in. Please try again.'
             };
@@ -471,23 +471,23 @@ export class Api implements ApiService {
                 email,
                 password
             });
-            
+
             if (response.data?.token) {
                 await AsyncStorage.setItem('auth_token', response.data.token);
                 this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
             }
-            
+
             return response;
         } catch (error) {
             console.error('Registration error:', error);
-            
+
             if (axios.isAxiosError(error)) {
                 return {
                     data: null,
                     error: error.response?.data?.error || 'Registration failed. Please try again.'
                 };
             }
-            
+
             return {
                 data: null,
                 error: 'An unexpected error occurred'
@@ -523,6 +523,14 @@ export class Api implements ApiService {
         return this.get<T>(this.ENDPOINTS.CATEGORY_DETAILS(id));
     }
 
+    async getCategoryProducts(categoryId: number): Promise<ApiResponse<any[]>> {
+        return this.get<any[]>(this.ENDPOINTS.ADMIN_CATEGORY_PRODUCTS(categoryId));
+    }
+
+    async updateCategoryProducts(categoryId: number, productIds: number[]): Promise<ApiResponse<any>> {
+        return this.post<any>(this.ENDPOINTS.ADMIN_CATEGORY_PRODUCTS(categoryId), { product_ids: productIds });
+    }
+
     async testConnection(): Promise<boolean> {
         try {
             const response = await this.client.get(this.ENDPOINTS.HEALTH, {
@@ -553,11 +561,11 @@ export class Api implements ApiService {
     async addAddress(address: Omit<Address, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Address> {
         try {
             console.log('Raw address data:', address);
-            
+
             // Validate required fields
             const requiredFields = ['full_name', 'phone_number', 'address_line1', 'city', 'state', 'postal_code'];
             const missingFields = requiredFields.filter(field => !address[field as keyof typeof address]);
-            
+
             console.log('Validation check:', {
                 requiredFields,
                 missingFields,
@@ -631,7 +639,7 @@ export class Api implements ApiService {
     async uploadProfilePhoto(formData: FormData): Promise<ApiResponse<{ photo_url: string }>> {
         try {
             console.log('Uploading profile photo to:', this.ENDPOINTS.USER_PROFILE_PHOTO);
-            
+
             // Create a new FormData instance and append the file
             const photoData = formData.get('photo');
             if (!photoData) {
@@ -649,14 +657,14 @@ export class Api implements ApiService {
                     return data;
                 },
             });
-            
+
             console.log('Upload response:', response.data);
-            
+
             if (response.data && response.data.photo_url) {
                 // Update the user profile with the new photo URL
                 await this.updateUserProfile({ photo_url: response.data.photo_url });
             }
-            
+
             return { data: response.data };
         } catch (error) {
             console.error('Error uploading profile photo:', error);
@@ -667,7 +675,7 @@ export class Api implements ApiService {
                     headers: error.response?.headers,
                     config: error.config
                 });
-                
+
                 // Check if it's a 404 error and provide a more specific message
                 if (error.response?.status === 404) {
                     return {
@@ -675,15 +683,15 @@ export class Api implements ApiService {
                         error: 'The photo upload service is currently unavailable. Please try again later.'
                     };
                 }
-                
+
                 return {
                     data: null,
                     error: error.response?.data?.error || 'Failed to upload profile photo'
                 };
             }
-            return { 
-                data: null, 
-                error: error instanceof Error ? error.message : 'Failed to upload profile photo' 
+            return {
+                data: null,
+                error: error instanceof Error ? error.message : 'Failed to upload profile photo'
             };
         }
     }
@@ -692,11 +700,28 @@ export class Api implements ApiService {
         return this.get<Category[]>(this.ENDPOINTS.ADMIN_CATEGORIES);
     }
 
-    async addCategory(data: { name: string; description: string }): Promise<ApiResponse<Category>> {
+    async addCategory(data: FormData | { name: string; description: string }): Promise<ApiResponse<Category>> {
+        // If it's FormData, we need to make sure headers are handled correctly by Axios (automatic usually)
+        if (data instanceof FormData) {
+            return this.client.post(this.ENDPOINTS.ADMIN_CATEGORIES, data, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                transformRequest: (formData) => formData, // Prevent Axios from stringifying execution
+            }).then(res => ({ data: res.data })).catch(err => ({ error: err.message }));
+        }
         return this.post<Category>(this.ENDPOINTS.ADMIN_CATEGORIES, data);
     }
 
-    async updateCategory(id: number, data: Partial<Category>): Promise<ApiResponse<Category>> {
+    async updateCategory(id: number, data: FormData | Partial<Category>): Promise<ApiResponse<Category>> {
+        if (data instanceof FormData) {
+            return this.client.put(this.ENDPOINTS.ADMIN_CATEGORY(id), data, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                transformRequest: (formData) => formData,
+            }).then(res => ({ data: res.data })).catch(err => ({ error: err.message }));
+        }
         return this.put<Category>(this.ENDPOINTS.ADMIN_CATEGORY(id), data);
     }
 
@@ -723,7 +748,7 @@ export class Api implements ApiService {
             if (DEBUG_API) {
                 console.log('[API] Request URL:', `${this.client.defaults.baseURL}${endpoint}`);
             }
-            
+
             interface ProductResponse {
                 products?: ProductData[];
             }
@@ -739,8 +764,8 @@ export class Api implements ApiService {
                     }
                     // Ensure we're returning an array of products with proper type checking
                     const products = Array.isArray(response.data) ? response.data :
-                                   (response.data as ProductResponse).products || [];
-                    
+                        (response.data as ProductResponse).products || [];
+
                     if (DEBUG_API) {
                         console.log('[API] Fetched products count:', products.length);
                     }
@@ -757,8 +782,8 @@ export class Api implements ApiService {
                             details: error.response?.data
                         } as any;
                     }
-                    return { 
-                        data: null, 
+                    return {
+                        data: null,
                         error: error instanceof Error ? error.message : 'Failed to fetch products'
                     } as any;
                 })
@@ -775,8 +800,8 @@ export class Api implements ApiService {
                     details: error.response?.data
                 };
             }
-            return { 
-                data: null, 
+            return {
+                data: null,
                 error: error instanceof Error ? error.message : 'Failed to fetch products'
             };
         }
@@ -863,12 +888,12 @@ export class Api implements ApiService {
                 try {
                     const entries = Array.from(formData.entries()).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 60) : '[binary]']);
                     console.log('[API] Adding product - entries preview:', entries);
-                } catch {}
+                } catch { }
             }
-            
+
             // Get auth token for admin endpoint
             const token = await AsyncStorage.getItem('auth_token');
-            
+
             const response = await this.client.post(
                 this.ENDPOINTS.PRODUCTS,
                 formData,
@@ -877,6 +902,7 @@ export class Api implements ApiService {
                         'Content-Type': 'multipart/form-data',
                         'Authorization': token ? `Bearer ${token}` : '',
                     },
+                    transformRequest: (data) => data, // Prevent Axios from stringifying/serializing the FormData
                     timeout: 30000, // 30 seconds timeout for image upload
                 }
             );
@@ -926,15 +952,17 @@ export class Api implements ApiService {
 
             // Get the auth token
             const token = await AsyncStorage.getItem('auth_token');
-            
+
             const response = await this.client.put(
                 `${this.ENDPOINTS.PRODUCTS}/${productId}`,
                 formData,
                 {
                     headers: {
+                        'Content-Type': 'multipart/form-data',
                         'Accept': 'application/json',
                         'Authorization': token ? `Bearer ${token}` : '',
                     },
+                    transformRequest: (data) => data, // Prevent Axios from stringifying/serializing the FormData
                     timeout: 30000, // 30 seconds timeout for image upload
                 }
             );
@@ -981,7 +1009,7 @@ export class Api implements ApiService {
         try {
             if (DEBUG_API) console.log('Deleting product:', id);
             const response = await this.client.delete(this.ENDPOINTS.PRODUCT_DETAILS(id));
-            
+
             if (DEBUG_API) console.log('Delete OK');
             return { data: response.data };
         } catch (error) {
@@ -1002,23 +1030,23 @@ export class Api implements ApiService {
     async googleSignIn(idToken: string): Promise<ApiResponse<GoogleAuthResponse>> {
         try {
             const response = await this.post<GoogleAuthResponse>('/auth/google', { idToken });
-            
+
             if (response.data?.token) {
                 await AsyncStorage.setItem('auth_token', response.data.token);
                 this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
             }
-            
+
             return response;
         } catch (error) {
             console.error('Google Sign-In error:', error);
-            
+
             if (axios.isAxiosError(error)) {
                 return {
                     data: null,
                     error: error.response?.data?.error || 'Google Sign-In failed. Please try again.'
                 };
             }
-            
+
             return {
                 data: null,
                 error: 'An unexpected error occurred during Google Sign-In'
@@ -1036,16 +1064,16 @@ export class Api implements ApiService {
 
     getFullImageUrl(imageUrl: string | undefined): string {
         if (!imageUrl) return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
-        
+
         try {
             // If it's already a full URL, return it
             if (imageUrl.startsWith('http')) {
                 return imageUrl;
             }
-            
+
             // Get the base URL from the API configuration
             const baseUrl = API_BASE_URL.replace('/api', '');
-            
+
             // Handle different path formats
             let fullUrl;
             if (imageUrl.startsWith('/uploads/')) {
@@ -1197,7 +1225,7 @@ export class Api implements ApiService {
                             isArray: Array.isArray(response.data)
                         });
                     }
-                    
+
                     if (!response.data) {
                         if (DEBUG_API) {
                             console.log('[API] No data in coupons response');
@@ -1206,11 +1234,11 @@ export class Api implements ApiService {
                         this.couponsCache = { data: res.data, ts: Date.now() };
                         return res;
                     }
-        
+
                     // Ensure we're returning an array and transform the data if needed
-                    let coupons = Array.isArray(response.data) ? response.data : 
-                                 Array.isArray(response.data.data) ? response.data.data : [];
-        
+                    let coupons = Array.isArray(response.data) ? response.data :
+                        Array.isArray(response.data.data) ? response.data.data : [];
+
                     // Transform the coupons to ensure consistent data structure
                     coupons = coupons.map((coupon: any) => ({
                         id: coupon.id,
@@ -1222,7 +1250,7 @@ export class Api implements ApiService {
                         end_date: coupon.end_date,
                         is_active: Boolean(coupon.is_active)
                     }));
-                    
+
                     if (DEBUG_API) {
                         console.log('[API] Processed coupons count:', Array.isArray(coupons) ? coupons.length : 0);
                     }
@@ -1253,7 +1281,7 @@ export class Api implements ApiService {
                 data: error.response?.data,
                 stack: error.stack
             });
-            
+
             return {
                 data: null,
                 error: error.response?.data?.error || error.message || 'Failed to fetch coupons'
@@ -1279,7 +1307,7 @@ export class Api implements ApiService {
                 console.log('[API] Fetching cart items...');
             }
             const response = await this.get<any>(this.ENDPOINTS.CART);
-            
+
             if (response.error) {
                 if (DEBUG_API) {
                     console.error('[API] Error fetching cart:', response.error);
@@ -1306,21 +1334,21 @@ export class Api implements ApiService {
                 console.log('[API] Fetching payment methods from:', this.ENDPOINTS.PAYMENT_METHODS);
             }
             const response = await this.get<any[]>(this.ENDPOINTS.PAYMENT_METHODS);
-            
+
             if (response.error) {
                 if (DEBUG_API) {
                     console.warn('[API] Error fetching payment methods:', response.error);
                 }
                 throw new Error(response.error);
             }
-            
+
             if (!response.data) {
                 if (DEBUG_API) {
                     console.warn('[API] No payment methods data received');
                 }
                 throw new Error('No payment methods available');
             }
-            
+
             if (DEBUG_API) {
                 console.log('[API] Payment methods fetched successfully:', response.data);
             }
@@ -1369,10 +1397,10 @@ export class Api implements ApiService {
             }
 
             // Ensure all items have required fields
-            const validItems = orderData.items.every((item: any) => 
-                item.product_id && 
-                item.quantity && 
-                item.price && 
+            const validItems = orderData.items.every((item: any) =>
+                item.product_id &&
+                item.quantity &&
+                item.price &&
                 item.name
             );
 
@@ -1430,7 +1458,7 @@ export class Api implements ApiService {
                 console.log('[API] Requesting signup OTP for:', email);
                 console.log('[API] Using base URL:', this.client.defaults.baseURL);
             }
-            
+
             const response = await this.client.post(
                 this.ENDPOINTS.REQUEST_SIGNUP_OTP,
                 { email },
@@ -1441,21 +1469,21 @@ export class Api implements ApiService {
                     }
                 }
             );
-            
+
             if (DEBUG_API) {
                 console.log('[API] OTP request response:', {
                     status: response.status,
                     data: response.data
                 });
             }
-            
+
             return { data: response.data };
         } catch (error: any) {
             console.error('[API] Error in requestSignupOTP:', error);
-            
+
             // Check if it's a network error
             if (!error.response) {
-                return { 
+                return {
                     error: 'Unable to connect to the server. Please check your connection.',
                     details: {
                         baseUrl: this.client.defaults.baseURL,
@@ -1463,13 +1491,13 @@ export class Api implements ApiService {
                     }
                 };
             }
-            
+
             // Handle specific error responses
             if (error.response?.status === 400) {
                 return { error: error.response.data?.error || 'Invalid email address' };
             }
-            
-            return { 
+
+            return {
                 error: error.response?.data?.error || error.message || 'Failed to send verification code',
                 details: {
                     status: error.response?.status,
@@ -1497,11 +1525,11 @@ export class Api implements ApiService {
             // Handle specific error cases with user-friendly messages
             if (axios.isAxiosError(error)) {
                 if (!error.response || error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-                    return { 
+                    return {
                         error: 'Unable to connect to the server. Please check your internet connection.'
                     };
                 }
-                
+
                 if (error.response?.status === 400) {
                     const errorMessage = error.response.data?.error;
                     if (errorMessage?.includes('expired')) {
@@ -1513,7 +1541,7 @@ export class Api implements ApiService {
                     return { error: 'Invalid verification code. Please try again.' };
                 }
             }
-            
+
             return {
                 error: 'Failed to verify code. Please try again.'
             };

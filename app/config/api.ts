@@ -2,15 +2,15 @@ import Constants from 'expo-constants';
 import axios, { AxiosInstance } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEV_CONFIG } from './dev';
-import { 
-    ApiService, 
-    ApiResponse, 
+import {
+    ApiService,
+    ApiResponse,
     ProductData,
     AuthResponse,
     GoogleAuthResponse,
     UserProfile,
     Category,
-    Address 
+    Address
 } from '../types/api';
 
 // Debug gating to avoid log storms in development
@@ -32,11 +32,11 @@ const wsSubscribers = new Set<(data: any) => void>();
 // Initialize WebSocket connection
 const initWebSocket = async (userId: string | null) => {
     if (!userId) return;
-    
+
     try {
         // Use dev config for WebSocket URL
         const wsUrl = DEV_CONFIG.getWsUrl();
-        
+
         if (ws?.readyState === WebSocket.OPEN) {
             if (DEBUG_API) console.log('[WebSocket] Already connected');
             return;
@@ -131,7 +131,7 @@ export const testApiReachable = async () => {
     try {
         const url = getBaseUrl();
         if (DEBUG_API) console.log('[API Config] Testing connection to:', url);
-        
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased timeout to 10 seconds
 
@@ -144,12 +144,12 @@ export const testApiReachable = async () => {
         });
 
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
             if (DEBUG_API) console.error('[API Config] API health check failed:', response.status, response.statusText);
             return false;
         }
-        
+
         if (DEBUG_API) console.log('[API Config] API is reachable at:', url);
         return true;
     } catch (error) {
@@ -173,92 +173,93 @@ export const API_CONFIG = {
     RETRY_DELAY: 2000,
     BASE_URL: getBaseUrl(),
     ENDPOINTS: {
-      // Auth object for grouped auth endpoints
-      AUTH: {
+        // Auth object for grouped auth endpoints
+        AUTH: {
+            LOGIN: '/auth/login',
+            REGISTER: '/auth/register',
+        },
+
+        // Health check
+        HEALTH: '/health',
+
+        // Auth endpoints
         LOGIN: '/auth/login',
         REGISTER: '/auth/register',
-      },
-      
-      // Health check
-      HEALTH: '/health',
-      
-      // Auth endpoints
-      LOGIN: '/auth/login',
-      REGISTER: '/auth/register',
-      LOGOUT: '/auth/logout',
-      FORGOT_PASSWORD: '/auth/forgot-password',
-      VERIFY_RESET_OTP: '/auth/verify-reset-otp',
-      RESET_PASSWORD: '/auth/reset-password',
-      REQUEST_SIGNUP_OTP: '/auth/request-signup-otp',
-      VERIFY_SIGNUP_OTP: '/auth/verify-signup-otp',
-      
-      // Product endpoints
-      PRODUCTS: '/products',
-      PRODUCT_DETAILS: (id: number) => `/products/${id}`,
-      PRODUCT_REVIEWS: (id: number) => `/products/${id}/reviews`,
-      BRAND_REVIEWS: '/brand-reviews',
-      
-      // Category endpoints
-      CATEGORIES: '/categories',
-      CATEGORY_DETAILS: (id: number) => `/categories/${id}`,
-      
-      // Cart endpoints
-      CART: '/cart',
-      CART_ITEM: (id: number) => `/cart/${id}`,
-      CART_TOGGLE: (id: number) => `/cart/${id}/select`,
-      
-      // Wishlist endpoints
-      WISHLIST: '/wishlist',
-      WISHLIST_ITEM: (id: number) => `/wishlist/${id}`,
-      
-      // Order endpoints
-      ORDERS: '/orders',
-      ORDER_DETAILS: (id: number) => `/orders/${id}`,
-      
-      // User endpoints
-      USER_DASHBOARD: '/users/dashboard',
-      USER_PROFILE: '/users/profile',
-      USER_PROFILE_PHOTO: '/users/profile/photo',
-      
-      // Admin endpoints
-      ADMIN_STATS: '/admin/stats',
-      ADMIN_PRODUCTS: '/admin/products',
-      ADMIN_PRODUCT: (id: number) => `/admin/products/${id}`,
-      ADMIN_ORDERS: '/admin/orders',
-      ADMIN_ORDERS_EXPORT: '/admin/orders/export',
-      ADMIN_ORDER_STATUS: (id: string) => `/admin/orders/${id}/status`,
-      ADMIN_REVIEWS: '/admin/reviews',
-      ADMIN_REVIEW: (id: number) => `/admin/reviews/${id}`,
-      ADMIN_USERS: '/admin/users',
-      ADMIN_CATEGORIES: '/admin/categories',
-      ADMIN_CATEGORY: (id: number) => `/admin/categories/${id}`,
-      
-      // Address endpoints
-      ADDRESSES: '/addresses',
-      ADDRESS: (id: number) => `/addresses/${id}`,
-      ADDRESS_DEFAULT: (id: number) => `/addresses/${id}/default`,
-      
-      // Notification endpoints
-      NOTIFICATIONS: '/notifications',
-      NOTIFICATION_READ: (id: number) => `/notifications/${id}/read`,
-      
-      // Coupon endpoints
-      VALIDATE_COUPON: '/coupons/validate',
-      APPLY_COUPON: '/coupons/apply',
-      ADMIN_COUPONS: '/admin/coupons',
-      GET_COUPONS: '/coupons',
+        LOGOUT: '/auth/logout',
+        FORGOT_PASSWORD: '/auth/forgot-password',
+        VERIFY_RESET_OTP: '/auth/verify-reset-otp',
+        RESET_PASSWORD: '/auth/reset-password',
+        REQUEST_SIGNUP_OTP: '/auth/request-signup-otp',
+        VERIFY_SIGNUP_OTP: '/auth/verify-signup-otp',
 
-      // Combo offers endpoints
-      COMBOS: '/combos',
-      COMBO_DETAILS: (id: number) => `/combos/${id}`,
-      ADMIN_COMBOS: '/admin/combos',
-      ADMIN_COMBOS_ALL: '/admin/combos/all',
+        // Product endpoints
+        PRODUCTS: '/products',
+        PRODUCT_DETAILS: (id: number) => `/products/${id}`,
+        PRODUCT_REVIEWS: (id: number) => `/products/${id}/reviews`,
+        BRAND_REVIEWS: '/brand-reviews',
 
-      // Payment endpoints
-      PAYMENT_METHODS: '/payments/payment-methods' as const,
+        // Category endpoints
+        CATEGORIES: '/categories',
+        CATEGORY_DETAILS: (id: number) => `/categories/${id}`,
 
-      // Delivery endpoints
-      CHECK_DELIVERY: (pincode: string) => `/check-delivery/${pincode}`,
+        // Cart endpoints
+        CART: '/cart',
+        CART_ITEM: (id: number) => `/cart/${id}`,
+        CART_TOGGLE: (id: number) => `/cart/${id}/select`,
+
+        // Wishlist endpoints
+        WISHLIST: '/wishlist',
+        WISHLIST_ITEM: (id: number) => `/wishlist/${id}`,
+
+        // Order endpoints
+        ORDERS: '/orders',
+        ORDER_DETAILS: (id: number) => `/orders/${id}`,
+
+        // User endpoints
+        USER_DASHBOARD: '/users/dashboard',
+        USER_PROFILE: '/users/profile',
+        USER_PROFILE_PHOTO: '/users/profile/photo',
+
+        // Admin endpoints
+        ADMIN_STATS: '/admin/stats',
+        ADMIN_PRODUCTS: '/admin/products',
+        ADMIN_PRODUCT: (id: number) => `/admin/products/${id}`,
+        ADMIN_ORDERS: '/admin/orders',
+        ADMIN_ORDERS_EXPORT: '/admin/orders/export',
+        ADMIN_ORDER_STATUS: (id: string) => `/admin/orders/${id}/status`,
+        ADMIN_REVIEWS: '/admin/reviews',
+        ADMIN_REVIEW: (id: number) => `/admin/reviews/${id}`,
+        ADMIN_USERS: '/admin/users',
+        ADMIN_CATEGORIES: '/admin/categories',
+        ADMIN_CATEGORY: (id: number) => `/admin/categories/${id}`,
+        ADMIN_CATEGORY_PRODUCTS: (id: number) => `/admin/categories/${id}/products`,
+
+        // Address endpoints
+        ADDRESSES: '/addresses',
+        ADDRESS: (id: number) => `/addresses/${id}`,
+        ADDRESS_DEFAULT: (id: number) => `/addresses/${id}/default`,
+
+        // Notification endpoints
+        NOTIFICATIONS: '/notifications',
+        NOTIFICATION_READ: (id: number) => `/notifications/${id}/read`,
+
+        // Coupon endpoints
+        VALIDATE_COUPON: '/coupons/validate',
+        APPLY_COUPON: '/coupons/apply',
+        ADMIN_COUPONS: '/admin/coupons',
+        GET_COUPONS: '/coupons',
+
+        // Combo offers endpoints
+        COMBOS: '/combos',
+        COMBO_DETAILS: (id: number) => `/combos/${id}`,
+        ADMIN_COMBOS: '/admin/combos',
+        ADMIN_COMBOS_ALL: '/admin/combos/all',
+
+        // Payment endpoints
+        PAYMENT_METHODS: '/payments/payment-methods' as const,
+
+        // Delivery endpoints
+        CHECK_DELIVERY: (pincode: string) => `/check-delivery/${pincode}`,
     } as const,
     HEADERS: {
         'Accept': 'application/json',
@@ -491,7 +492,7 @@ export class Api implements ApiService {
     async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
         const response = await this.post<AuthResponse>(this.ENDPOINTS.LOGIN, { email, password });
         const userData = response.data?.user as { id: string } | undefined;
-        
+
         if (userData?.id) {
             this.userId = userData.id;
             await initWebSocket(this.userId);
@@ -529,6 +530,14 @@ export class Api implements ApiService {
         return this.get(this.ENDPOINTS.CATEGORY_DETAILS(id));
     }
 
+    async getCategoryProducts(categoryId: number): Promise<ApiResponse<any[]>> {
+        return this.get(this.ENDPOINTS.ADMIN_CATEGORY_PRODUCTS(categoryId));
+    }
+
+    async updateCategoryProducts(categoryId: number, productIds: number[]): Promise<ApiResponse<any>> {
+        return this.post(this.ENDPOINTS.ADMIN_CATEGORY_PRODUCTS(categoryId), { product_ids: productIds });
+    }
+
     // Product methods
     async getAdminProducts(queryParams?: string): Promise<ApiResponse<ProductData[]>> {
         const endpoint = queryParams ? `${this.ENDPOINTS.PRODUCTS}?${queryParams}` : this.ENDPOINTS.PRODUCTS;
@@ -563,21 +572,21 @@ export class Api implements ApiService {
     async addProduct(formData: FormData): Promise<ApiResponse<ProductData>> {
         try {
             console.log('[API] Adding product');
-            
+
             // Log FormData entries for debugging
             const formDataEntries = Array.from(formData.entries());
             console.log('[API] Form data entries:', formDataEntries);
 
             // Create a new FormData instance
             const processedFormData = new FormData();
-            
+
             // Process each entry in the FormData
             for (const [key, value] of formDataEntries) {
                 if (key === 'images') {
                     try {
                         // Handle image data
                         const imageData: ImageData = typeof value === 'string' ? JSON.parse(value) : value;
-                        
+
                         if (imageData.uri) {
                             // If the image is from device/local storage
                             if (imageData.uri.startsWith('file://') || imageData.uri.startsWith('content://')) {
@@ -611,6 +620,7 @@ export class Api implements ApiService {
                     'Content-Type': 'multipart/form-data',
                     'Accept': 'application/json'
                 },
+                transformRequest: (data: any) => data, // Prevent Axios from stringifying/serializing the FormData
                 timeout: 30000, // 30 seconds timeout
                 maxBodyLength: Infinity, // Allow large file uploads
                 maxContentLength: Infinity
@@ -622,9 +632,9 @@ export class Api implements ApiService {
                 processedFormData,
                 config
             );
-            
+
             console.log('[API] Product add response:', response.data);
-            return { 
+            return {
                 data: response.data,
                 error: undefined
             };
@@ -639,8 +649,8 @@ export class Api implements ApiService {
             });
 
             // Return a more descriptive error message
-            return { 
-                data: null, 
+            return {
+                data: null,
                 error: error.response?.data?.message || error.message || 'Failed to add product. Please check your connection and try again.'
             };
         }
@@ -649,7 +659,7 @@ export class Api implements ApiService {
     async updateProduct(id: number, formData: FormData): Promise<ApiResponse<ProductData>> {
         try {
             console.log('[API] Updating product:', { id });
-            
+
             // Log FormData entries for debugging
             const formDataEntries = Array.from(formData.entries());
             console.log('[API] Form data entries:', formDataEntries);
@@ -660,6 +670,7 @@ export class Api implements ApiService {
                     'Content-Type': 'multipart/form-data',
                     'Accept': 'application/json'
                 },
+                transformRequest: (data: any) => data, // Prevent Axios from stringifying/serializing the FormData
                 timeout: 60000, // Increase timeout to 60 seconds for image uploads
                 maxBodyLength: Infinity,
                 maxContentLength: Infinity,
@@ -830,11 +841,11 @@ export class Api implements ApiService {
         return this.get(this.ENDPOINTS.ADMIN_CATEGORIES);
     }
 
-    async addCategory(data: { name: string; description: string }): Promise<ApiResponse<Category>> {
+    async addCategory(data: FormData | { name: string; description: string }): Promise<ApiResponse<Category>> {
         return this.post(this.ENDPOINTS.ADMIN_CATEGORIES, data);
     }
 
-    async updateCategory(id: number, data: Partial<Category>): Promise<ApiResponse<Category>> {
+    async updateCategory(id: number, data: FormData | Partial<Category>): Promise<ApiResponse<Category>> {
         return this.put(this.ENDPOINTS.ADMIN_CATEGORY(id), data);
     }
 
@@ -854,16 +865,16 @@ export class Api implements ApiService {
     // Helper methods
     getFullImageUrl(imageUrl: string | undefined): string {
         if (!imageUrl) return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
-        
+
         try {
             // If it's already a full URL, return it
             if (imageUrl.startsWith('http')) {
                 return imageUrl;
             }
-            
+
             // Get the base URL from the API configuration
             const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-            
+
             // Handle different path formats
             let fullUrl;
             if (imageUrl.startsWith('/uploads/')) {

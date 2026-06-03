@@ -176,17 +176,7 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) {
-        Alert.alert(
-          'Login Required',
-          'Please login to add items to your cart',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Login',
-              onPress: () => router.push('/auth/login'),
-            },
-          ]
-        );
+        router.push('/auth/login');
         return;
       }
 
@@ -235,7 +225,7 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
         const itemQuantity = Number(comboItem.quantity || 1);
         const itemTotalPrice = itemPrice * itemQuantity; // Total price for this item (with quantity)
         const offerPercentage = Number(comboItem.offer_percentage || 0);
-        
+
         const product = {
           id: comboItem.product_id,
           name: comboItem.name || `Product ${comboItem.product_id}`,
@@ -327,11 +317,11 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
         <View style={styles.comboProductsRow}>
           {comboImages.length > 0 ? (
             comboImages.map((img, idx) => (
-              <Image 
+              <Image
                 key={idx}
                 source={{ uri: apiService.getFullImageUrl(img) }}
                 style={[styles.comboProductImage, idx === comboImages.length - 1 && styles.lastImage]}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             ))
           ) : (
@@ -348,13 +338,13 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
             )}
           </View>
           <Text style={styles.comboSaveText}>
-            Save {item.discount_type === 'percentage' 
-              ? `${Number(item.discount_value || 0)}%` 
+            Save {item.discount_type === 'percentage'
+              ? `${Number(item.discount_value || 0)}%`
               : `₹${Number(item.discount_value || 0)}`}
           </Text>
         </View>
         <View style={styles.buttonRow}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.viewComboButton}
             onPress={handleCardPress}
             activeOpacity={0.9}
@@ -364,7 +354,7 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
           </TouchableOpacity>
           {status === 'active' && (
             <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addToCartButton}
                 onPress={handleAddToCart}
                 disabled={isAddingToCart}
@@ -392,7 +382,7 @@ export default function ComboOffersPage() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [combos, setCombos] = useState<any[]>([]);
-  
+
   // Animation for list fade in
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -480,7 +470,7 @@ export default function ComboOffersPage() {
     if (res.data) {
       // Show all combos (active, upcoming, expired)
       setCombos(res.data as any[]);
-      
+
       // Animate list entrance
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -506,8 +496,8 @@ export default function ComboOffersPage() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           title: 'Combo Offers',
           headerStyle: {
             backgroundColor: '#694d21',
@@ -517,7 +507,7 @@ export default function ComboOffersPage() {
             fontWeight: '600',
             color: '#fff',
           },
-        }} 
+        }}
       />
       <View style={styles.container}>
         {loading ? (
@@ -646,7 +636,7 @@ const styles = StyleSheet.create({
     width: (screenWidth - 56) / 2,
     height: 100,
     borderRadius: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#fff',
     marginRight: 8,
   },
   lastImage: {

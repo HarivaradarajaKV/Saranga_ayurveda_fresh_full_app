@@ -163,6 +163,15 @@ export default function EditAddressPage() {
         options={{
           title: 'Edit Address',
           headerShown: true,
+          headerStyle: {
+            backgroundColor: '#f8f6f0',
+          },
+          headerTintColor: '#694d21',
+          headerTitleStyle: {
+            fontFamily: 'CormorantGaramond-Bold',
+            fontWeight: '700',
+            fontSize: 20,
+          },
         }}
       />
       <ScrollView style={styles.container}>
@@ -313,12 +322,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
     marginBottom: 8,
   },
   input: {
+    fontFamily: 'CormorantGaramond-Medium',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -331,6 +342,7 @@ const styles = StyleSheet.create({
     borderColor: '#ff4444',
   },
   errorText: {
+    fontFamily: 'CormorantGaramond-Medium',
     color: '#ff4444',
     fontSize: 12,
     marginTop: 4,
@@ -358,11 +370,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#007bff',
   },
   addressTypeText: {
+    fontFamily: 'CormorantGaramond-Bold',
     marginLeft: 8,
     color: '#666',
     fontWeight: '500',
   },
   addressTypeTextActive: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
   },
   buttonContainer: {
@@ -376,6 +390,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   submitButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -389,6 +404,7 @@ const styles = StyleSheet.create({
     borderColor: '#ff4444',
   },
   deleteButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#ff4444',
     fontSize: 16,
     fontWeight: 'bold',

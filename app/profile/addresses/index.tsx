@@ -56,18 +56,12 @@ export default function AddressListPage() {
     ]).start();
   }, []);
 
-  const handleAddressSelect = (address: Address) => {
-    if (mode === 'select' && returnTo === 'checkout') {
-      // Immediately navigate back to checkout with the selected address
-      router.back();
-      // Use setTimeout to ensure the navigation happens first
-      setTimeout(() => {
-        router.replace({
-          pathname: '/checkout',
-          params: { selectedAddressId: address.id.toString() }
-        });
-      }, 0);
-    }
+  const handleAddressSelect = async (address: Address) => {
+    await setDefaultAddress(address.id);
+    router.back();
+    setTimeout(() => {
+      router.replace('/(tabs)/cart');
+    }, 0);
   };
 
   const renderAddressIcon = () => {
@@ -78,68 +72,31 @@ export default function AddressListPage() {
     <SafeAreaView style={styles.safeArea}>
       <Stack.Screen
         options={{
-          title: mode === 'select' ? 'Select Address' : 'My Addresses',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#f8f6f0',
-          },
-          headerTintColor: '#694d21',
-          headerTitleStyle: {
-            fontWeight: '700',
-            fontSize: 20,
-          },
-          headerShadowVisible: true,
+          headerShown: false,
         }}
       />
       <LinearGradient
         colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
         style={StyleSheet.absoluteFill}
       />
+      <View style={styles.headerSection}>
+        <Text style={styles.brandTitle}>Address</Text>
+      </View>
       <View style={styles.container}>
-        <Animated.View 
-          style={[
-            styles.header,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: fadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-20, 0]
-              })}]
-            }
-          ]}
-        >
-          <LinearGradient
-            colors={['#f8f6f0', '#f5f2eb', '#fff']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerGradient}
-          >
-            <View style={styles.iconBadge}>
-              <Ionicons name="location" size={28} color="#694d21" />
-            </View>
-            <Text style={styles.headerTitle}>
-              {addresses.length} {addresses.length === 1 ? 'Address' : 'Addresses'} Saved
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              Manage your delivery locations
-            </Text>
-          </LinearGradient>
-        </Animated.View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.addressList}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {addresses.map((address, index) => (
+          {addresses.length > 0 ? (
             <Animated.View
-              key={address.id}
               style={[
                 styles.addressCard,
                 {
                   opacity: fadeAnim,
                   transform: [{ scale: scaleAnim }],
-                  marginBottom: index === addresses.length - 1 ? 100 : 16
+                  marginBottom: 100
                 }
               ]}
             >
@@ -150,92 +107,117 @@ export default function AddressListPage() {
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <TouchableOpacity
-                  onPress={() => handleAddressSelect(address)}
-                  activeOpacity={0.9}
-                  style={styles.cardContent}
-                >
-                  <View style={styles.addressHeader}>
+                <View style={styles.cardContent}>
+                  {/* Unified Delivery Address Header */}
+                  <View style={[styles.addressHeader, { marginBottom: 16 }]}>
                     <View style={styles.addressType}>
-                        <LinearGradient
-                          colors={['#694d21', '#5a3f1a']}
-                          style={styles.iconContainer}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                        >
-                          <Ionicons
-                            name={renderAddressIcon()}
-                            size={20}
-                            color="#fff"
-                          />
-                        </LinearGradient>
+                      <View
+                        style={[
+                          styles.iconContainer,
+                          {
+                            backgroundColor: '#f2f4f0',
+                            borderWidth: 1,
+                            borderColor: 'rgba(43, 58, 26, 0.1)',
+                            shadowColor: 'transparent',
+                            elevation: 0,
+                            padding: 8,
+                            borderRadius: 10,
+                          }
+                        ]}
+                      >
+                        <Ionicons
+                          name={renderAddressIcon()}
+                          size={16}
+                          color="#2b3a1a"
+                        />
+                      </View>
                       <View style={styles.typeContainer}>
-                        <Text style={styles.addressTypeText}>Delivery Address</Text>
-                        {address.is_default && (
-                          <View style={styles.defaultBadge}>
-                            <Text style={styles.defaultText}>Default</Text>
+                        <Text style={styles.addressTypeText}>Delivery To</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* List of addresses inside this single section */}
+                  {addresses.map((address, index) => (
+                    <TouchableOpacity
+                      key={address.id}
+                      onPress={() => handleAddressSelect(address)}
+                      activeOpacity={0.9}
+                      style={[
+                        {
+                          marginTop: index > 0 ? 12 : 0,
+                          borderTopWidth: index > 0 ? 1 : 0,
+                          borderColor: 'rgba(43, 58, 26, 0.08)',
+                          paddingTop: index > 0 ? 16 : 0,
+                        }
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+                          <Text style={[styles.name, { marginBottom: 0 }]}>{address.full_name}</Text>
+                          {address.is_default && (
+                            <View style={styles.defaultBadge}>
+                              <Text style={styles.defaultText}>Default</Text>
+                            </View>
+                          )}
+                        </View>
+                        {mode !== 'select' && (
+                          <View style={styles.actionButtons}>
+                            <TouchableOpacity
+                              style={[styles.actionButton, styles.editButton, { borderColor: '#2b3a1a', backgroundColor: '#f2f4f0' }]}
+                              onPress={() => router.push({
+                                pathname: '/profile/addresses/edit',
+                                params: { id: address.id }
+                              })}
+                            >
+                              <Ionicons name="pencil" size={16} color="#2b3a1a" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionButton, styles.deleteButton]}
+                              onPress={() => deleteAddress(address.id)}
+                            >
+                              <Ionicons name="trash-outline" size={16} color="#ff4444" />
+                            </TouchableOpacity>
                           </View>
                         )}
                       </View>
-                    </View>
-                    {mode !== 'select' && (
-                      <View style={styles.actionButtons}>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.editButton]}
-                          onPress={() => router.push({
-                            pathname: '/profile/addresses/edit',
-                            params: { id: address.id }
-                          })}
-                        >
-                          <Ionicons name="pencil" size={18} color="#694d21" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.deleteButton]}
-                          onPress={() => deleteAddress(address.id)}
-                        >
-                          <Ionicons name="trash-outline" size={18} color="#ff4444" />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
+                      <Text style={styles.addressText}>
+                        {address.address_line1}
+                        {address.address_line2 ? `, ${address.address_line2}` : ''}
+                      </Text>
+                      <Text style={styles.addressText}>
+                        {address.city}, {address.state} - {address.postal_code}
+                      </Text>
+                      <Text style={styles.phone}>
+                        <Ionicons name="call-outline" size={14} color="#2b3a1a" /> {address.phone_number}
+                      </Text>
 
-                  <View style={styles.addressDetails}>
-                    <Text style={styles.name}>{address.full_name}</Text>
-                    <Text style={styles.addressText}>
-                      {address.address_line1}
-                      {address.address_line2 ? `, ${address.address_line2}` : ''}
-                    </Text>
-                    <Text style={styles.addressText}>
-                      {address.city}, {address.state} - {address.postal_code}
-                    </Text>
-                    <Text style={styles.phone}>
-                      <Ionicons name="call-outline" size={14} color="#666" /> {address.phone_number}
-                    </Text>
-                  </View>
-
-                  {!address.is_default && mode !== 'select' && (
-                    <TouchableOpacity
-                      style={styles.setDefaultButton}
-                      onPress={() => setDefaultAddress(address.id)}
-                    >
-                      <LinearGradient
-                        colors={['#694d21', '#5a3f1a']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.defaultGradient}
-                      >
-                        <Ionicons name="star" size={16} color="#fff" style={styles.defaultIcon} />
-                        <Text style={styles.setDefaultText}>Set as Default</Text>
-                      </LinearGradient>
+                      {!address.is_default && mode !== 'select' && (
+                        <TouchableOpacity
+                          style={styles.setDefaultButton}
+                          onPress={() => handleAddressSelect(address)}
+                        >
+                          <LinearGradient
+                            colors={['#2b3a1a', '#1e2912']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.defaultGradient}
+                          >
+                            <Text style={styles.setDefaultText}>Set as Default</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      )}
                     </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
+                  ))}
+                </View>
               </BlurView>
             </Animated.View>
-          ))}
+          ) : (
+            null
+          )}
 
           {addresses.length === 0 && (
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.emptyState,
                 {
@@ -248,7 +230,7 @@ export default function AddressListPage() {
                 colors={['#f8f6f0', '#f5f2eb']}
                 style={styles.emptyStateGradient}
               >
-                <Ionicons name="location-outline" size={64} color="#694d21" />
+                <Ionicons name="location-outline" size={64} color="#2b3a1a" />
                 <Text style={styles.emptyStateText}>No addresses saved yet</Text>
                 <Text style={styles.emptyStateSubtext}>
                   Add your delivery addresses to make checkout faster
@@ -263,7 +245,7 @@ export default function AddressListPage() {
           onPress={() => router.push('/profile/addresses/new')}
         >
           <LinearGradient
-            colors={['#694d21', '#5a3f1a']}
+            colors={['#2b3a1a', '#1e2912']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.addButtonGradient}
@@ -282,6 +264,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight ?? 0) + 20,
+    paddingBottom: 6,
+    zIndex: 10,
+  },
+  brandTitle: {
+    fontSize: 42,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Bold',
+    letterSpacing: 1,
+    marginBottom: 16,
   },
   container: {
     flex: 1,
@@ -310,7 +305,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -319,6 +314,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(105, 77, 33, 0.1)',
   },
   headerTitle: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 26,
     fontWeight: '700',
     color: '#2c3e50',
@@ -326,6 +322,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   headerSubtitle: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 15,
     color: '#666',
     fontWeight: '500',
@@ -377,6 +374,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   addressTypeText: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 17,
     fontWeight: '700',
     color: '#2c3e50',
@@ -392,7 +390,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(105, 77, 33, 0.2)',
   },
   defaultText: {
-    color: '#694d21',
+    fontFamily: 'CormorantGaramond-Bold',
+    color: '#2b3a1a',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -428,6 +427,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   name: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 18,
     fontWeight: '700',
     color: '#2c3e50',
@@ -435,6 +435,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   addressText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#555',
     marginBottom: 6,
@@ -442,6 +443,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   phone: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
     marginTop: 8,
@@ -449,22 +451,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   setDefaultButton: {
-    overflow: 'hidden',
+    alignSelf: 'flex-start',
     borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8,
   },
   defaultGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   defaultIcon: {
     marginRight: 6,
   },
   setDefaultText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
   },
   addButton: {
     position: 'absolute',
@@ -474,7 +480,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 8,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -486,6 +492,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   addButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
@@ -506,6 +513,7 @@ const styles = StyleSheet.create({
     width: width - 48,
   },
   emptyStateText: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 20,
     fontWeight: '600',
     color: '#333',
@@ -513,6 +521,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyStateSubtext: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
     textAlign: 'center',

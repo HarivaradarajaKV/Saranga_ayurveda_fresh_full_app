@@ -85,6 +85,8 @@ export interface ApiService {
     getUserDashboard: () => Promise<ApiResponse<any>>;
     getCategories: () => Promise<ApiResponse<Category[]>>;
     getCategoryDetails: <T>(id: number) => Promise<ApiResponse<T>>;
+    getCategoryProducts: (categoryId: number) => Promise<ApiResponse<any[]>>;
+    updateCategoryProducts: (categoryId: number, productIds: number[]) => Promise<ApiResponse<any>>;
     testConnection: () => Promise<boolean>;
     getAddresses: () => Promise<Address[]>;
     addAddress: (address: Omit<Address, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<Address>;
@@ -94,8 +96,8 @@ export interface ApiService {
     updateUserProfile: (data: Partial<UserProfile>) => Promise<ApiResponse<UserProfile>>;
     uploadProfilePhoto: (formData: FormData) => Promise<ApiResponse<{ photo_url: string }>>;
     getAdminCategories: () => Promise<ApiResponse<Category[]>>;
-    addCategory: (data: { name: string; description: string }) => Promise<ApiResponse<Category>>;
-    updateCategory: (id: number, data: Partial<Category>) => Promise<ApiResponse<Category>>;
+    addCategory: (data: FormData | { name: string; description: string }) => Promise<ApiResponse<Category>>;
+    updateCategory: (id: number, data: FormData | Partial<Category>) => Promise<ApiResponse<Category>>;
     deleteCategory: (id: number) => Promise<ApiResponse<void>>;
     getAdminProducts: (queryParams?: string) => Promise<ApiResponse<ProductData[]>>;
     addProduct: (formData: FormData) => Promise<ApiResponse<ProductData>>;

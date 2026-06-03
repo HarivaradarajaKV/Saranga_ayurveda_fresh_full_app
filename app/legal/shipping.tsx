@@ -1,17 +1,31 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ShippingPolicyScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   return (
     <>
       <Stack.Screen
         options={{
-          title: 'Shipping Policy',
-          headerShown: true,
+          headerShown: false,
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={[styles.safeContainer, { paddingTop: insets.top }]}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#2b3a1a" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.content}>
           <Text style={styles.title}>Shipping Policy</Text>
           <Text style={styles.lastUpdated}>Last updated: February 24, 2024</Text>
@@ -53,14 +67,29 @@ export default function ShippingPolicyScreen() {
           </Text>
         </View>
       </ScrollView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: '#fbf7f4',
+  },
+  headerRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fbf7f4',
+  },
+  backButton: {
+    padding: 4,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fffbe9',
+    backgroundColor: '#fbf7f4',
   },
   contentContainer: {
     padding: 16,
@@ -70,30 +99,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#efd8bb',
+    borderColor: 'rgba(43, 58, 26, 0.08)',
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'CormorantGaramond-Bold',
     marginBottom: 8,
-    color: '#000',
+    color: '#2b3a1a',
   },
   lastUpdated: {
     fontSize: 14,
-    color: '#666',
+    fontFamily: 'CormorantGaramond-Medium',
+    color: '#556C3A',
     marginBottom: 24,
   },
   section: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'CormorantGaramond-Bold',
     marginTop: 24,
     marginBottom: 12,
-    color: '#000',
+    color: '#2b3a1a',
   },
   text: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: 'CormorantGaramond-Medium',
+    color: '#556C3A',
     marginBottom: 16,
   },
 }); 

@@ -29,7 +29,7 @@ export const initializeRazorpayPayment = async (orderData: any) => {
       key: razorpay_order.key,
       amount: razorpay_order.amount,
       currency: razorpay_order.currency,
-      name: 'Saranga Ayurveda',
+      name: 'Saranga Ayurveda LLP',
       description: `Order #${orderId}`,
       order_id: razorpay_order.id,
       prefill: {
@@ -37,7 +37,7 @@ export const initializeRazorpayPayment = async (orderData: any) => {
         contact: orderData.shipping_address.phone_number,
       },
       theme: {
-        color: '#FF69B4'
+        color: '#2b3a1a'
       }
     };
 

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Linking,
   ScrollView,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -55,53 +56,56 @@ export default function CallSupportPage() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{
-          title: 'Call Support',
-          headerShown: true,
-        }}
-      />
-      <ScrollView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+
+        {/* Page Header */}
         <View style={styles.header}>
-          <Ionicons name="call" size={40} color="#007bff" />
-          <Text style={styles.headerTitle}>Contact Support</Text>
+          <View style={styles.headerIconWrap}>
+            <Ionicons name="call" size={32} color="#fff" />
+          </View>
+          <Text style={styles.headerTitle}>Call Support</Text>
           <Text style={styles.headerSubtitle}>
             Choose the appropriate department to get quick assistance
           </Text>
         </View>
 
+        {/* Contact Cards */}
         {supportContacts.map((contact) => (
           <View key={contact.id} style={styles.contactCard}>
             <View style={styles.contactInfo}>
               <View style={styles.iconContainer}>
-                <Ionicons name={contact.icon} size={24} color="#007bff" />
+                <Ionicons name={contact.icon} size={22} color="#fff" />
               </View>
               <View style={styles.textContainer}>
                 <Text style={styles.contactTitle}>{contact.title}</Text>
                 <Text style={styles.contactDescription}>{contact.description}</Text>
-                <Text style={styles.availability}>
-                  <Ionicons name="time-outline" size={14} color="#666" />
-                  {' '}{contact.availability}
-                </Text>
+                <View style={styles.availabilityRow}>
+                  <Ionicons name="time-outline" size={13} color="#7a7a7a" />
+                  <Text style={styles.availability}> {contact.availability}</Text>
+                </View>
               </View>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.callButton}
               onPress={() => handleCall(contact.number)}
+              activeOpacity={0.85}
             >
-              <Ionicons name="call" size={20} color="#fff" />
+              <Ionicons name="call" size={18} color="#fff" />
               <Text style={styles.callButtonText}>Call Now</Text>
             </TouchableOpacity>
           </View>
         ))}
 
+        {/* Info box */}
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={24} color="#666" />
+          <Ionicons name="information-circle-outline" size={22} color="#2b3a1a" />
           <Text style={styles.infoText}>
-            Our support team is here to help you with any questions or concerns you may have.
+            Our support team is here to help you with any questions or concerns.
             Standard calling rates may apply.
           </Text>
         </View>
+
       </ScrollView>
     </>
   );
@@ -110,95 +114,118 @@ export default function CallSupportPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
+  },
+  contentContainer: {
+    paddingBottom: 32,
   },
   header: {
     alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#f8f9fa',
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    backgroundColor: '#fbf7f4',
+  },
+  headerIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#2b3a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-    marginTop: 16,
+    fontSize: 36,
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
+    letterSpacing: 1,
     marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#7a7a7a',
     textAlign: 'center',
+    lineHeight: 19,
   },
   contactCard: {
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 14,
     padding: 16,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
-    shadowColor: '#000',
+    borderColor: '#ede8e0',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   contactInfo: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f8f9fa',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#2b3a1a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   textContainer: {
     flex: 1,
   },
   contactTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2b3a1a',
+    marginBottom: 3,
   },
   contactDescription: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#7a7a7a',
     marginBottom: 4,
+    lineHeight: 18,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   availability: {
     fontSize: 12,
-    color: '#666',
+    color: '#7a7a7a',
   },
   callButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007bff',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: '#2b3a1a',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
   },
   callButtonText: {
     color: '#fff',
-    fontWeight: '600',
-    marginLeft: 8,
+    fontWeight: '700',
+    fontSize: 14,
+    letterSpacing: 0.3,
   },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 6,
     padding: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f3f0ea',
     borderRadius: 12,
+    gap: 10,
   },
   infoText: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#5a5a5a',
+    lineHeight: 19,
   },
-}); 
+});

@@ -20,14 +20,14 @@ export default function LegalLayout() {
       <Stack.Screen
         name="shipping"
         options={{
-          headerShown: true,
+          headerShown: false,
           title: 'Shipping Policy',
         }}
       />
       <Stack.Screen
         name="refund"
         options={{
-          headerShown: true,
+          headerShown: false,
           title: 'Refund Policy',
         }}
       />

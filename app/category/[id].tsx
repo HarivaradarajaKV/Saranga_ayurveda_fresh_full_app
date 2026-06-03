@@ -92,22 +92,6 @@ export default function CategoryPage() {
         }
     };
 
-    if (loading) {
-        return (
-            <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-        );
-    }
-
-    if (error) {
-        return (
-            <View style={styles.centerContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-            </View>
-        );
-    }
-
     return (
         <>
             <Stack.Screen 
@@ -115,22 +99,32 @@ export default function CategoryPage() {
                     title: name as string,
                     headerShown: true,
                     headerStyle: {
-                        backgroundColor: '#fff',
+                        backgroundColor: '#fbf7f4',
                     },
-                    headerShadowVisible: true,
+                    headerTintColor: '#2b3a1a',
+                    headerTitleAlign: 'center',
                     headerTitleStyle: {
-                        fontSize: 18,
-                        fontWeight: '600',
-                        color: '#000',
+                        fontFamily: 'CormorantGaramond-Bold',
+                        fontSize: 22,
+                        color: '#2b3a1a',
                     },
+                    headerShadowVisible: false,
                     contentStyle: {
-                        backgroundColor: '#fff',
+                        backgroundColor: '#fbf7f4',
                     },
                     statusBarStyle: 'dark',
                 }}
             />
             <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 0 : (StatusBar.currentHeight || 0) }]}>
-                {filteredProducts.length === 0 ? (
+                {loading ? (
+                    <View style={styles.centerContainer}>
+                        <ActivityIndicator size="large" color="#694d21" />
+                    </View>
+                ) : error ? (
+                    <View style={styles.centerContainer}>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                ) : filteredProducts.length === 0 ? (
                     <View style={styles.centerContainer}>
                         <Text style={styles.noResultsText}>
                             No products available in this category
@@ -141,7 +135,7 @@ export default function CategoryPage() {
                         data={filteredProducts}
                         renderItem={({ item }) => (
                             <View style={styles.productItem}>
-                                <ProductCard product={item} hideActions={true} />
+                                <ProductCard product={item} />
                             </View>
                         )}
                         keyExtractor={item => item.id.toString()}
@@ -149,19 +143,6 @@ export default function CategoryPage() {
                         contentContainerStyle={styles.productGrid}
                         columnWrapperStyle={styles.productRow}
                         showsVerticalScrollIndicator={false}
-                        ListHeaderComponent={
-                            <View style={styles.header}>
-                                <Text style={styles.categoryName}>{category?.name}</Text>
-                                <Text style={styles.productCount}>
-                                    {products.length} Products
-                                </Text>
-                                {category?.description && (
-                                    <Text style={styles.description}>
-                                        {category.description}
-                                    </Text>
-                                )}
-                            </View>
-                        }
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
                                 <Text style={styles.emptyText}>
@@ -179,13 +160,11 @@ export default function CategoryPage() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#fbf7f4',
     },
     header: {
         padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-        backgroundColor: '#fff',
+        backgroundColor: '#fbf7f4',
     },
     categoryName: {
         fontSize: 24,

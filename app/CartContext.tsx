@@ -334,12 +334,6 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
           .catch(error => console.error('Error saving to storage:', error));
         return updatedItems;
       });
-
-      Alert.alert(
-        'Added to Cart',
-        `${product.name}${variant ? ` (${variant})` : ''} has been added to your cart.`,
-        [{ text: 'OK' }]
-      );
     } catch (error) {
       console.error('Error adding item to cart:', error);
       throw error;

@@ -223,7 +223,6 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity style={[styles.button, styles.addToCartButton]} onPress={handleAddToCart}>
-            <Ionicons name="cart-outline" size={20} color="#007AFF" />
             <Text style={styles.addToCartText}>Add to Cart</Text>
           </TouchableOpacity>
         </View>
@@ -348,6 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     marginRight: 8,
+    backgroundColor: '#ebe8da',
   },
   checkButton: {
     backgroundColor: '#007AFF',
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   addToCartButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ebe8da',
     borderWidth: 1,
     borderColor: '#007AFF',
     marginRight: 8,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   addToCartText: {
     color: '#007AFF',
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: 0,
   },
   closeButton: {
     position: 'absolute',

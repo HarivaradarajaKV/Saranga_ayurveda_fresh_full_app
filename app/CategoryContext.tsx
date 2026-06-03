@@ -34,7 +34,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
     const [error, setError] = useState<string | null>(null);
     const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
-    const loadCachedCategories = async () => {
+    const loadCachedCategories = React.useCallback(async () => {
         try {
             const cachedData = await AsyncStorage.getItem(CATEGORIES_CACHE_KEY);
             if (cachedData) {
@@ -52,9 +52,9 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
             console.error('Error loading cached categories:', err);
             return false;
         }
-    };
+    }, []);
 
-    const fetchCategories = async (forceRefresh: boolean = false) => {
+    const fetchCategories = React.useCallback(async (forceRefresh: boolean = false) => {
         const now = Date.now();
         // Don't fetch if we've fetched recently (within last 5 minutes) unless forced
         if (!forceRefresh && now - lastFetchTime < CACHE_EXPIRY_TIME) {
@@ -76,6 +76,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
                 const cachedData = await AsyncStorage.getItem(CATEGORIES_CACHE_KEY);
                 if (cachedData) {
                     const { categories: cachedCategories } = JSON.parse(cachedData);
+                    console.log('CategoryContext: Cache hit. Count:', cachedCategories.length);
                     setCategories(cachedCategories);
                 } else {
                     // Only throw if we truly have nothing
@@ -84,6 +85,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
                     }
                 }
             } else {
+                console.log('CategoryContext: API fetch success. Count:', fetchedCategories.length);
                 setCategories(fetchedCategories);
             }
             setLastFetchTime(now);
@@ -100,7 +102,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [categories.length, lastFetchTime]);
 
     // Initial load from cache and fetch
     useEffect(() => {
@@ -111,7 +113,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
             }
         };
         initializeCategories();
-    }, []);
+    }, [loadCachedCategories, fetchCategories]);
 
     // Memoize derived category data
     const mainCategories = useMemo(() =>
@@ -142,7 +144,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         [subCategories]
     );
 
-    const value = {
+    const value = useMemo(() => ({
         categories,
         mainCategories,
         subCategories,
@@ -151,7 +153,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         fetchCategories,
         getCategoryById,
         getSubcategories,
-    };
+    }), [categories, mainCategories, subCategories, loading, error, fetchCategories, getCategoryById, getSubcategories]);
 
     return (
         <CategoryContext.Provider value={value}>

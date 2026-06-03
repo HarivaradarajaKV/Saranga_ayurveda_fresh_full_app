@@ -19,8 +19,8 @@ interface AddressContextType {
   addresses: Address[];
   loading: boolean;
   fetchAddresses: () => Promise<void>;
-  addAddress: (address: Omit<Address, 'id'>) => Promise<void>;
-  updateAddress: (id: number, address: Partial<Address>) => Promise<void>;
+  addAddress: (address: Omit<Address, 'id'>, showAlert?: boolean) => Promise<void>;
+  updateAddress: (id: number, address: Partial<Address>, showAlert?: boolean) => Promise<void>;
   deleteAddress: (id: number) => Promise<void>;
   setDefaultAddress: (id: number) => Promise<void>;
   getDefaultAddress: () => Address | undefined;
@@ -30,6 +30,14 @@ const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
 const ADDRESSES_CACHE_KEY = 'addresses_cache';
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+const sortAddresses = (list: Address[]) => {
+  return [...list].sort((a, b) => {
+    if (a.is_default && !b.is_default) return -1;
+    if (!a.is_default && b.is_default) return 1;
+    return 0;
+  });
+};
 
 export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -66,7 +74,7 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const { addresses: cachedAddresses, timestamp } = JSON.parse(cachedData);
         if (Date.now() - timestamp < CACHE_EXPIRY) {
           console.log('[AddressContext] Using cached addresses');
-          setAddresses(cachedAddresses);
+          setAddresses(sortAddresses(cachedAddresses));
           setLastFetch(timestamp);
           return true;
         }
@@ -127,7 +135,7 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (response?.data) {
         const addressesData = Array.isArray(response.data) ? response.data : [response.data];
         console.log('[AddressContext] Addresses fetched:', addressesData);
-        setAddresses(addressesData);
+        setAddresses(sortAddresses(addressesData));
         setLastFetch(Date.now());
         await saveAddressesToCache(addressesData);
       } else {
@@ -145,25 +153,29 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addAddress = async (address: Omit<Address, 'id'>) => {
+  const addAddress = async (address: Omit<Address, 'id'>, showAlert = true) => {
     try {
       setLoading(true);
       const response = await apiService.post('/addresses', address);
       if (response.data) {
         const newAddresses = [...addresses, response.data];
-        setAddresses(newAddresses);
+        setAddresses(sortAddresses(newAddresses));
         await saveAddressesToCache(newAddresses);
-        Alert.alert('Success', 'Address added successfully');
+        if (showAlert) {
+          Alert.alert('Success', 'Address added successfully');
+        }
       }
     } catch (error) {
       console.error('[AddressContext] Error adding address:', error);
-      Alert.alert('Error', 'Failed to add address');
+      if (showAlert) {
+        Alert.alert('Error', 'Failed to add address');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const updateAddress = async (id: number, address: Partial<Address>) => {
+  const updateAddress = async (id: number, address: Partial<Address>, showAlert = true) => {
     try {
       setLoading(true);
       console.log('[AddressContext] Updating address:', { id, address });
@@ -172,37 +184,49 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (address.is_default) {
         const updatedAddresses = addresses.map(addr => ({
           ...addr,
-          is_default: false
+          is_default: addr.id === id
         }));
-        setAddresses(updatedAddresses);
+        setAddresses(sortAddresses(updatedAddresses));
       }
       
       const response = await apiService.put(`/addresses/${id}`, address);
       if (response.data) {
-        const updatedAddresses = addresses.map(addr =>
-          addr.id === id ? { ...addr, ...response.data } : addr
-        );
+        const updatedAddresses = addresses.map(addr => {
+          if (addr.id === id) {
+            return { ...addr, ...response.data };
+          }
+          return {
+            ...addr,
+            is_default: response.data.is_default ? false : addr.is_default
+          };
+        });
         console.log('[AddressContext] Updated addresses:', updatedAddresses);
-        setAddresses(updatedAddresses);
-        await saveAddressesToCache(updatedAddresses);
-        Alert.alert('Success', 'Address updated successfully');
+        const finalAddresses = sortAddresses(updatedAddresses);
+        setAddresses(finalAddresses);
+        await saveAddressesToCache(finalAddresses);
+        if (showAlert) {
+          Alert.alert('Success', 'Address updated successfully');
+        }
       }
     } catch (error) {
       console.error('[AddressContext] Error updating address:', error);
-      Alert.alert('Error', 'Failed to update address');
+      if (showAlert) {
+        Alert.alert('Error', 'Failed to update address');
+      }
     } finally {
       setLoading(false);
     }
   };
-
+ 
   const deleteAddress = async (id: number) => {
     try {
       setLoading(true);
       const response = await apiService.delete(`/addresses/${id}`);
-      if (response.data?.success) {
+      if (response.data?.success || response.data?.msg) {
         const updatedAddresses = addresses.filter(addr => addr.id !== id);
-        setAddresses(updatedAddresses);
-        await saveAddressesToCache(updatedAddresses);
+        const finalAddresses = sortAddresses(updatedAddresses);
+        setAddresses(finalAddresses);
+        await saveAddressesToCache(finalAddresses);
         Alert.alert('Success', 'Address deleted successfully');
       }
     } catch (error) {
@@ -212,13 +236,25 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setLoading(false);
     }
   };
-
+ 
   const setDefaultAddress = async (id: number) => {
     try {
-      await updateAddress(id, { is_default: true });
+      setLoading(true);
+      const response = await apiService.put(`/addresses/${id}/default`, {});
+      if (response.data?.success) {
+        const updatedAddresses = addresses.map(addr => ({
+          ...addr,
+          is_default: addr.id === id
+        }));
+        const finalAddresses = sortAddresses(updatedAddresses);
+        setAddresses(finalAddresses);
+        await saveAddressesToCache(finalAddresses);
+      }
     } catch (error) {
       console.error('[AddressContext] Error setting default address:', error);
       Alert.alert('Error', 'Failed to set default address');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -253,8 +289,8 @@ export const useAddress = () => {
       addresses: [],
       loading: false,
       fetchAddresses: async () => {},
-      addAddress: async () => {},
-      updateAddress: async () => {},
+      addAddress: async (address: Omit<Address, 'id'>, showAlert?: boolean) => {},
+      updateAddress: async (id: number, address: Partial<Address>, showAlert?: boolean) => {},
       deleteAddress: async () => {},
       setDefaultAddress: async () => {},
       getDefaultAddress: () => undefined,

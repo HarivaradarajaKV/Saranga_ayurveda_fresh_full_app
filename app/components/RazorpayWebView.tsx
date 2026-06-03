@@ -1,7 +1,7 @@
 import React from 'react';
-import { Modal, Platform, StyleSheet, StatusBar } from 'react-native';
+import { Modal, Platform, StyleSheet, StatusBar, View } from 'react-native';
 import WebView from 'react-native-webview';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiService } from '../services/api';
 
 interface RazorpayWebViewProps {
@@ -21,7 +21,6 @@ const RazorpayWebView: React.FC<RazorpayWebViewProps> = ({
   onPaymentSuccess,
   onPaymentError,
 }) => {
-  const insets = useSafeAreaInsets();
   const handlePaymentCancellation = async () => {
     try {
       // Call the cancel-payment endpoint
@@ -46,20 +45,20 @@ const RazorpayWebView: React.FC<RazorpayWebViewProps> = ({
         }
         body {
           display: flex;
-          justify-content: center;
+          justifyContent: center;
           align-items: center;
           height: 100vh;
           width: 100vw;
           margin: 0;
           padding: 0;
           overflow: hidden;
-          background-color: #ffffff;
+          background-color: #fbf7f4;
         }
         #payment-button {
           width: 100%;
           height: 100%;
           display: flex;
-          justify-content: center;
+          justifyContent: center;
           align-items: center;
         }
       </style>
@@ -112,9 +111,9 @@ const RazorpayWebView: React.FC<RazorpayWebViewProps> = ({
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
         <StatusBar 
-          barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'} 
+          barStyle="dark-content" 
           translucent={false}
-          backgroundColor="#ffffff"
+          backgroundColor="#fbf7f4"
         />
         <WebView
           source={{ html: htmlContent }}
@@ -136,12 +135,12 @@ const RazorpayWebView: React.FC<RazorpayWebViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
   },
   webview: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fbf7f4',
   },
 });
 
-export default RazorpayWebView; 
+export default RazorpayWebView;

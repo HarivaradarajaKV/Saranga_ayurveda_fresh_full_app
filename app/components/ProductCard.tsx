@@ -42,13 +42,16 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   hideActions?: boolean;
+  hideWishlist?: boolean;
+  showTrash?: boolean;
 }
 
-export default function ProductCard({ product, hideActions = false }: ProductCardProps) {
+export default function ProductCard({ product, hideActions = false, hideWishlist = false, showTrash = false }: ProductCardProps) {
   const router = useRouter();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const { addItem, getCartItems } = useCart();
+  const { addItem, getCartItems, items } = useCart();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const isInCart = items?.some(item => item.id === product.id) || false;
   const inWishlist = isInWishlist(product.id);
   const [isWishlistProcessing, setIsWishlistProcessing] = useState(false);
   const [isCartProcessing, setIsCartProcessing] = useState(false);
@@ -60,6 +63,7 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
   const cartScaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
     checkAuth();
@@ -76,6 +80,22 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Pulse animation for selling fast text
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
   const checkAuth = async () => {
@@ -89,19 +109,9 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
   };
 
   const handleAuthRequired = () => {
-    Alert.alert(
-      'Login Required',
-      'Please log in to perform this action.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Login', 
-          onPress: () => router.push({
-            pathname: '/auth/login'
-          })
-        }
-      ]
-    );
+    router.push({
+      pathname: '/auth/login'
+    });
   };
 
   const formatPrice = (price: number | undefined | null): string => {
@@ -197,7 +207,6 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
     if (product.stock_quantity > 0) {
       try {
         await addItem(product);
-        Alert.alert('Success', 'Product added to cart successfully');
       } catch (error) {
         console.error('Error adding to cart:', error);
         Alert.alert('Error', 'Failed to add product to cart');
@@ -279,7 +288,7 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
             placeholderColor="#f8f9fa"
             showLoader={true}
             priority="normal"
-            resizeMode="cover"
+            resizeMode="contain"
             onError={(error) => {
               console.log('Image failed to load:', imageUrl, error);
             }}
@@ -289,7 +298,7 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
               <Text style={styles.offerText}>{product.offer_percentage}% OFF</Text>
             </Animated.View>
           )}
-          {!hideActions && (
+          {!hideActions && !hideWishlist && (
             <Animated.View
               style={[
                 styles.wishlistButton,
@@ -304,30 +313,35 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
                 disabled={isWishlistProcessing}
                 style={styles.wishlistTouchable}
               >
-                <Ionicons 
-                  name={inWishlist ? "heart" : "heart-outline"} 
-                  size={24} 
-                  color={inWishlist ? "#FF69B4" : "#666"}
-                />
+                {showTrash ? (
+                  <Ionicons 
+                    name="trash" 
+                    size={16} 
+                    color="#e74c3c"
+                  />
+                ) : (
+                  <Ionicons 
+                    name={inWishlist ? "heart" : "heart-outline"} 
+                    size={18} 
+                    color="#2b3a1a"
+                  />
+                )}
               </TouchableOpacity>
             </Animated.View>
           )}
         </View>
         <View style={styles.content}>
+          <Text style={styles.category} numberOfLines={1}>{product.category}</Text>
           <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
-          <View style={styles.ratingContainer}>
-            {product.review_count && product.review_count > 0 ? (
-              <>
-                <View style={styles.ratingWrapper}>
-                  <Text style={styles.rating}>{Number(product.average_rating || 0).toFixed(1)}</Text>
-                  <Ionicons name="star" size={14} color="#FFD700" style={styles.starIcon} />
-                </View>
-                <Text style={styles.reviewCount}>({product.review_count})</Text>
-              </>
-            ) : (
-              <Text style={styles.noRating}>No ratings yet</Text>
-            )}
-          </View>
+          {product.stock_quantity > 0 && product.stock_quantity < 10 && (
+            <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+              <Ionicons name="flame" size={10} color="#e74c3c" style={{ marginRight: 2 }} />
+              <Text style={[styles.sellingFastText, { marginBottom: 0 }]}>Selling fast</Text>
+            </Animated.View>
+          )}
+          {product.stock_quantity === 0 && (
+            <Text style={styles.outOfStockText}>Out of Stock</Text>
+          )}
           <View style={styles.priceContainer}>
             <View style={styles.priceWrapper}>
               <Text style={styles.price}>₹{formatPrice(finalPrice)}</Text>
@@ -348,11 +362,11 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
                 <TouchableOpacity 
                   onPress={handleAddToCart}
                   activeOpacity={0.6}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   disabled={product.stock_quantity === 0 || isCartProcessing}
                   style={styles.cartTouchable}
                 >
-                  <Ionicons name="cart-outline" size={20} color="#fff" />
+                  <Ionicons name={isInCart ? "checkmark" : "add"} size={14} color="#2b3a1a" />
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -366,13 +380,13 @@ export default function ProductCard({ product, hideActions = false }: ProductCar
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    elevation: 6,
+    borderRadius: 12,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    height: 320,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    height: 235,
     position: 'relative',
     overflow: 'hidden',
     marginHorizontal: 6,
@@ -386,28 +400,42 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 170,
+    aspectRatio: 1,
     backgroundColor: '#f8f9fa',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   image: {
     width: '100%',
     height: '100%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    resizeMode: 'cover',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    resizeMode: 'contain',
   },
   content: {
-    padding: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
     flex: 1,
+    justifyContent: 'space-between',
+  },
+  category: {
+    fontFamily: 'CormorantGaramond-Medium',
+    fontSize: 9,
+    fontWeight: 'normal',
+    color: '#7f8c8d',
+    marginBottom: 1,
+    textTransform: 'uppercase',
   },
   name: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontFamily: 'CormorantGaramond-Medium',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 1,
     color: '#1a1a1a',
-    lineHeight: 20,
+    lineHeight: 14,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -419,73 +447,80 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   price: {
-    fontSize: 18,
+    fontFamily: 'CormorantGaramond-Medium',
+    fontSize: 15,
     fontWeight: '700',
     color: '#2c3e50',
   },
   originalPrice: {
-    fontSize: 13,
+    fontSize: 9,
     color: '#95a5a6',
     textDecorationLine: 'line-through',
-    marginTop: 2,
+    marginTop: 0,
   },
   offerBadge: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    top: 8,
+    left: 8,
     backgroundColor: '#e74c3c',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    elevation: 4,
+    borderRadius: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    elevation: 2,
     shadowColor: '#e74c3c',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   offerText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 'bold',
   },
   actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#007bff',
-    elevation: 4,
-    shadowColor: '#007bff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#2b3a1a',
+    elevation: 2,
+    shadowColor: '#2b3a1a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
   addToCartButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#fff',
   },
   disabledButton: {
     backgroundColor: '#ccc',
   },
   wishlistButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 6,
+    right: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 22,
-    padding: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 1,
+    elevation: 2,
   },
   wishlistButtonDisabled: {
     backgroundColor: '#ccc',
   },
   wishlistTouchable: {
-    flex: 1,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -497,41 +532,54 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 2,
-    minHeight: 24,
+    marginBottom: 1,
+    marginTop: 1,
+    minHeight: 14,
   } as const,
   ratingWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff3cd',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#ffeaa7',
   } as const,
   rating: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
     color: '#d63031',
     marginRight: 2,
   } as const,
   starIcon: {
-    marginRight: 2,
+    marginRight: 1,
   } as const,
   reviewCount: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
-    marginLeft: 6,
+    marginLeft: 4,
     fontWeight: '500',
   } as const,
   noRating: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#999',
     fontStyle: 'italic',
   } as const,
   processingButton: {
     backgroundColor: '#ccc',
+  },
+  sellingFastText: {
+    fontSize: 10,
+    color: '#e74c3c',
+    fontWeight: 'bold',
+    marginBottom: 2,
+    fontStyle: 'italic',
+  },
+  outOfStockText: {
+    fontSize: 10,
+    color: '#e74c3c',
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
 }); 

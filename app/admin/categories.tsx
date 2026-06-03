@@ -18,11 +18,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
 import { Category as ApiCategory } from '../types/api';
 import { useCategories } from '../CategoryContext';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
 
 const { height: screenHeight } = Dimensions.get('window');
 
 // Extend the API Category type to include created_at for admin use
-interface Category extends Omit<ApiCategory, 'image_url' | 'parent_id' | 'parent_name'> {
+interface Category extends ApiCategory {
     created_at: string;
 }
 
@@ -30,8 +32,8 @@ export default function AdminCategories() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [newCategory, setNewCategory] = useState({ name: '', description: '' });
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [newCategory, setNewCategory] = useState({ name: '', description: '', image: null as string | null });
+    const [editingCategory, setEditingCategory] = useState<(Category & { newImage?: string | null }) | null>(null);
     const { fetchCategories: refreshGlobalCategories } = useCategories();
 
     const fetchCategories = async () => {
@@ -46,6 +48,7 @@ export default function AdminCategories() {
                         name: apiCat.name,
                         description: apiCat.description || '',
                         product_count: apiCat.product_count || 0,
+                        image_url: apiCat.image_url,
                         created_at: apiCat.created_at || new Date().toISOString(),
                     } as Category;
                 });
@@ -69,6 +72,23 @@ export default function AdminCategories() {
         fetchCategories();
     }, []);
 
+    const pickImage = async (isEditing: boolean) => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            if (isEditing) {
+                setEditingCategory(prev => prev ? { ...prev, newImage: result.assets[0].uri } : null);
+            } else {
+                setNewCategory(prev => ({ ...prev, image: result.assets[0].uri }));
+            }
+        }
+    };
+
     const handleAddCategory = async () => {
         if (!newCategory.name.trim()) {
             Alert.alert('Error', 'Category name is required');
@@ -76,12 +96,27 @@ export default function AdminCategories() {
         }
 
         try {
-            const response = await apiService.post('/admin/categories', newCategory);
+            const formData = new FormData();
+            formData.append('name', newCategory.name);
+            formData.append('description', newCategory.description);
+
+            if (newCategory.image) {
+                const uriParts = newCategory.image.split('.');
+                const fileType = uriParts[uriParts.length - 1];
+
+                // @ts-ignore
+                formData.append('image', {
+                    uri: newCategory.image,
+                    name: `category.${fileType}`,
+                    type: `image/${fileType}`,
+                });
+            }
+
+            const response = await apiService.addCategory(formData);
             if (response.error) {
                 throw new Error(response.error);
             }
-            setNewCategory({ name: '', description: '' });
-            setNewCategory({ name: '', description: '' });
+            setNewCategory({ name: '', description: '', image: null });
             await fetchCategories();
             // Refresh global context so other screens (like AddProduct) see the new category
             refreshGlobalCategories(true);
@@ -91,15 +126,33 @@ export default function AdminCategories() {
         }
     };
 
+    // State for managing products in a category
+    const [managingCategory, setManagingCategory] = useState<Category | null>(null);
+
     const handleUpdateCategory = async () => {
         if (!editingCategory) return;
 
         try {
-            const response = await apiService.updateCategory(editingCategory.id, editingCategory);
+            const formData = new FormData();
+            formData.append('name', editingCategory.name);
+            formData.append('description', editingCategory.description);
+
+            if (editingCategory.newImage) {
+                const uriParts = editingCategory.newImage.split('.');
+                const fileType = uriParts[uriParts.length - 1];
+
+                // @ts-ignore
+                formData.append('image', {
+                    uri: editingCategory.newImage,
+                    name: `category_update.${fileType}`,
+                    type: `image/${fileType}`,
+                });
+            }
+
+            const response = await apiService.updateCategory(editingCategory.id, formData);
             if (response.error) {
                 throw new Error(response.error);
             }
-            setEditingCategory(null);
             setEditingCategory(null);
             await fetchCategories();
             refreshGlobalCategories(true);
@@ -124,14 +177,13 @@ export default function AdminCategories() {
                             if (response.error) {
                                 throw new Error(response.error);
                             }
-                            if (response.error) {
-                                throw new Error(response.error);
-                            }
                             await fetchCategories();
                             refreshGlobalCategories(true);
                         } catch (error) {
                             console.error('Error deleting category:', error);
-                            Alert.alert('Error', 'Failed to delete category');
+                            // @ts-ignore
+                            const errorMessage = error.message || 'Failed to delete category';
+                            Alert.alert('Error', errorMessage);
                         }
                     },
                 },
@@ -155,7 +207,7 @@ export default function AdminCategories() {
                     headerRight: () => (
                         <TouchableOpacity
                             style={styles.headerButton}
-                            onPress={() => setNewCategory({ name: '', description: '' })}
+                            onPress={() => setNewCategory({ name: '', description: '', image: null })}
                         >
                             <Ionicons name="add" size={24} color="#000" />
                         </TouchableOpacity>
@@ -171,6 +223,19 @@ export default function AdminCategories() {
                     <View style={styles.categoryCard}>
                         {editingCategory?.id === category.id ? (
                             <View style={styles.editForm}>
+                                <TouchableOpacity onPress={() => pickImage(true)} style={styles.imagePicker}>
+                                    {editingCategory.newImage || editingCategory.image_url ? (
+                                        <Image
+                                            source={{ uri: editingCategory.newImage || apiService.getFullImageUrl(editingCategory.image_url) }}
+                                            style={styles.previewImage}
+                                        />
+                                    ) : (
+                                        <View style={styles.placeholderImage}>
+                                            <Ionicons name="camera" size={24} color="#666" />
+                                            <Text style={styles.placeholderText}>Change Image</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
                                 <TextInput
                                     style={styles.input}
                                     value={editingCategory.name}
@@ -204,8 +269,22 @@ export default function AdminCategories() {
                         ) : (
                             <>
                                 <View style={styles.categoryHeader}>
-                                    <Text style={styles.categoryName}>{category.name}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                        {category.image_url && (
+                                            <Image
+                                                source={{ uri: apiService.getFullImageUrl(category.image_url) }}
+                                                style={styles.categoryIcon}
+                                            />
+                                        )}
+                                        <Text style={styles.categoryName} numberOfLines={1}>{category.name}</Text>
+                                    </View>
                                     <View style={styles.categoryActions}>
+                                        <TouchableOpacity
+                                            onPress={() => setManagingCategory(category)}
+                                            style={[styles.iconButton, { marginRight: 4 }]}
+                                        >
+                                            <Ionicons name="list" size={20} color="#FF69B4" />
+                                        </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={() => setEditingCategory(category)}
                                             style={styles.iconButton}
@@ -250,6 +329,16 @@ export default function AdminCategories() {
                                 onChangeText={(text) => setNewCategory(prev => ({ ...prev, description: text }))}
                                 multiline
                             />
+                            <TouchableOpacity onPress={() => pickImage(false)} style={styles.imagePicker}>
+                                {newCategory.image ? (
+                                    <Image source={{ uri: newCategory.image }} style={styles.previewImage} />
+                                ) : (
+                                    <View style={styles.placeholderImage}>
+                                        <Ionicons name="camera" size={24} color="#666" />
+                                        <Text style={styles.placeholderText}>Add Image</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.addButton}
                                 onPress={handleAddCategory}
@@ -273,9 +362,23 @@ export default function AdminCategories() {
                 updateCellsBatchingPeriod={50}
                 ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 24 }}>No categories found</Text>}
             />
+            {managingCategory && (
+                <CategoryProductManager
+                    visible={!!managingCategory}
+                    categoryId={managingCategory.id}
+                    categoryName={managingCategory.name}
+                    onClose={() => {
+                        setManagingCategory(null);
+                        // Refresh to update counts
+                        fetchCategories();
+                    }}
+                />
+            )}
         </SafeAreaView>
     );
 }
+
+import CategoryProductManager from './components/CategoryProductManager';
 
 const styles = StyleSheet.create({
     safeArea: {
@@ -409,5 +512,37 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '600',
+    },
+    imagePicker: {
+        marginBottom: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewImage: {
+        width: 100,
+        height: 100,
+        borderRadius: 8,
+    },
+    placeholderImage: {
+        width: 100,
+        height: 100,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderStyle: 'dashed',
+    },
+    placeholderText: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 4,
+    },
+    categoryIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 10,
     },
 }); 

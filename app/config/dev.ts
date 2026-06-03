@@ -12,12 +12,11 @@ interface BackendInfo {
 // Flip this flag to point the app at your local backend.
 // true  => use LAN IP / localhost backend
 // false => use hosted Vercel backend
-const USE_LOCAL_BACKEND = true
-    ;
+const USE_LOCAL_BACKEND = true;
 
 const LOCAL_FALLBACK = {
-    api: 'http://localhost:5001/api',
-    ws: 'ws://localhost:5001',
+    api: 'http://192.168.1.5:5001/api',
+    ws: 'ws://192.168.1.5:5001',
 };
 
 const VERCEL_TARGET = {
@@ -36,9 +35,10 @@ const resolveLocalBaseUrls = () => {
             || Constants.manifest?.hostUri
             // @ts-ignore
             || (Constants.expoConfig as any)?.hostUri;
-        const ip = typeof host === 'string' ? host.split(':')[0] : 'localhost';
-        const api = `http://${ip}:5001/api`;
-        const ws = `ws://${ip}:5001`;
+        const ip = typeof host === 'string' ? host.split(':')[0] : '192.168.1.5';
+        const resolvedIp = ip === 'localhost' || !ip ? '192.168.1.5' : ip;
+        const api = `http://${resolvedIp}:5001/api`;
+        const ws = `ws://${resolvedIp}:5001`;
         return { api, ws };
     } catch {
         return { ...LOCAL_FALLBACK };

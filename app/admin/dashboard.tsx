@@ -233,13 +233,37 @@ export default function AdminDashboard() {
               <Text style={styles.menuText}>Reviews</Text>
             </TouchableOpacity>
 
-            {/* <TouchableOpacity
+            <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => navigateTo('/admin/settings')}
+              onPress={() => {
+                try {
+                  if (router && typeof router.push === 'function') {
+                    router.push('/admin/new-arrivals');
+                  }
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }}
             >
-              <Ionicons name="settings-outline" size={32} color="#1a1a1a" />
-              <Text style={styles.menuText}>Settings</Text>
-            </TouchableOpacity> */}
+              <Ionicons name="sparkles-outline" size={32} color="#1a1a1a" />
+              <Text style={styles.menuText}>New Arrivals</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                try {
+                  if (router && typeof router.push === 'function') {
+                    router.push('/admin/best-sellers');
+                  }
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }}
+            >
+              <Ionicons name="star-outline" size={32} color="#1a1a1a" />
+              <Text style={styles.menuText}>Best Sellers</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
