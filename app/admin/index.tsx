@@ -30,6 +30,8 @@ interface DashboardStats {
     total_products: number;
     total_revenue: number;
     total_orders: number;
+    total_contacts?: number;
+    total_careers?: number;
 }
 
 const ADMIN_ROUTES = {
@@ -52,6 +54,8 @@ function AdminDashboardInner() {
         total_products: 0,
         total_revenue: 0,
         total_orders: 0,
+        total_contacts: 0,
+        total_careers: 0,
     });
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -136,6 +140,8 @@ function AdminDashboardInner() {
                             total_products: Number(statsData.total_products || 0) || 0,
                             total_revenue: Number(statsData.total_revenue || 0) || 0,
                             total_orders: Number(statsData.total_orders || 0) || 0,
+                            total_contacts: Number(statsData.total_contacts || 0) || 0,
+                            total_careers: Number(statsData.total_careers || 0) || 0,
                         });
                         setError(null);
                     }
@@ -352,6 +358,20 @@ function AdminDashboardInner() {
                             icon="cash"
                             color="#9C27B0"
                             onPress={() => safeNavigate(ADMIN_ROUTES.ANALYTICS)}
+                        />
+                        <AdminCard
+                            title="Contact Responses"
+                            value={stats.total_contacts || 0}
+                            icon="mail"
+                            color="#00BCD4"
+                            onPress={() => {}}
+                        />
+                        <AdminCard
+                            title="Career Responses"
+                            value={stats.total_careers || 0}
+                            icon="briefcase"
+                            color="#E91E63"
+                            onPress={() => {}}
                         />
                     </View>
                 </View>
