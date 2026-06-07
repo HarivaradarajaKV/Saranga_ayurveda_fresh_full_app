@@ -410,11 +410,24 @@ const AdminOrdersInner = () => {
 
   // Shiprocket Helper Functions
   const hasShiprocketData = (order: Order) => {
-    return !!(order as any).shiprocket_order_id;
+    if (!order) return false;
+    return !!(
+      (order as any).shiprocket_order_id ||
+      (order as any).shiprocket_shipment_id ||
+      (order as any).awb_number ||
+      (order as any).shipment_status === 'created' ||
+      (order as any).shipment_status === 'awb_generated' ||
+      (order as any).shipment_status === 'pickup_scheduled'
+    );
   };
 
   const hasAWB = (order: Order) => {
-    return !!(order as any).awb_number;
+    if (!order) return false;
+    return !!(
+      (order as any).awb_number ||
+      (order as any).shipment_status === 'awb_generated' ||
+      (order as any).shipment_status === 'pickup_scheduled'
+    );
   };
 
   const handleCreateShipment = async (orderId: string) => {
