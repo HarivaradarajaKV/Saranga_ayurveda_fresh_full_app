@@ -588,7 +588,10 @@ const CheckoutPage = () => {
         // Handle Razorpay payment
         try {
           const response = await apiService.post('/orders', orderData);
-          const { order } = response.data;
+          if (response.error) {
+            throw new Error(response.error);
+          }
+          const { order } = response.data || {};
 
           if (!order || !order.razorpay_order) {
             throw new Error('Failed to create order');
@@ -641,10 +644,12 @@ const CheckoutPage = () => {
       setLoading(true);
 
       // Verify payment with backend
-      await apiService.post('/razorpay/verify-payment', {
+      const verifyRes = await apiService.post('/razorpay/verify-payment', {
         ...paymentData,
         order_id: currentOrderId
       });
+
+      const actualOrderId = verifyRes.data?.order_id || currentOrderId;
 
       // Clear cart silently - don't let errors affect the user experience
       try {
@@ -660,7 +665,7 @@ const CheckoutPage = () => {
       router.replace({
         pathname: "/orders/[id]",
         params: {
-          id: String(currentOrderId),
+          id: String(actualOrderId),
           status: 'success',
           totalAmount: total
         }
