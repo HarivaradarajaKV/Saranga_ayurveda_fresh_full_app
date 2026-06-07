@@ -84,6 +84,7 @@ interface RazorpayOptions {
   prefill: {
     name: string;
     contact: string;
+    email?: string;
   };
   theme?: {
     color: string;
@@ -121,6 +122,7 @@ const CheckoutPage = () => {
   const [showRazorpay, setShowRazorpay] = useState(false);
   const [razorpayOptions, setRazorpayOptions] = useState<RazorpayOptions | null>(null);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState('');
   const [sectionExpanded, setSectionExpanded] = useState({
     orderSummary: true,
     coupons: true,
@@ -257,6 +259,17 @@ const CheckoutPage = () => {
   const loadCheckoutData = async () => {
     try {
       setPageLoading(true);
+
+      // Fetch user profile to prefill email in Razorpay
+      try {
+        const profileRes = await apiService.getUserProfile();
+        if (profileRes && profileRes.data && profileRes.data.email) {
+          setUserEmail(profileRes.data.email);
+        }
+      } catch (profileErr) {
+        console.error('Error fetching user profile in checkout:', profileErr);
+      }
+
       await Promise.all([
         fetchAddresses(),
         validateCart()
@@ -612,6 +625,7 @@ const CheckoutPage = () => {
             prefill: {
               name: selectedAddress.full_name,
               contact: selectedAddress.phone || selectedAddress.phone_number || '',
+              email: userEmail || ''
             },
             theme: {
               color: "#2b3a1a"
