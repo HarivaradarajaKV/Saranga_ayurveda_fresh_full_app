@@ -515,7 +515,19 @@ export default function ProductPage() {
   const handleShare = async () => {
     if (!productData) return;
     try {
-      const shareUrl = `https://sarangaayurveda.com/product/${productData.id}`;
+      const slugify = (text: string) => {
+        if (!text) return '';
+        return text
+          .toString()
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, '-')
+          .replace(/[^\w\-]+/g, '')
+          .replace(/\-\-+/g, '-')
+          .replace(/^-+/, '')
+          .replace(/-+$/, '');
+      };
+      const shareUrl = `https://sarangaayurveda.com/product/${slugify(productData.name)}`;
       const message = `Check out this amazing product from Saranga Ayurveda: ${productData.name}\n\nPrice: ₹${productData.price}\n\nLink: ${shareUrl}`;
       await Share.share({
         message: message,
