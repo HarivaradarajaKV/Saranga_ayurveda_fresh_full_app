@@ -14,6 +14,7 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -24,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function DonateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
 
   // Form states
   const [amount, setAmount] = useState('100');
@@ -217,9 +219,10 @@ export default function DonateScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView 
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { alignItems: 'center' }]}
           showsVerticalScrollIndicator={false}
         >
+          <View style={{ width: '100%', maxWidth: 600, alignSelf: 'center' }}>
           {/* Top Beige/Cream Header */}
           <View style={styles.topHeader}>
             <View style={styles.navigationRow}>
@@ -350,6 +353,16 @@ export default function DonateScreen() {
                 <Text style={styles.donateButtonText}>DONATE</Text>
               )}
             </TouchableOpacity>
+
+            {/* Foundation Quote Block */}
+            <View style={styles.quoteBlock}>
+              <Ionicons name="heart" size={16} color="#25c469" style={styles.quoteIcon} />
+              <Text style={styles.quoteText}>
+                "Your contribution has the power to heal lives and restore hope through the gift of Ayurveda."
+              </Text>
+              <Text style={styles.quoteAuthor}>— Saranga Anugraha Foundation</Text>
+            </View>
+          </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -393,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF4EB',
   },
   topHeader: {
-    paddingBottom: 36,
+    paddingBottom: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
@@ -401,18 +414,18 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   backButton: {
     padding: 4,
   },
   logoContainer: {
-    width: 90,
-    height: 90,
+    width: 64,
+    height: 64,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    marginTop: 8,
+    marginTop: 0,
   },
   logo: {
     width: '100%',
@@ -421,9 +434,9 @@ const styles = StyleSheet.create({
   impactPill: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    marginTop: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: '#eee',
     elevation: 1,
@@ -438,22 +451,22 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   mainHeading: {
-    fontSize: 28,
+    fontSize: 22,
     fontFamily: 'CormorantGaramond-Bold',
     fontWeight: 'bold',
     color: '#1c1c1c',
     textAlign: 'center',
-    marginTop: 20,
-    lineHeight: 36,
+    marginTop: 10,
+    lineHeight: 28,
   },
   whiteCard: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    paddingTop: 32,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 16,
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingBottom: 20,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -461,11 +474,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -473,8 +486,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     borderRadius: 12,
     paddingHorizontal: 16,
-    height: 52,
-    marginBottom: 16,
+    height: 48,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
@@ -489,8 +502,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 18,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#e5e5e5',
   },
@@ -502,7 +515,7 @@ const styles = StyleSheet.create({
   presetsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   presetButton: {
     flex: 1,
@@ -530,7 +543,7 @@ const styles = StyleSheet.create({
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   checkbox: {
     width: 20,
@@ -558,7 +571,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     paddingHorizontal: 16,
-    height: 48,
+    height: 44,
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
@@ -572,10 +585,10 @@ const styles = StyleSheet.create({
   donateButton: {
     backgroundColor: '#25c469',
     borderRadius: 24,
-    height: 52,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 28,
+    marginTop: 16,
     elevation: 3,
     shadowColor: '#25c469',
     shadowOffset: { width: 0, height: 3 },
@@ -599,5 +612,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f2',
     borderRadius: 20,
     padding: 6,
+  },
+  quoteBlock: {
+    marginTop: 20,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f9fbf9',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e8f5e9',
+  },
+  quoteIcon: {
+    marginBottom: 6,
+  },
+  quoteText: {
+    fontSize: 14,
+    fontFamily: 'CormorantGaramond-Medium',
+    fontStyle: 'italic',
+    color: '#4a5d3b',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  quoteAuthor: {
+    fontSize: 11,
+    fontFamily: 'CormorantGaramond-Bold',
+    color: '#2b3a1a',
+    marginTop: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

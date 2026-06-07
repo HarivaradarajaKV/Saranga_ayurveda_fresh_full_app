@@ -12,7 +12,7 @@ interface BackendInfo {
 // Flip this flag to point the app at your local backend.
 // true  => use LAN IP / localhost backend
 // false => use hosted Vercel backend
-const USE_LOCAL_BACKEND = true;
+const USE_LOCAL_BACKEND = false;
 
 const LOCAL_FALLBACK = {
     api: 'http://192.168.1.5:5001/api',

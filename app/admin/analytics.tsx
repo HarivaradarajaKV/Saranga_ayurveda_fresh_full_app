@@ -31,7 +31,7 @@ export default function AdminAnalytics() {
 
     const fetchAnalytics = async () => {
         try {
-            const response = await apiService.get(apiService.ENDPOINTS.ADMIN_ANALYTICS);
+            const response = await apiService.get('/admin/analytics');
             if (response.data) {
                 setAnalytics(response.data);
             }

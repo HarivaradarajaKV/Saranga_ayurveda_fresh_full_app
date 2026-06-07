@@ -13,6 +13,8 @@ interface Address {
   postal_code: string;
   phone_number: string;
   is_default: boolean;
+  address_type?: string;
+  country?: string;
 }
 
 interface AddressContextType {

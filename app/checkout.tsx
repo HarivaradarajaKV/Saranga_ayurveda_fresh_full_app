@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  Dimensions,
   Alert,
   ActivityIndicator,
   Image,
@@ -17,6 +16,7 @@ import {
   FlatList,
   Button,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,11 +25,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import { apiService } from './services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCart } from './CartContext';
+import { useCart, CartItem } from './CartContext';
 import { initializeRazorpayPayment } from './services/razorpay';
 import RazorpayWebView from './components/RazorpayWebView';
 
-const { width } = Dimensions.get('window');
+// Checkout page uses useWindowDimensions for responsive layout
 
 // Local Address type for checkout page
 interface Address {
@@ -135,10 +135,43 @@ const CheckoutPage = () => {
   };
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
+  const buyNowProductParam = params?.buyNowProduct;
+  const buyNowQuantityParam = params?.quantity;
+
+  const buyNowProduct = React.useMemo(() => {
+    if (buyNowProductParam && typeof buyNowProductParam === 'string') {
+      try {
+        const prod = JSON.parse(buyNowProductParam);
+        const qty = buyNowQuantityParam ? Number(buyNowQuantityParam) : 1;
+        const basePrice = Number(prod.price) || 0;
+        const offerPct = Number(prod.offer_percentage || 0);
+        return [{
+          id: Number(prod.id),
+          name: prod.name || '',
+          description: prod.description || '',
+          price: basePrice,
+          category: prod.category || '',
+          image_url: prod.image_url || '',
+          stock_quantity: typeof prod.stock_quantity === 'number' ? prod.stock_quantity : (parseInt(String(prod.stock_quantity)) || 999),
+          created_at: prod.created_at || new Date().toISOString(),
+          offer_percentage: offerPct,
+          quantity: qty,
+          discounted_price: basePrice * (1 - offerPct / 100)
+        }] as CartItem[];
+      } catch (e) {
+        console.error('Error parsing buyNowProduct param:', e);
+      }
+    }
+    return null;
+  }, [buyNowProductParam, buyNowQuantityParam]);
+
   // Filter only selected cart items
   const selectedCartItems = React.useMemo(() => {
+    if (buyNowProduct) {
+      return buyNowProduct;
+    }
     return getSelectedItems();
-  }, [cartItems]);
+  }, [cartItems, buyNowProduct]);
 
   // Consolidated focus effect for address handling
   useFocusEffect(
@@ -460,8 +493,8 @@ const CheckoutPage = () => {
     }
     setGstAmount(gstTotal);
 
-    // Calculate delivery charge (₹59 for orders below ₹500, free for ₹500+)
-    const delivery = itemsTotal >= 500 ? 0 : 59;
+    // Calculate delivery charge (₹59 for orders below ₹599, free for ₹599+)
+    const delivery = itemsTotal >= 599 ? 0 : 59;
     setDeliveryCharge(delivery);
 
     // Apply discount, GST, and delivery to get final total
@@ -536,7 +569,9 @@ const CheckoutPage = () => {
         const response = await apiService.post('/orders', orderData);
 
         if (response.data?.order && response.data.order.id) {
-          await clearCart();
+          if (!buyNowProduct) {
+            await clearCart();
+          }
 
           router.replace({
             pathname: "/orders/[id]",
@@ -613,7 +648,9 @@ const CheckoutPage = () => {
 
       // Clear cart silently - don't let errors affect the user experience
       try {
-        await clearCart();
+        if (!buyNowProduct) {
+          await clearCart();
+        }
       } catch (error) {
         // Just log the error, don't show it to the user
         console.error('Error clearing cart:', error);
@@ -726,7 +763,13 @@ const CheckoutPage = () => {
           <View style={{ width: 24 }} />
         </View>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
+          <ScrollView 
+            style={{ flex: 1 }} 
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center' }}>
             {/* Order Summary Section */}
             <TouchableOpacity
               style={styles.sectionHeader}
@@ -965,7 +1008,7 @@ const CheckoutPage = () => {
                               <Ionicons
                                 name={method.id === 'cod' ? 'lock-closed' : 'card'}
                                 size={24}
-                                color={selectedPayment?.id === method.id ? '#fff' : (isCOD ? '#757575' : '#2b3a1a')}
+                                color={isCOD ? '#757575' : '#2b3a1a'}
                               />
                             </View>
                             <View style={styles.paymentMethodInfo}>
@@ -981,7 +1024,7 @@ const CheckoutPage = () => {
                                 selectedPayment?.id === method.id && styles.selectedPaymentText,
                                 isCOD && { color: '#9e9e9e' }
                               ]}>
-                                {method.description}
+                                {method.id === 'razorpay' ? 'UPI, Cards, NetBanking' : method.description}
                               </Text>
                             </View>
                           </View>
@@ -1073,6 +1116,7 @@ const CheckoutPage = () => {
                   <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
                 </View>
               </View>
+              </View>
             </View>
           </ScrollView>
 
@@ -1089,6 +1133,7 @@ const CheckoutPage = () => {
               ]}
               onPress={handlePlaceOrder}
               disabled={!selectedAddress || !selectedPayment || loading}
+              delayPressIn={0}
             >
               {loading ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -1458,7 +1503,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   selectedPaymentCard: {
-    backgroundColor: '#2b3a1a',
+    backgroundColor: '#fbf7f4',
     borderColor: '#2b3a1a',
     borderWidth: 2.5,
   },
@@ -1498,7 +1543,7 @@ const styles = StyleSheet.create({
     fontFamily: 'CormorantGaramond-Medium',
   },
   selectedPaymentText: {
-    color: '#fff',
+    color: '#2b3a1a',
   },
   paymentMethodRadio: {
     marginLeft: 12,
@@ -1514,13 +1559,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   radioOuterSelected: {
-    borderColor: '#fff',
+    borderColor: '#2b3a1a',
   },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#fff',
+    backgroundColor: '#2b3a1a',
   },
   priceDetails: {
     marginBottom: 20,
@@ -1717,6 +1762,46 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+  },
+  logosContainer: {
+    marginTop: 8,
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  logoImage: {
+    width: 34,
+    height: 22,
+    resizeMode: 'contain',
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  bankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#b89c72',
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    height: 22,
+    justifyContent: 'center',
+  },
+  selectedBankBadge: {
+    backgroundColor: '#2b3a1a',
+  },
+  bankBadgeText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: '700',
+    fontFamily: 'System',
+  },
+  selectedBankBadgeText: {
+    color: '#fff',
   },
 });
 

@@ -17,38 +17,72 @@ interface Product {
   offer_percentage: number;
   stock_quantity: number;
   category: string;
+  category_name?: string;
 }
 
 interface FrequentlyBoughtTogetherProps {
   currentProductId: number;
   category: string;
+  categoryName?: string;
 }
 
-export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> = ({ currentProductId, category }) => {
+export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> = ({ currentProductId, category, categoryName }) => {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     fetchRelatedProducts();
-  }, [currentProductId, category]);
+  }, [currentProductId, category, categoryName]);
 
   const fetchRelatedProducts = async () => {
     try {
       setLoading(true);
-      const response = await apiService.get('/products');
-      if (response.data) {
-        let products = Array.isArray(response.data) ? response.data : response.data.products;
-        // Filter products from the same category, excluding the current product
-        products = products
-          .filter((product: Product) => 
-            product.id !== currentProductId && 
-            product.category === category &&
-            product.stock_quantity > 0
-          )
-          .slice(0, 5); // Limit to 5 products
-        setRelatedProducts(products);
+      const catFilter = categoryName || category;
+      let response;
+      if (catFilter) {
+        response = await apiService.get(`/products?category=${encodeURIComponent(catFilter)}`);
       }
+      
+      let products = [];
+      if (response && response.data) {
+        products = Array.isArray(response.data) ? response.data : (response.data.products || []);
+      }
+
+      // If we got no products or only the current one, fall back to fetching a larger pool of all products
+      if (products.length <= 1) {
+        const fallbackRes = await apiService.get('/products?limit=50');
+        if (fallbackRes && fallbackRes.data) {
+          products = Array.isArray(fallbackRes.data) ? fallbackRes.data : (fallbackRes.data.products || []);
+        }
+      }
+
+      // Filter products from the same category, excluding the current product
+      let filtered = products
+        .filter((product: Product) => {
+          const currentCat = (category || '').toLowerCase().trim();
+          const currentCatName = (categoryName || '').toLowerCase().trim();
+          const productCat = (product.category || '').toLowerCase().trim();
+          const productCatName = (product.category_name || '').toLowerCase().trim();
+          
+          const matchesCategory = 
+            (currentCatName && productCatName && currentCatName === productCatName) ||
+            (currentCat && productCat && currentCat === productCat) ||
+            (currentCatName && productCat && currentCatName === productCat) ||
+            (currentCat && productCatName && currentCat === productCatName);
+            
+          return product.id !== currentProductId && 
+            matchesCategory &&
+            product.stock_quantity > 0;
+        });
+
+      // If still no products after filtering, take any products excluding the current one
+      if (filtered.length === 0) {
+        filtered = products
+          .filter((p: Product) => p.id !== currentProductId && p.stock_quantity > 0);
+      }
+
+      setRelatedProducts(filtered.slice(0, 5));
     } catch (error) {
       console.error('Error fetching related products:', error);
       setRelatedProducts([]);
@@ -86,6 +120,7 @@ export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> =
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContainer}
       >
         {relatedProducts.map((product) => (
@@ -100,20 +135,24 @@ export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> =
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginVertical: 24,
+    backgroundColor: '#fbf7f4',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2b3a1a',
     marginBottom: 12,
-    paddingHorizontal: 16,
   },
   loader: {
     marginVertical: 20,
   },
+  scrollView: {
+    marginHorizontal: -20,
+  },
   scrollContainer: {
-    paddingLeft: 16,
-    paddingRight: 4,
+    paddingLeft: 20,
+    paddingRight: 8,
     paddingVertical: 8,
   },
   productCardWrapper: {

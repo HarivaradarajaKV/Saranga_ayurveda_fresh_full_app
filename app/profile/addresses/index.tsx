@@ -29,7 +29,7 @@ interface Address {
   postal_code: string;
   phone_number: string;
   is_default: boolean;
-  address_type?: 'Home' | 'Work' | 'Other';
+  address_type?: string;
   country?: string;
 }
 
@@ -79,10 +79,11 @@ export default function AddressListPage() {
         colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.headerSection}>
-        <Text style={styles.brandTitle}>Address</Text>
-      </View>
-      <View style={styles.container}>
+      <View style={{ width: '100%', maxWidth: 650, alignSelf: 'center', flex: 1 }}>
+        <View style={styles.headerSection}>
+          <Text style={styles.brandTitle}>Address</Text>
+        </View>
+        <View style={styles.container}>
 
         <ScrollView
           style={styles.addressList}
@@ -228,7 +229,7 @@ export default function AddressListPage() {
             >
               <LinearGradient
                 colors={['#f8f6f0', '#f5f2eb']}
-                style={styles.emptyStateGradient}
+                style={[styles.emptyStateGradient, { width: '100%' }]}
               >
                 <Ionicons name="location-outline" size={64} color="#2b3a1a" />
                 <Text style={styles.emptyStateText}>No addresses saved yet</Text>
@@ -254,6 +255,7 @@ export default function AddressListPage() {
             <Text style={styles.addButtonText}>Add New Address</Text>
           </LinearGradient>
         </TouchableOpacity>
+      </View>
       </View>
     </SafeAreaView>
   );
@@ -427,28 +429,26 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   name: {
-    fontFamily: 'CormorantGaramond-Bold',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#2c3e50',
+    color: '#1a1a1a',
     marginBottom: 8,
     letterSpacing: 0.2,
   },
   addressText: {
-    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
-    color: '#555',
+    color: '#666',
     marginBottom: 6,
     lineHeight: 22,
-    fontWeight: '400',
+    fontWeight: '500',
   },
   phone: {
-    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
     marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    fontWeight: '500',
   },
   setDefaultButton: {
     alignSelf: 'flex-start',

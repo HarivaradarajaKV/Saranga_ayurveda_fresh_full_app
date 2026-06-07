@@ -62,6 +62,22 @@ function GstPageInner() {
     return map;
   }, [productGst]);
 
+  // Merge product catalog with existing GST rows so admin can set GST for any product
+  const mergedProductGst = React.useMemo(() => {
+    if (allProducts.length === 0) return productGst;
+    const gstMap = new Map<number, ProductGst>();
+    productGst.forEach((p) => gstMap.set(p.product_id, p));
+    return allProducts
+      .map((prod) => {
+        const gst = gstMap.get(prod.product_id);
+        if (gst) {
+          return { ...prod, percentage: gst.percentage, is_active: gst.is_active };
+        }
+        return prod;
+      })
+      .sort((a, b) => (a.product_name || '').localeCompare(b.product_name || ''));
+  }, [allProducts, productGst]);
+
   const getDisplayPercentage = (productId: number, fallback: number) =>
     productGstMap.get(productId) ?? fallback;
   const [savingProductId, setSavingProductId] = useState<number | null>(null);
@@ -218,34 +234,7 @@ function GstPageInner() {
     }
   };
 
-  // Merge product catalog with existing GST rows so admin can set GST for any product
-  const mergedProductGst = React.useMemo(() => {
-    if (allProducts.length === 0) return productGst;
-    const gstMap = new Map<number, ProductGst>();
-    productGst.forEach((p) => gstMap.set(p.product_id, p));
-    return allProducts
-      .map((prod) => {
-        const gst = gstMap.get(prod.product_id);
-        if (gst) {
-          return { ...prod, percentage: gst.percentage, is_active: gst.is_active };
-        }
-        return prod;
-      })
-      .sort((a, b) => (a.product_name || '').localeCompare(b.product_name || ''));
-  }, [allProducts, productGst]);
 
-  useEffect(() => {
-    // Debug logging
-    if (productGst.length > 0 || allProducts.length > 0) {
-      console.log('GST Data State:', {
-        productGstCount: productGst.length,
-        allProductsCount: allProducts.length,
-        mergedCount: mergedProductGst.length,
-        sampleProductGst: productGst.slice(0, 2),
-        sampleMerged: mergedProductGst.slice(0, 2)
-      });
-    }
-  }, [productGst, allProducts, mergedProductGst]);
 
   const handleAdd = () => {
     setEditingGst(null);

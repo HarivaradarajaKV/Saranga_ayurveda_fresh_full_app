@@ -6,30 +6,31 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWishlist } from './WishlistContext';
 import { useRouter } from 'expo-router';
-
-const { width } = Dimensions.get('window');
+import { apiService } from './services/api';
 
 export default function WishlistPage() {
-  const { items, removeFromWishlist } = useWishlist();
+  const { wishlist, removeFromWishlist } = useWishlist();
   const router = useRouter();
-  const wishlistItems = Array.isArray(items) ? items : [];
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 768 ? 3 : 2;
+  const wishlistItems = Array.isArray(wishlist) ? wishlist : [];
 
   if (wishlistItems.length === 0) {
     return (
-      <>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
         <Stack.Screen 
           options={{
             title: 'My Wishlist',
             headerShown: true,
           }}
         />
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, { maxWidth: 600, width: '100%', alignSelf: 'center' }]}>
           <Ionicons name="heart" size={64} color="#ccc" />
           <Text style={styles.emptyText}>Your wishlist is empty</Text>
           <TouchableOpacity 
@@ -39,61 +40,72 @@ export default function WishlistPage() {
             <Text style={styles.shopButtonText}>Start Shopping</Text>
           </TouchableOpacity>
         </View>
-      </>
+      </View>
     );
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <Stack.Screen 
         options={{
           title: 'My Wishlist',
           headerShown: true,
         }}
       />
-      <FlatList
-        data={wishlistItems}
-        numColumns={2}
-        contentContainerStyle={styles.container}
-        renderItem={({ item }) => (
-          <View style={styles.productCard}>
-            <TouchableOpacity
-              onPress={() => router.push({
-                pathname: '/product/[id]',
-                params: { id: item.id, productData: JSON.stringify(item) }
-              })}
-            >
-              <Image source={{ uri: item.image }} style={styles.productImage} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.removeButton}
-              onPress={() => removeFromWishlist(item.id)}
-            >
-              <Ionicons name="heart" size={20} color="#ff4444" />
-            </TouchableOpacity>
-            <Text style={styles.productName}>{item.name}</Text>
-            <View style={styles.priceContainer}>
-              <Text style={styles.price}>₹{item.price}</Text>
-              <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
-            </View>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#ffd700" />
-              <Text style={styles.rating}>{item.rating}</Text>
-              <Text style={styles.reviewCount}>({item.reviewCount})</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.addToCartButton}
-              onPress={() => {
-                // Handle add to cart
-              }}
-            >
-              <Text style={styles.addToCartText}>Add to Cart</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        keyExtractor={item => String(item?.id)}
-      />
-    </>
+      <View style={{ flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' }}>
+        <FlatList
+          key={String(numColumns)}
+          data={wishlistItems}
+          numColumns={numColumns}
+          contentContainerStyle={styles.container}
+          renderItem={({ item }) => {
+            const base = Number(item.price) || 0;
+            const offerPct = Number(item.offer_percentage) || 0;
+            const discounted = base * (1 - offerPct / 100);
+            return (
+              <View style={[styles.productCard, { flex: 1 / numColumns }]}>
+                <TouchableOpacity
+                  onPress={() => router.push({
+                    pathname: '/(product)/[id]',
+                    params: { id: item.id, productData: JSON.stringify(item) }
+                  })}
+                >
+                  <Image
+                    source={{ uri: apiService.getFullImageUrl(item.image_url) }}
+                    style={styles.productImage}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.removeButton}
+                  onPress={() => removeFromWishlist(item.id)}
+                >
+                  <Ionicons name="heart" size={20} color="#ff4444" />
+                </TouchableOpacity>
+                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.price}>₹{discounted.toFixed(2)}</Text>
+                  {offerPct > 0 && (
+                    <Text style={styles.originalPrice}>₹{base.toFixed(2)}</Text>
+                  )}
+                </View>
+                <TouchableOpacity 
+                  style={styles.addToCartButton}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/(product)/[id]',
+                      params: { id: item.id, productData: JSON.stringify(item) }
+                    });
+                  }}
+                >
+                  <Text style={styles.addToCartText}>View Product</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }}
+          keyExtractor={item => String(item?.id)}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -114,7 +126,7 @@ const styles = StyleSheet.create({
   },
   shopButton: {
     marginTop: 20,
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 25,
@@ -125,7 +137,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   productCard: {
-    flex: 1,
     margin: 8,
     backgroundColor: '#fff',
     borderRadius: 8,
@@ -140,6 +151,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     borderRadius: 8,
+    backgroundColor: '#f5f5f5',
   },
   removeButton: {
     position: 'absolute',
@@ -159,35 +171,21 @@ const styles = StyleSheet.create({
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   price: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    color: '#d63384',
+    color: '#2b3a1a',
     marginRight: 4,
   },
   originalPrice: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#888',
     textDecorationLine: 'line-through',
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  rating: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
-    marginRight: 2,
-  },
-  reviewCount: {
-    fontSize: 12,
-    color: '#888',
-  },
   addToCartButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
     paddingVertical: 8,
     borderRadius: 4,
     alignItems: 'center',
@@ -196,6 +194,6 @@ const styles = StyleSheet.create({
   addToCartText: {
     color: '#fff',
     fontWeight: '500',
-    fontSize: 14,
+    fontSize: 13,
   },
-}); 
+});

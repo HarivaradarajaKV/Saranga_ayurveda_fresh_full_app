@@ -16,6 +16,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   TextInput,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -23,20 +24,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import Chatbot from '../../components/Chatbot';
 import { GenderAvatar } from '../../components/GenderAvatar';
 import { useBottomTabBarHeight } from '../_layout';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-
-const { width } = Dimensions.get('window');
+import { useAddress } from '../../AddressContext';
 
 interface MenuItem {
   id: string;
   title: string;
+  subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
   route?: string;
-  badge?: number;
+  action?: () => void;
 }
 
 interface UserProfile {
@@ -67,6 +66,16 @@ export default function ProfilePage() {
   const [chatInput, setChatInput] = useState('');
   const chatScrollRef = useRef<ScrollView>(null);
   const bottomTabHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
+  const navigation = useNavigation();
+
+  // Address Context integration
+  const { addresses, fetchAddresses } = useAddress();
+
+  // Get screen dimensions dynamically for responsive design
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isTablet = screenWidth >= 600;
+  const isSmallDevice = screenWidth < 360;
 
   const handleChatSend = () => {
     if (!chatInput.trim()) return;
@@ -102,12 +111,19 @@ export default function ProfilePage() {
   const scrollViewRef = useRef<ScrollView>(null);
   const isInitialMount = useRef(true);
   const lastFocusedState = useRef(false);
-  const isFocused = useIsFocused();
-  const navigation = useNavigation();
 
   useEffect(() => {
     checkAuthAndLoadProfile();
   }, []);
+
+  useEffect(() => {
+    if (isFocused) {
+      checkAuthAndLoadProfile();
+      if (isLoggedIn) {
+        fetchAddresses();
+      }
+    }
+  }, [isFocused, isLoggedIn]);
 
   useEffect(() => {
     Animated.parallel([
@@ -140,7 +156,7 @@ export default function ProfilePage() {
 
   // Handle tab press for scroll to top
   useEffect(() => {
-    const unsubscribe = navigation.addListener('tabPress', (e) => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
       if (isFocused) {
         e.preventDefault();
         scrollToTop();
@@ -190,56 +206,37 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.logout();
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('user_role');
-      setIsLoggedIn(false);
-      router.replace('/auth/login');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to logout. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const menuItems: MenuItem[] = [
-    {
-      id: 'orders',
-      title: 'My Orders',
-      icon: 'receipt-outline',
-      route: '/profile/orders',
-      badge: userProfile?.stats.totalOrders || 0,
-    },
-    {
-      id: 'addresses',
-      title: 'My Addresses',
-      icon: 'location-outline',
-      route: '/profile/addresses',
-    },
-    {
-      id: 'support',
-      title: 'Support',
-      icon: 'help-circle-outline',
-      route: '/support',
-    },
-  ];
-
-  const handleNavigation = (route: string) => {
-    try {
-      if (route === '/support') {
-        setShowSupportModal(true);
-      } else {
-        router.push(route as any);
-      }
-    } catch (error) {
-      console.error('Navigation error:', error);
-      Alert.alert('Error', 'Unable to navigate to the selected page.');
-    }
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out from your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const response = await apiService.logout();
+              if (response.error) {
+                throw new Error(response.error);
+              }
+              await AsyncStorage.removeItem('auth_token');
+              await AsyncStorage.removeItem('user_role');
+              await AsyncStorage.removeItem('user_id');
+              await AsyncStorage.removeItem('name');
+              await AsyncStorage.removeItem('user_name');
+              setIsLoggedIn(false);
+              router.replace('/auth/login');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleEditProfile = () => {
@@ -256,14 +253,74 @@ export default function ProfilePage() {
     <GenderAvatar 
       name={userProfile?.name || 'User'} 
       gender={userProfile?.gender || 'other'} 
-      size={80} 
+      size={isTablet ? 72 : 60} 
     />
   );
+
+  const menuItems: MenuItem[] = [
+    {
+      id: 'personal',
+      title: 'Personal Information',
+      subtitle: 'View and edit your profile details',
+      icon: 'person-outline',
+      route: '/profile/edit',
+    },
+    {
+      id: 'address',
+      title: 'Address',
+      subtitle: 'Manage your saved address',
+      icon: 'location-outline',
+      route: '/profile/addresses',
+    },
+    {
+      id: 'orders',
+      title: 'Orders',
+      subtitle: 'View your order history',
+      icon: 'bag-outline',
+      route: '/profile/orders',
+    },
+    {
+      id: 'wishlist',
+      title: 'Wishlist',
+      subtitle: 'View your saved products',
+      icon: 'heart-outline',
+      route: '/(tabs)/wishlist',
+    },
+    {
+      id: 'cart',
+      title: 'Cart',
+      subtitle: 'View items in your shopping cart',
+      icon: 'cart-outline',
+      route: '/(tabs)/cart',
+    },
+    {
+      id: 'support',
+      title: 'Support & Live Chat',
+      subtitle: 'Contact our customer support team',
+      icon: 'chatbubble-ellipses-outline',
+      action: () => setShowSupportModal(true),
+    },
+    {
+      id: 'logout',
+      title: 'Logout',
+      subtitle: 'Sign out from your account',
+      icon: 'log-out-outline',
+      action: handleLogout,
+    },
+  ];
+
+  const handleItemPress = (item: MenuItem) => {
+    if (item.action) {
+      item.action();
+    } else if (item.route) {
+      router.push(item.route as any);
+    }
+  };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#694d21" />
+        <ActivityIndicator size="large" color="#2b3a1a" />
       </View>
     );
   }
@@ -275,15 +332,10 @@ export default function ProfilePage() {
           colors={['#fbf7f4', '#fbf7f4', '#fbf7f4']}
           style={styles.backgroundGradient}
         />
-        <View style={styles.floatingElements}>
-          <View style={styles.floatingCircle1} />
-          <View style={styles.floatingCircle2} />
-          <View style={styles.floatingCircle3} />
-        </View>
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, { maxWidth: 500, alignSelf: 'center', width: '100%' }]}>
           <Animated.View style={[styles.emptyIconContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
             <LinearGradient
-              colors={['#694d21', '#5a3f1a']}
+              colors={['#2b3a1a', '#3a5f3a']}
               style={styles.emptyIconGradient}
             >
               <Ionicons name="person-outline" size={40} color="#fff" />
@@ -297,7 +349,7 @@ export default function ProfilePage() {
           </Animated.Text>
           <Animated.View style={[styles.loginButtonContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <LinearGradient
-              colors={['#694d21', '#5a3f1a']}
+              colors={['#2b3a1a', '#3a5f3a']}
               style={styles.loginButtonGradient}
             >
               <TouchableOpacity
@@ -325,296 +377,374 @@ export default function ProfilePage() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#fbf7f4', '#fbf7f4', '#fbf7f4']}
+        colors={['#fcf9f6', '#fbf7f4', '#fcf9f6']}
         style={styles.backgroundGradient}
       />
-      <View style={styles.floatingElements}>
-        <View style={styles.floatingCircle1} />
-        <View style={styles.floatingCircle2} />
-        <View style={styles.floatingCircle3} />
-      </View>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={{
-            paddingBottom: bottomTabHeight + 20
-          }}
-        >
-          <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.headerCard}>
-              <Animated.View style={[styles.headerContent, { transform: [{ scale: scaleAnim }] }]}>
-                <TouchableOpacity onPress={handleAvatarPress}>
-                  {userProfile?.photo_url ? (
-                    <View style={styles.avatarContainer}>
-                      <Image
-                        source={{ uri: apiService.getFullImageUrl(userProfile.photo_url) }}
-                        style={styles.avatar}
-                      />
-                      <View style={styles.avatarOverlay}>
-                        <Ionicons name="camera" size={20} color="#fff" />
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.avatarContainer}>
-                      <DefaultAvatar />
-                      <View style={styles.avatarOverlay}>
-                        <Ionicons name="camera" size={20} color="#fff" />
-                      </View>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{userProfile?.name}</Text>
-                  <Text style={styles.userEmail}>{userProfile?.email}</Text>
-                  <TouchableOpacity 
-                    style={styles.editProfileButton}
-                    onPress={handleEditProfile}
-                  >
-                    <LinearGradient
-                      colors={['#2b3a1a', '#2b3a1a']}
-                      style={styles.editProfileGradient}
-                    >
-                      <Text style={styles.editProfileText}>Edit Profile</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
-          </Animated.View>
+        <View style={{ width: '100%', maxWidth: isTablet ? 720 : 650, alignSelf: 'center', flex: 1, position: 'relative' }}>
+          
+          {/* Responsive Leaf Background Graphic at Top-Right */}
+          <Image 
+            source={require('../../../assets/images/profile_leaf_bg.png')} 
+            style={[styles.topLeafBg, { 
+              width: isTablet ? 250 : 180, 
+              height: isTablet ? 210 : 150 
+            }]} 
+            resizeMode="contain"
+          />
 
-          <Animated.View style={[styles.statsContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.statsCard}>
-              <View style={styles.statItem}>
-                <View style={[styles.statIconContainer, { backgroundColor: '#e3f2fd' }]}>
-                  <Ionicons name="receipt-outline" size={20} color="#1976d2" />
-                </View>
-                <Text style={styles.statNumber}>{userProfile?.stats.totalOrders || 0}</Text>
-                <Text style={styles.statLabel}>Orders</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <View style={[styles.statIconContainer, { backgroundColor: '#fce4ec' }]}>
-                  <Ionicons name="heart-outline" size={20} color="#c2185b" />
-                </View>
-                <Text style={styles.statNumber}>{userProfile?.stats.wishlistCount || 0}</Text>
-                <Text style={styles.statLabel}>Wishlist</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e8' }]}>
-                  <Ionicons name="cart-outline" size={20} color="#388e3c" />
-                </View>
-                <Text style={styles.statNumber}>{userProfile?.stats.cartCount || 0}</Text>
-                <Text style={styles.statLabel}>Cart</Text>
-              </View>
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingBottom: bottomTabHeight + (isTablet ? 40 : 20),
+              paddingHorizontal: isTablet ? 24 : 0
+            }}
+          >
+            {/* Responsive Header Text */}
+            <View style={[styles.headerTextContainer, { marginTop: Platform.OS === 'ios' ? 10 : 25 }]}>
+              <Text style={[styles.headerTitle, { fontSize: isTablet ? 40 : 34 }]}>My Account</Text>
+              <Text style={[styles.headerSubtitle, { fontSize: isTablet ? 16 : 14 }]}>Welcome back, {userProfile?.name}!</Text>
             </View>
-          </Animated.View>
 
-          <Animated.View style={[styles.menuContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            {menuItems.map((item, index) => (
-              <Animated.View
-                key={item.id}
-                style={[
-                  styles.menuItemContainer,
-                  {
-                    opacity: fadeAnim,
-                    transform: [
-                      { translateY: slideAnim },
-                      { scale: scaleAnim }
-                    ]
-                  }
-                ]}
-              >
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => item.route && handleNavigation(item.route)}
+            {/* Combined User Info and Stats Card */}
+            <Animated.View style={[styles.profileCardContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+              <View style={[styles.profileCard, { padding: isTablet ? 24 : 20 }]}>
+                
+                {/* Profile Row */}
+                <TouchableOpacity 
+                  style={styles.profileRow} 
+                  onPress={handleEditProfile}
+                  activeOpacity={0.7}
                 >
-                  <View style={styles.menuItemCard}>
-                    <View style={[
-                      styles.menuIcon, 
-                      { backgroundColor: item.id === 'orders' ? '#e3f2fd' : 
-                                        item.id === 'addresses' ? '#e8f5e8' : 
-                                        '#fff3e0' }
-                    ]}>
-                      <Ionicons 
-                        name={item.icon} 
-                        size={24} 
-                        color={item.id === 'orders' ? '#1976d2' : 
-                               item.id === 'addresses' ? '#388e3c' : 
-                               '#f57c00'} 
-                      />
-                    </View>
-                    <Text style={styles.menuTitle}>{item.title}</Text>
-                    {item.badge ? (
-                      <View style={[styles.menuBadge, { backgroundColor: '#ff4444' }]}>
-                        <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                  <TouchableOpacity onPress={handleAvatarPress}>
+                    {userProfile?.photo_url ? (
+                      <View style={styles.avatarContainer}>
+                        <Image
+                          source={{ uri: apiService.getFullImageUrl(userProfile.photo_url) }}
+                          style={[styles.avatar, { 
+                            width: isTablet ? 72 : 64, 
+                            height: isTablet ? 72 : 64,
+                            borderRadius: isTablet ? 36 : 32 
+                          }]}
+                        />
+                        <View style={styles.avatarOverlay}>
+                          <Ionicons name="camera" size={12} color="#fff" />
+                        </View>
                       </View>
                     ) : (
-                      <Ionicons name="chevron-forward" size={20} color="#666" />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </Animated.View>
-
-          <Animated.View style={[styles.logoutContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <LinearGradient
-                colors={['#ff4444', '#cc0000']}
-                style={styles.logoutGradient}
-              >
-                <Ionicons name="log-out-outline" size={20} color="#fff" style={styles.logoutIcon} />
-                <Text style={styles.logoutText}>Logout</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Animated.Text style={[styles.version, { opacity: fadeAnim }]}>Version 1.0.0</Animated.Text>
-        </ScrollView>
-
-        <Modal visible={isImageViewerVisible} transparent={true}>
-          <ImageViewer
-            imageUrls={images}
-            enableSwipeDown
-            onSwipeDown={() => setIsImageViewerVisible(false)}
-          />
-        </Modal>
-
-        {/* Support Modal */}
-        <Modal
-          visible={showSupportModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowSupportModal(false)}
-        >
-          <View style={styles.supportOverlay}>
-            <View style={styles.supportModal}>
-              <View style={styles.supportModalHeader}>
-                <Text style={styles.supportModalTitle}>Contact Support</Text>
-                <TouchableOpacity
-                  style={styles.supportCloseButton}
-                  onPress={() => setShowSupportModal(false)}
-                >
-                  <Ionicons name="close" size={22} color="#2b3a1a" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.supportModalSubtitle}>
-                How would you like to contact our support team?
-              </Text>
-              <TouchableOpacity
-                style={styles.supportOptionButton}
-                onPress={() => {
-                  setShowSupportModal(false);
-                  setTimeout(() => {
-                    setChatMessages([{ id: 1, text: 'Hi! 👋 How can I help you today?', isBot: true }]);
-                    setShowChatModal(true);
-                  }, 200);
-                }}
-              >
-                <Ionicons name="chatbubble-ellipses-outline" size={22} color="#2b3a1a" />
-                <Text style={styles.supportOptionText}>Live Chat</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.supportOptionButton}
-                onPress={() => {
-                  setShowSupportModal(false);
-                  router.push('/support/call');
-                }}
-              >
-                <Ionicons name="call-outline" size={22} color="#2b3a1a" />
-                <Text style={styles.supportOptionText}>Call Support</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Live Chat Modal */}
-        <Modal
-          visible={showChatModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowChatModal(false)}
-        >
-          <View style={styles.chatOverlay}>
-            <View style={styles.chatModalContainer}>
-              {/* Chat Header */}
-              <View style={styles.chatHeader}>
-                <View style={styles.chatHeaderLeft}>
-                  <View style={styles.chatAvatarDot} />
-                  <View>
-                    <Text style={styles.chatHeaderTitle}>Customer Support</Text>
-                    <Text style={styles.chatHeaderStatus}>Online</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.chatCloseButton}
-                  onPress={() => setShowChatModal(false)}
-                >
-                  <Ionicons name="close" size={22} color="#2b3a1a" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Messages */}
-              <ScrollView
-                ref={chatScrollRef}
-                style={styles.chatMessages}
-                contentContainerStyle={{ padding: 16 }}
-                onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
-              >
-                {chatMessages.map((msg) => (
-                  <View
-                    key={msg.id}
-                    style={[
-                      styles.chatBubbleWrapper,
-                      msg.isBot ? styles.chatBubbleWrapperBot : styles.chatBubbleWrapperUser,
-                    ]}
-                  >
-                    {msg.isBot && (
-                      <View style={styles.chatBotAvatar}>
-                        <Ionicons name="leaf" size={12} color="#fff" />
+                      <View style={styles.avatarContainer}>
+                        <DefaultAvatar />
+                        <View style={styles.avatarOverlay}>
+                          <Ionicons name="camera" size={12} color="#fff" />
+                        </View>
                       </View>
                     )}
-                    <View
-                      style={[
-                        styles.chatBubble,
-                        msg.isBot ? styles.chatBubbleBot : styles.chatBubbleUser,
-                      ]}
+                  </TouchableOpacity>
+                  
+                  <View style={styles.profileInfo}>
+                    <Text style={[styles.profileName, { fontSize: isTablet ? 21 : 19 }]}>{userProfile?.name}</Text>
+                    <Text style={[styles.profileEmail, { fontSize: isTablet ? 14 : 13 }]}>{userProfile?.email}</Text>
+                  </View>
+                  
+                  <Ionicons name="chevron-forward" size={20} color="#888" />
+                </TouchableOpacity>
+
+                {/* Stats Inner Card Box */}
+                <View style={styles.statsInnerContainer}>
+                  <View style={styles.statsRow}>
+                    {/* Orders */}
+                    <TouchableOpacity 
+                      style={styles.statItem} 
+                      onPress={() => router.push('/profile/orders')}
+                      activeOpacity={0.6}
                     >
-                      <Text style={[styles.chatBubbleText, msg.isBot ? styles.chatBubbleTextBot : styles.chatBubbleTextUser]}>
-                        {msg.text}
-                      </Text>
-                    </View>
+                      <View style={[styles.statIconContainer, { 
+                        width: isTablet ? 44 : 38, 
+                        height: isTablet ? 44 : 38,
+                        borderRadius: isTablet ? 22 : 19 
+                      }]}>
+                        <Ionicons name="bag-outline" size={isTablet ? 22 : 20} color="#2b3a1a" />
+                      </View>
+                      <Text style={[styles.statLabel, { fontSize: isTablet ? 13 : 11 }]} numberOfLines={1}>Orders</Text>
+                      <Text style={[styles.statNumber, { fontSize: isTablet ? 20 : 17 }]}>{userProfile?.stats.totalOrders || 0}</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.statDivider} />
+
+                    {/* Wishlist */}
+                    <TouchableOpacity 
+                      style={styles.statItem} 
+                      onPress={() => router.push('/(tabs)/wishlist')}
+                      activeOpacity={0.6}
+                    >
+                      <View style={[styles.statIconContainer, { 
+                        width: isTablet ? 44 : 38, 
+                        height: isTablet ? 44 : 38,
+                        borderRadius: isTablet ? 22 : 19 
+                      }]}>
+                        <Ionicons name="heart-outline" size={isTablet ? 22 : 20} color="#2b3a1a" />
+                      </View>
+                      <Text style={[styles.statLabel, { fontSize: isTablet ? 13 : 11 }]} numberOfLines={1}>Wishlist</Text>
+                      <Text style={[styles.statNumber, { fontSize: isTablet ? 20 : 17 }]}>{userProfile?.stats.wishlistCount || 0}</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.statDivider} />
+
+                    {/* Addresses */}
+                    <TouchableOpacity 
+                      style={styles.statItem} 
+                      onPress={() => router.push('/profile/addresses')}
+                      activeOpacity={0.6}
+                    >
+                      <View style={[styles.statIconContainer, { 
+                        width: isTablet ? 44 : 38, 
+                        height: isTablet ? 44 : 38,
+                        borderRadius: isTablet ? 22 : 19 
+                      }]}>
+                        <Ionicons name="location-outline" size={isTablet ? 22 : 20} color="#2b3a1a" />
+                      </View>
+                      <Text style={[styles.statLabel, { fontSize: isTablet ? 13 : 11 }]} numberOfLines={1}>Addresses</Text>
+                      <Text style={[styles.statNumber, { fontSize: isTablet ? 20 : 17 }]}>{addresses.length}</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.statDivider} />
+
+                    {/* Cart */}
+                    <TouchableOpacity 
+                      style={styles.statItem} 
+                      onPress={() => router.push('/(tabs)/cart')}
+                      activeOpacity={0.6}
+                    >
+                      <View style={[styles.statIconContainer, { 
+                        width: isTablet ? 44 : 38, 
+                        height: isTablet ? 44 : 38,
+                        borderRadius: isTablet ? 22 : 19 
+                      }]}>
+                        <Ionicons name="cart-outline" size={isTablet ? 22 : 20} color="#2b3a1a" />
+                      </View>
+                      <Text style={[styles.statLabel, { fontSize: isTablet ? 13 : 11 }]} numberOfLines={1}>Cart</Text>
+                      <Text style={[styles.statNumber, { fontSize: isTablet ? 20 : 17 }]}>{userProfile?.stats.cartCount || 0}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+
+            {/* Account Overview List Section */}
+            <Text style={[styles.sectionTitle, { fontSize: isTablet ? 22 : 20 }]}>Account Overview</Text>
+
+            <Animated.View style={[styles.menuCardContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+              <View style={styles.menuCard}>
+                {menuItems.map((item, index) => (
+                  <View key={item.id}>
+                    <TouchableOpacity
+                      style={[styles.menuItem, { paddingVertical: isTablet ? 16 : 14 }]}
+                      onPress={() => handleItemPress(item)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuItemLeft}>
+                        <View style={[styles.menuItemIconContainer, { 
+                          width: isTablet ? 40 : 36, 
+                          height: isTablet ? 40 : 36,
+                          borderRadius: isTablet ? 20 : 18 
+                        }]}>
+                          <Ionicons name={item.icon} size={isTablet ? 22 : 20} color="#2b3a1a" />
+                        </View>
+                        <View style={styles.menuItemTextContainer}>
+                          <Text style={[styles.menuItemTitle, { fontSize: isTablet ? 16 : 15 }]}>{item.title}</Text>
+                          <Text style={[styles.menuItemSubtitle, { fontSize: isTablet ? 13 : 12 }]} numberOfLines={1}>{item.subtitle}</Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="#aaa" />
+                    </TouchableOpacity>
+                    {index < menuItems.length - 1 && <View style={styles.menuDivider} />}
                   </View>
                 ))}
-              </ScrollView>
+              </View>
+            </Animated.View>
 
-              {/* Input Bar */}
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                <View style={styles.chatInputRow}>
-                  <TextInput
-                    style={styles.chatInput}
-                    value={chatInput}
-                    onChangeText={setChatInput}
-                    placeholder="Type your message..."
-                    placeholderTextColor="#aaa"
-                    multiline
-                    returnKeyType="send"
-                    onSubmitEditing={handleChatSend}
-                  />
-                  <TouchableOpacity
-                    style={styles.chatSendButton}
-                    onPress={handleChatSend}
+            {/* Bottom Promo / Support Banner */}
+            <Animated.View style={[styles.bannerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+              <View style={[styles.bannerCard, { padding: isTablet ? 20 : 16 }]}>
+                <Image 
+                  source={require('../../../assets/images/profile_wellness_banner.png')} 
+                  style={[styles.bannerImage, { 
+                    width: isTablet ? 120 : 90, 
+                    height: isTablet ? 120 : 90 
+                  }]}
+                  resizeMode="cover"
+                />
+                <View style={styles.bannerContent}>
+                  <Text style={[styles.bannerTitle, { 
+                    fontSize: isTablet ? 18 : 16, 
+                    lineHeight: isTablet ? 22 : 20 
+                  }]}>Your wellness journey matters to us.</Text>
+                  <Text style={[styles.bannerSubtitle, { 
+                    fontSize: isTablet ? 13 : 12,
+                    lineHeight: isTablet ? 17 : 15,
+                    marginBottom: isTablet ? 14 : 10
+                  }]}>We're here to support you every step of the way.</Text>
+                  <TouchableOpacity 
+                    style={[styles.bannerButton, { 
+                      paddingHorizontal: isTablet ? 16 : 12,
+                      paddingVertical: isTablet ? 10 : 8 
+                    }]}
+                    onPress={() => router.push('/(tabs)/explore')}
+                    activeOpacity={0.8}
                   >
-                    <Ionicons name="send" size={20} color="#fff" />
+                    <Text style={[styles.bannerButtonText, { fontSize: isTablet ? 13 : 12 }]}>Explore Our Products</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#fff" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 </View>
-              </KeyboardAvoidingView>
-            </View>
-          </View>
-        </Modal>
+              </View>
+            </Animated.View>
+          </ScrollView>
 
+          {/* User Profile Zoom View Modal */}
+          <Modal visible={isImageViewerVisible} transparent={true}>
+            <ImageViewer
+              imageUrls={images}
+              enableSwipeDown
+              onSwipeDown={() => setIsImageViewerVisible(false)}
+            />
+          </Modal>
+
+          {/* Support Modal */}
+          <Modal
+            visible={showSupportModal}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowSupportModal(false)}
+          >
+            <View style={styles.supportOverlay}>
+              <View style={styles.supportModal}>
+                <View style={styles.supportModalHeader}>
+                  <Text style={styles.supportModalTitle}>Contact Support</Text>
+                  <TouchableOpacity
+                    style={styles.supportCloseButton}
+                    onPress={() => setShowSupportModal(false)}
+                  >
+                    <Ionicons name="close" size={22} color="#2b3a1a" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.supportModalSubtitle}>
+                  How would you like to contact our support team?
+                </Text>
+                <TouchableOpacity
+                  style={styles.supportOptionButton}
+                  onPress={() => {
+                    setShowSupportModal(false);
+                    setTimeout(() => {
+                      setChatMessages([{ id: 1, text: 'Hi! 👋 How can I help you today?', isBot: true }]);
+                      setShowChatModal(true);
+                    }, 200);
+                  }}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={22} color="#2b3a1a" />
+                  <Text style={styles.supportOptionText}>Live Chat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.supportOptionButton}
+                  onPress={() => {
+                    setShowSupportModal(false);
+                    router.push('/support/call');
+                  }}
+                >
+                  <Ionicons name="call-outline" size={22} color="#2b3a1a" />
+                  <Text style={styles.supportOptionText}>Call Support</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Live Chat Modal */}
+          <Modal
+            visible={showChatModal}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowChatModal(false)}
+          >
+            <View style={styles.chatOverlay}>
+              <View style={styles.chatModalContainer}>
+                {/* Chat Header */}
+                <View style={styles.chatHeader}>
+                  <View style={styles.chatHeaderLeft}>
+                    <View style={styles.chatAvatarDot} />
+                    <View>
+                      <Text style={styles.chatHeaderTitle}>Customer Support</Text>
+                      <Text style={styles.chatHeaderStatus}>Online</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.chatCloseButton}
+                    onPress={() => setShowChatModal(false)}
+                  >
+                    <Ionicons name="close" size={22} color="#2b3a1a" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Messages */}
+                <ScrollView
+                  ref={chatScrollRef}
+                  style={styles.chatMessages}
+                  contentContainerStyle={{ padding: 16 }}
+                  onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
+                >
+                  {chatMessages.map((msg) => (
+                    <View
+                      key={msg.id}
+                      style={[
+                        styles.chatBubbleWrapper,
+                        msg.isBot ? styles.chatBubbleWrapperBot : styles.chatBubbleWrapperUser,
+                      ]}
+                    >
+                      {msg.isBot && (
+                        <View style={styles.chatBotAvatar}>
+                          <Ionicons name="leaf" size={12} color="#fff" />
+                        </View>
+                      )}
+                      <View
+                        style={[
+                          styles.chatBubble,
+                          msg.isBot ? styles.chatBubbleBot : styles.chatBubbleUser,
+                        ]}
+                      >
+                        <Text style={[styles.chatBubbleText, msg.isBot ? styles.chatBubbleTextBot : styles.chatBubbleTextUser]}>
+                          {msg.text}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {/* Input Bar */}
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                  <View style={styles.chatInputRow}>
+                    <TextInput
+                      style={styles.chatInput}
+                      value={chatInput}
+                      onChangeText={setChatInput}
+                      placeholder="Type your message..."
+                      placeholderTextColor="#aaa"
+                      multiline
+                      returnKeyType="send"
+                      onSubmitEditing={handleChatSend}
+                    />
+                    <TouchableOpacity
+                      style={styles.chatSendButton}
+                      onPress={handleChatSend}
+                    >
+                      <Ionicons name="send" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </KeyboardAvoidingView>
+              </View>
+            </View>
+          </Modal>
+
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -632,45 +762,230 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  floatingElements: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  floatingCircle1: {
-    position: 'absolute',
-    top: 100,
-    right: -50,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(105, 77, 33, 0.03)',
-  },
-  floatingCircle2: {
-    position: 'absolute',
-    top: 200,
-    left: -30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(90, 63, 26, 0.03)',
-  },
-  floatingCircle3: {
-    position: 'absolute',
-    bottom: 200,
-    right: 20,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(105, 77, 33, 0.02)',
-  },
   safeArea: {
     flex: 1,
   },
+  topLeafBg: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 0,
+  },
   scrollView: {
     flex: 1,
+    zIndex: 1,
+  },
+  headerTextContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  headerTitle: {
+    fontWeight: 'bold',
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
+  },
+  headerSubtitle: {
+    color: '#666',
+    marginTop: 4,
+  },
+  profileCardContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  profileCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0ece6',
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatar: {
+    borderWidth: 1,
+    borderColor: '#e8eee4',
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileInfo: {
+    flex: 1,
+    paddingLeft: 16,
+    justifyContent: 'center',
+  },
+  profileName: {
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    fontFamily: 'CormorantGaramond-Bold',
+  },
+  profileEmail: {
+    color: '#666',
+    marginTop: 2,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#f5f0eb',
+    marginVertical: 18,
+  },
+  statsInnerContainer: {
+    borderWidth: 1,
+    borderColor: '#efe9df',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    backgroundColor: '#faf8f5',
+    marginTop: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statIconContainer: {
+    backgroundColor: '#f3f6f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statLabel: {
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  statNumber: {
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#f5f0eb',
+  },
+  sectionTitle: {
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    fontFamily: 'CormorantGaramond-Bold',
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  menuCardContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  menuCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0ece6',
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuItemIconContainer: {
+    backgroundColor: '#f3f6f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemTextContainer: {
+    paddingLeft: 12,
+    flex: 1,
+  },
+  menuItemTitle: {
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  menuItemSubtitle: {
+    color: '#777',
+    marginTop: 2,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#f5f0eb',
+    marginLeft: 64,
+  },
+  bannerContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  bannerCard: {
+    backgroundColor: '#edeae2',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2ded5',
+  },
+  bannerImage: {
+    borderRadius: 12,
+  },
+  bannerContent: {
+    flex: 1,
+    paddingLeft: 16,
+  },
+  bannerTitle: {
+    fontWeight: 'bold',
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
+  },
+  bannerSubtitle: {
+    color: '#555',
+    marginTop: 4,
+  },
+  bannerButton: {
+    backgroundColor: '#2b3a1a',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  bannerButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fbf7f4',
   },
   emptyContainer: {
     flex: 1,
@@ -687,9 +1002,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -720,9 +1035,9 @@ const styles = StyleSheet.create({
   },
   loginButtonGradient: {
     borderRadius: 16,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -742,255 +1057,6 @@ const styles = StyleSheet.create({
   },
   loginButtonIcon: {
     marginLeft: 4,
-  },
-  headerContainer: {
-    marginHorizontal: 16,
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  headerCard: {
-    backgroundColor: '#fbf7f4',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  headerContent: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
-    borderColor: '#fff',
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  avatarOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  defaultAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#fff',
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  userInfo: {
-    alignItems: 'center',
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  userEmail: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  editProfileButton: {
-    borderRadius: 16,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  editProfileGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editProfileText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  editProfileIcon: {
-    marginLeft: 4,
-  },
-  statsContainer: {
-    marginHorizontal: 16,
-    marginBottom: 20,
-  },
-  statsCard: {
-    backgroundColor: '#fbf7f4',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: 20,
-  },
-  statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontWeight: '600',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#e0e0e0',
-    alignSelf: 'center',
-  },
-  menuContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  menuItemContainer: {
-    marginBottom: 12,
-  },
-  menuItem: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  menuItemCard: {
-    backgroundColor: '#fbf7f4',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    borderRadius: 12,
-  },
-  menuIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  menuTitle: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1A1A1A',
-    fontWeight: '600',
-  },
-  menuBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  menuBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  logoutContainer: {
-    marginHorizontal: 16,
-    marginBottom: 20,
-  },
-  logoutButton: {
-    borderRadius: 12,
-    shadowColor: '#ff4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#ffebee',
-  },
-  logoutGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutIcon: {
-    marginRight: 8,
-  },
-  logoutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fbf7f4',
-  },
-  version: {
-    textAlign: 'center',
-    color: '#999',
-    fontSize: 12,
-    marginTop: 8,
-    marginBottom: 24,
-    paddingHorizontal: 16,
   },
   supportOverlay: {
     flex: 1,
@@ -1046,7 +1112,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2b3a1a',
   },
-  /* ── Live Chat Modal ── */
   chatOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -1172,4 +1237,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-}); 
+});

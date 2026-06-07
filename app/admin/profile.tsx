@@ -53,11 +53,6 @@ export default function AdminProfile() {
                         <Text style={styles.menuText}>Change Password</Text>
                         <Ionicons name="chevron-forward" size={24} color="#666" />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="notifications-outline" size={24} color="#666" />
-                        <Text style={styles.menuText}>Notifications</Text>
-                        <Ionicons name="chevron-forward" size={24} color="#666" />
-                    </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity 

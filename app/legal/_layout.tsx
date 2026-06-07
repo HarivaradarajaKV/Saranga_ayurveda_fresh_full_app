@@ -6,29 +6,29 @@ export default function LegalLayout() {
       <Stack.Screen
         name="privacy-policy"
         options={{
-          headerShown: true,
+          headerShown: false,
           title: 'Privacy Policy',
         }}
       />
       <Stack.Screen
         name="terms"
         options={{
-          headerShown: true,
-          title: 'Terms of Service',
+          headerShown: false,
+          title: 'Terms & Conditions',
         }}
       />
       <Stack.Screen
         name="shipping"
         options={{
           headerShown: false,
-          title: 'Shipping Policy',
+          title: 'Shipping & Delivery Policy',
         }}
       />
       <Stack.Screen
         name="refund"
         options={{
           headerShown: false,
-          title: 'Refund Policy',
+          title: 'Return & Cancellation Policy',
         }}
       />
     </Stack>

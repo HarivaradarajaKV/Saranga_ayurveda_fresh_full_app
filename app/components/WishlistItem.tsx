@@ -28,6 +28,7 @@ const WishlistItem: React.FC<WishlistItemProps> = ({ item, onRemove, onAddToCart
       description: item.description || '',
       price: item.price,
       category: item.category || '',
+      category_name: item.category_name || '',
       image_url: item.image_url,
       stock_quantity: item.stock_quantity || 0,
       offer_percentage: item.offer_percentage || 0

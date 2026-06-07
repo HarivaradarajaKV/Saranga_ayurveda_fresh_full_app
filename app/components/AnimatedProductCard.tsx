@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, Image, Pressable, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, Image, Pressable, View, ViewStyle, Platform } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -98,8 +98,8 @@ export const AnimatedProductCard: React.FC<AnimatedProductCardProps> = ({
       entering={entering}
       layout={Layout.springify()}
     >
-      <Image 
-        source={{ uri: imageError ? 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image' : product.image_url }} 
+      <Image
+        source={{ uri: imageError ? 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image' : product.image_url }}
         style={styles.image}
         onError={() => {
           console.log('Image failed to load:', product.image_url);
@@ -147,15 +147,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 8,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333333',
+    lineHeight: 18,
   },
   price: {
-    fontSize: 18,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 15,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#333333',
   },
   addToCartButton: {
     position: 'absolute',
@@ -167,4 +170,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 122, 255, 0.1)',
     borderRadius: 20,
   },
-}); 
+});

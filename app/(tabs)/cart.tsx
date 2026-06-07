@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useCart } from '../CartContext';
 import { useRouter } from 'expo-router';
 import { apiService } from '../services/api';
@@ -99,8 +98,8 @@ export default function CartPage() {
 
   const subtotal = calculateSelectedTotal();
   const discount = 0; // Calculate based on applied promo
-  // Delivery charge: ₹59 for orders below ₹500, free for ₹500+
-  const deliveryCharge = subtotal >= 500 ? 0 : 59;
+  // Delivery charge: ₹59 for orders below ₹599, free for ₹599+
+  const deliveryCharge = subtotal >= 599 ? 0 : 59;
   const total = subtotal - discount + deliveryCharge;
 
   const handleCheckout = () => {
@@ -201,19 +200,14 @@ export default function CartPage() {
     }
   };
 
-  // Update useEffect to handle selected items state when items change
+  // Update useEffect to handle suggested/frequently bought products when items change
   useEffect(() => {
     if (items.length > 0) {
-      // Keep only valid item IDs in selectedItems
-      const validIds = items.map(item => item.id);
-      setSelectedItems(validIds);
       setLoading(true);
       Promise.all([
         fetchSuggestedProducts(),
         fetchFrequentlyBoughtProducts()
       ]).finally(() => setLoading(false));
-    } else {
-      setSelectedItems([]);
     }
   }, [items]);
 
@@ -260,7 +254,7 @@ export default function CartPage() {
 
   // Handle tab press for scroll to top
   useEffect(() => {
-    const unsubscribe = navigation.addListener('tabPress', (e) => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
       if (isFocused) {
         e.preventDefault();
         scrollToTop();
@@ -279,6 +273,9 @@ export default function CartPage() {
     lastFocusedState.current = isFocused;
   }, [isFocused]);
 
+  const allProductIds = items.filter(item => item.stock_quantity > 0).map(item => item.id);
+  const isAllSelected = allProductIds.length > 0 && allProductIds.every(id => selectedItems.includes(id));
+
   return (
     <View style={styles.container}>
       {/* Background Gradient */}
@@ -288,376 +285,303 @@ export default function CartPage() {
       />
 
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.headerSection}>
-          <Text style={styles.brandTitle}>Cart</Text>
-        </View>
-
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-              paddingTop: 10,
-            }
-          ]}
-        >
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.scrollView}
-            contentContainerStyle={{
-              paddingTop: 10,
-              paddingBottom: bottomTabHeight + 20 // Add extra 20 for spacing
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            {items.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <LinearGradient
-                  colors={['#694d21', '#5a3f1a']}
-                  style={styles.emptyIconContainer}
-                >
-                  <Ionicons name="cart-outline" size={48} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.emptyTitle}>Your cart is empty</Text>
-                <Text style={styles.emptySubtitle}>
-                  Discover amazing products and add them to your cart
-                </Text>
-                <TouchableOpacity
-                  style={styles.shopButton}
-                  onPress={() => router.push('/')}
-                >
-                  <LinearGradient
-                    colors={['#694d21', '#5a3f1a']}
-                    style={styles.shopButtonGradient}
-                  >
-                    <Text style={styles.shopButtonText}>Start Shopping</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.shopButtonIcon} />
-                  </LinearGradient>
-                </TouchableOpacity>
+        <View style={{ width: '100%', maxWidth: 700, alignSelf: 'center', flex: 1 }}>
+          <View style={styles.headerSection}>
+            <View style={styles.headerTextContainer}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <Text style={styles.brandTitle}>My Cart</Text>
+                <Text style={styles.brandTitleCount}> ({items.length})</Text>
               </View>
-            ) : (
-              <>
+              <Text style={styles.brandSubtitle}>Review your items and proceed to checkout</Text>
+            </View>
+            <Image
+              source={require('../assets/images/leaf_decoration.png')}
+              style={styles.leafDecoration}
+              resizeMode="contain"
+            />
+          </View>
 
-
-                {/* Cart Items */}
-                <BlurView intensity={20} style={styles.cartItemsContainer}>
-                  {items.map((item: CartItem) => {
-                    console.log('Rendering cart item:', item);
-                    const displayPrice = typeof item.price === 'number' ? item.price : (parseFloat(String(item.price)) || 0);
-                    const offerPercentage = typeof item.offer_percentage === 'number' ? item.offer_percentage : (parseFloat(String(item.offer_percentage)) || 0);
-
-                    // Use combo discounted price if item is from combo, otherwise use normal discounted price
-                    let finalPrice: number;
-                    if (item.is_from_combo && item.combo_discounted_price !== undefined) {
-                      finalPrice = item.combo_discounted_price;
-                    } else {
-                      finalPrice = displayPrice * (1 - offerPercentage / 100);
-                    }
-
-                    const formattedPrice = finalPrice.toFixed(2);
-                    return (
-                      <View key={`${item.id}-${item.variant || 'no-variant'}-${item.quantity}`} style={[styles.cartItem, item.stock_quantity === 0 && { opacity: 0.5 }]}>
-                        <TouchableOpacity
-                          style={styles.checkboxContainer}
-                          onPress={() => toggleItemSelection(item.id)}
-                          disabled={item.stock_quantity === 0}
-                        >
-                          <View
-                            style={[
-                              styles.checkbox,
-                              {
-                                backgroundColor: '#fff',
-                                borderWidth: 1.5,
-                                borderColor: selectedItems.includes(item.id) && item.stock_quantity > 0 ? '#2b3a1a' : '#ccc'
-                              }
-                            ]}
-                          >
-                            {selectedItems.includes(item.id) && item.stock_quantity > 0 && (
-                              <Ionicons name="checkmark" size={16} color="#2b3a1a" />
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.itemContentContainer}
-                          onPress={() => router.push({
-                            pathname: '/(product)/[id]',
-                            params: { id: item.id }
-                          })}
-                        >
-                          <View style={styles.itemImageContainer}>
-                            <Image
-                              source={{ uri: apiService.getFullImageUrl(item.image_url) }}
-                              style={styles.itemImage}
-                            />
-                            {offerPercentage > 0 && (
-                              <View style={styles.offerBadge}>
-                                <Text style={styles.offerText}>{offerPercentage}% OFF</Text>
-                              </View>
-                            )}
-                          </View>
-                          <View style={styles.itemDetails}>
-                            <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                            <View style={styles.priceContainer}>
-                              <Text style={styles.price}>₹{formattedPrice}</Text>
-                              {offerPercentage > 0 && (
-                                <Text style={styles.originalPrice}>₹{displayPrice.toFixed(2)}</Text>
-                              )}
-                            </View>
-                            {item.stock_quantity === 0 && (
-                              <View style={styles.stockContainer}>
-                                <Ionicons
-                                  name="warning"
-                                  size={16}
-                                  color="#ff4444"
-                                />
-                                <Text style={[styles.stockText, styles.lowStockText]}>
-                                  Out of Stock
-                                </Text>
-                              </View>
-                            )}
-                            <View style={styles.quantityContainer}>
-                              <TouchableOpacity
-                                style={[
-                                  styles.quantityButton,
-                                  item.stock_quantity === 0 && styles.quantityButtonDisabled
-                                ]}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  updateQuantity(item.id, false);
-                                }}
-                                disabled={item.stock_quantity === 0}
-                              >
-                                <Ionicons name="remove" size={16} color="#2b3a1a" />
-                              </TouchableOpacity>
-                              <Text style={styles.quantityText}>{item.quantity}</Text>
-                              <TouchableOpacity
-                                style={[
-                                  styles.quantityButton,
-                                  item.stock_quantity === 0 && styles.quantityButtonDisabled
-                                ]}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  updateQuantity(item.id, true);
-                                }}
-                                disabled={item.stock_quantity === 0}
-                              >
-                                <Ionicons name="add" size={16} color="#2b3a1a" />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => removeItem(item.id)}
-                        >
-                          <Ionicons name="trash" size={22} color="#ff4444" />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </BlurView>
-
-                {/* Buy Along with This Product */}
-                {suggestedProducts.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Buy Along with This Product</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.suggestedProductsContainer}
-                    >
-                      {suggestedProducts.map((product) => (
-                        <View key={product.id} style={{ width: 160, marginRight: 8 }}>
-                          <ProductCard product={product} />
-                        </View>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-
-                {/* Selected Items Summary */}
-                <View style={styles.summaryContainer}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <Text style={[styles.summaryText, { fontSize: 16, fontWeight: '700', color: '#1a1a1a' }]}>
-                      Order Summary
-                    </Text>
-                    <Text style={{ fontSize: 13, color: '#666', fontWeight: '500' }}>
-                      {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''} Selected
-                    </Text>
-                  </View>
-
-                  <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 12 }} />
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Text style={{ color: '#666', fontSize: 14 }}>Subtotal</Text>
-                    <Text style={{ fontWeight: '600', fontSize: 14, color: '#1a1a1a' }}>₹{subtotal.toFixed(2)}</Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <Text style={{ color: '#666', fontSize: 14 }}>Delivery</Text>
-                    <Text style={{ color: deliveryCharge === 0 ? '#28a745' : '#1a1a1a', fontWeight: '600', fontSize: 14 }}>
-                      {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge}`}
-                    </Text>
-                  </View>
-
-                  <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 12 }} />
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1a1a1a' }}>Total Amount</Text>
-                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2b3a1a' }}>
-                      ₹{total.toFixed(2)}
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 10, color: '#999', marginTop: 4, fontStyle: 'italic', textAlign: 'right' }}>
-                    (Inc. GST)
-                  </Text>
-                </View>
-
-                {/* Free Delivery Message */}
-                {subtotal > 0 && subtotal < 500 && (
-                  <Animated.View
-                    style={[
-                      styles.freeDeliveryContainer,
-                      { transform: [{ scale: pulseAnim }] }
-                    ]}
-                  >
-                    <Text style={styles.freeDeliveryText}>
-                      Add ₹{(500 - subtotal).toFixed(2)} more to enjoy FREE delivery!
-                    </Text>
-                  </Animated.View>
-                )}
-
-                {/* Address Display */}
-                {addresses && addresses.length > 0 ? (
-                  <TouchableOpacity
-                    style={[styles.deliveryMessageContainer, {
-                      padding: 16,
-                      backgroundColor: '#fff',
-                      borderRadius: 16,
-                      shadowColor: '#2b3a1a',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 12,
-                      elevation: 4,
-                      borderWidth: 1,
-                      borderColor: 'rgba(43, 58, 26, 0.1)',
-                      flexDirection: 'column',
-                      alignItems: 'stretch'
-                    }]}
-                    onPress={() => router.push('/profile/addresses')}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
-                        backgroundColor: '#f2f4f0',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginRight: 12
-                      }}>
-                        <Ionicons name="location" size={20} color="#2b3a1a" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, color: '#2b3a1a', fontWeight: '600', marginBottom: 2 }}>
-                          DELIVER TO
-                        </Text>
-                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#1a1a1a' }}>
-                          {addresses[0].full_name}
-                        </Text>
-                      </View>
-                      <View style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 8,
-                        backgroundColor: '#2b3a1a',
-                        borderRadius: 20,
-                        shadowColor: '#2b3a1a',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 4,
-                        elevation: 3
-                      }}>
-                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Change</Text>
-                      </View>
-                    </View>
-
-                    <View style={{
-                      backgroundColor: '#f8f9fa',
-                      padding: 12,
-                      borderRadius: 12,
-                      flexDirection: 'row',
-                      alignItems: 'flex-start'
-                    }}>
-                      <Text style={{ color: '#4a4a4a', fontSize: 13, lineHeight: 20, flex: 1 }}>
-                        {addresses[0].address_line1}, {addresses[0].city} - {addresses[0].postal_code}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.deliveryMessageContainer, {
-                      padding: 20,
-                      backgroundColor: '#fff',
-                      borderRadius: 16,
-                      borderWidth: 1.5,
-                      borderColor: '#eee',
-                      borderStyle: 'dashed',
-                      justifyContent: 'center'
-                    }]}
-                    onPress={() => router.push('/profile/addresses/new')}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                      <View style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: '#f2f4f0',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginRight: 12
-                      }}>
-                        <Ionicons name="add" size={24} color="#2b3a1a" />
-                      </View>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#2b3a1a' }}>
-                        Add Delivery Address
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-
-                {/* Proceed to Buy Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.proceedButton,
-                    selectedItems.length === 0 && styles.proceedButtonDisabled
-                  ]}
-                  onPress={handleCheckout}
-                  disabled={selectedItems.length === 0}
-                >
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }
+            ]}
+          >
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.scrollView}
+              contentContainerStyle={{
+                paddingTop: 10,
+                paddingBottom: bottomTabHeight + 20
+              }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {items.length === 0 ? (
+                <View style={styles.emptyContainer}>
                   <LinearGradient
-                    colors={selectedItems.length === 0 ? ['#ccc', '#999'] : ['#2b3a1a', '#1e2912']}
-                    style={styles.proceedButtonGradient}
+                    colors={['#2b3a1a', '#1e2912']}
+                    style={styles.emptyIconContainer}
                   >
-                    <Text style={styles.proceedButtonText}>
-                      Proceed to Buy ({selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''})
-                    </Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.proceedButtonIcon} />
+                    <Ionicons name="cart-outline" size={48} color="#fff" />
                   </LinearGradient>
-                </TouchableOpacity>
+                  <Text style={styles.emptyTitle}>Your cart is empty</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Discover amazing products and add them to your cart
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.shopButton}
+                    onPress={() => router.push('/')}
+                    delayPressIn={0}
+                  >
+                    <LinearGradient
+                      colors={['#2b3a1a', '#1e2912']}
+                      style={styles.shopButtonGradient}
+                    >
+                      <Text style={styles.shopButtonText}>Start Shopping</Text>
+                      <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.shopButtonIcon} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  {/* Cart Items List */}
+                  <View style={styles.cartCard}>
+                    {/* Select All Row */}
+                    <View style={styles.selectAllRow}>
+                      <TouchableOpacity
+                        style={styles.checkboxContainer}
+                        onPress={() => {
+                          if (isAllSelected) {
+                            setSelectedItems([]);
+                          } else {
+                            setSelectedItems(allProductIds);
+                          }
+                        }}
+                        delayPressIn={0}
+                      >
+                        <View
+                          style={[
+                            styles.checkbox,
+                            {
+                              backgroundColor: '#fff',
+                              borderWidth: 1.5,
+                              borderColor: isAllSelected ? '#2b3a1a' : '#ccc'
+                            }
+                          ]}
+                        >
+                          {isAllSelected && (
+                            <Ionicons name="checkmark" size={14} color="#2b3a1a" />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                      <Text style={styles.selectAllText}>Select All Items</Text>
+                    </View>
+                    
+                    <View style={styles.itemDivider} />
 
-                {/* Deselect All Items */}
-                <TouchableOpacity
-                  style={styles.deselectButton}
-                  onPress={() => setSelectedItems([])}
-                >
-                  <Ionicons name="close-circle-outline" size={20} color="#2b3a1a" />
-                  <Text style={styles.deselectButtonText}>Deselect all items</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </ScrollView>
-        </Animated.View>
+                    {items.map((item: CartItem, index: number) => {
+                      const displayPrice = typeof item.price === 'number' ? item.price : (parseFloat(String(item.price)) || 0);
+                      const offerPercentage = typeof item.offer_percentage === 'number' ? item.offer_percentage : (parseFloat(String(item.offer_percentage)) || 0);
+
+                      let finalPrice: number;
+                      if (item.is_from_combo && item.combo_discounted_price !== undefined) {
+                        finalPrice = item.combo_discounted_price;
+                      } else {
+                        finalPrice = displayPrice * (1 - offerPercentage / 100);
+                      }
+
+                      return (
+                        <View key={`${item.id}-${item.variant || 'no-variant'}-${item.quantity}`} style={{ width: '100%' }}>
+                          <View style={[styles.cartItemRow, item.stock_quantity === 0 && { opacity: 0.5 }]}>
+                            {/* Checkbox */}
+                            <TouchableOpacity
+                              style={styles.checkboxContainer}
+                              onPress={() => toggleItemSelection(item.id)}
+                              disabled={item.stock_quantity === 0}
+                              delayPressIn={0}
+                            >
+                              <View
+                                style={[
+                                  styles.checkbox,
+                                  {
+                                    backgroundColor: '#fff',
+                                    borderWidth: 1.5,
+                                    borderColor: selectedItems.includes(item.id) && item.stock_quantity > 0 ? '#2b3a1a' : '#ccc'
+                                  }
+                                ]}
+                              >
+                                {selectedItems.includes(item.id) && item.stock_quantity > 0 && (
+                                  <Ionicons name="checkmark" size={14} color="#2b3a1a" />
+                                )}
+                              </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.itemImageWrapper}
+                              onPress={() => router.push({
+                                pathname: '/(product)/[id]',
+                                params: { id: item.id }
+                              })}
+                            >
+                              <Image
+                                source={{ uri: apiService.getFullImageUrl(item.image_url) }}
+                                style={styles.productImage}
+                              />
+                            </TouchableOpacity>
+                            
+                            <View style={styles.itemDetailsCol}>
+                              <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                              <Text style={styles.productSize}>{item.size || item.variant || 'Standard'}</Text>
+                              <Text style={styles.productPriceGreen} numberOfLines={1}>₹{finalPrice.toFixed(2)}</Text>
+                            </View>
+                            
+                            <View style={styles.itemActionCol}>
+                              <Text style={styles.productOriginalPriceRight} numberOfLines={1}>₹{displayPrice.toFixed(2)}</Text>
+                              <View style={styles.quantityAndTrashRow}>
+                                <View style={styles.qtyBox}>
+                                  <TouchableOpacity
+                                    style={styles.qtyBoxBtn}
+                                    onPress={() => updateQuantity(item.id, false)}
+                                    disabled={item.stock_quantity === 0}
+                                    delayPressIn={0}
+                                  >
+                                    <Text style={styles.qtyBoxBtnText}>−</Text>
+                                  </TouchableOpacity>
+                                  <Text style={styles.qtyBoxValue}>{item.quantity}</Text>
+                                  <TouchableOpacity
+                                    style={styles.qtyBoxBtn}
+                                    onPress={() => updateQuantity(item.id, true)}
+                                    disabled={item.stock_quantity === 0}
+                                    delayPressIn={0}
+                                  >
+                                    <Text style={styles.qtyBoxBtnText}>+</Text>
+                                  </TouchableOpacity>
+                                </View>
+                                
+                                <TouchableOpacity
+                                  style={styles.trashBtn}
+                                  onPress={() => removeItem(item.id)}
+                                  delayPressIn={0}
+                                >
+                                  <Ionicons name="trash-outline" size={20} color="#888" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          </View>
+                          {index < items.length - 1 && <View style={styles.itemDivider} />}
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* Coupon Card */}
+                  <View style={styles.couponCard}>
+                    <View style={styles.couponLeft}>
+                      <View style={styles.couponIconCircle}>
+                        <Ionicons name="pricetag-outline" size={18} color="#2b3a1a" />
+                      </View>
+                      <View style={styles.couponTextContainer}>
+                        <Text style={styles.couponTitle}>Have a coupon code?</Text>
+                        <Text style={styles.couponSubtitle}>Apply code to get instant discount</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.couponApplyBtn}
+                      onPress={() => {
+                        Alert.alert('Coupon', 'Please enter coupon code at the checkout screen.');
+                      }}
+                      delayPressIn={0}
+                    >
+                      <Text style={styles.couponApplyText}>Apply</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Order Summary Card */}
+                  <View style={styles.summaryCard}>
+                    <Text style={styles.summaryTitle}>Order Summary</Text>
+                    
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Subtotal ({items.length} items)</Text>
+                      <Text style={styles.summaryValue}>₹{subtotal.toFixed(2)}</Text>
+                    </View>
+                    
+                    <View style={styles.summaryRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.summaryLabel}>Shipping</Text>
+                        <View style={styles.infoIconCircle}>
+                          <Ionicons name="information-outline" size={10} color="#666" />
+                        </View>
+                      </View>
+                      <Text style={[styles.summaryValue, { color: '#2b3a1a', fontWeight: 'bold' }]}>
+                        {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge.toFixed(2)}`}
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryDivider} />
+
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryTotalLabel}>Total</Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.summaryTotalValue}>₹{total.toFixed(2)}</Text>
+                        <Text style={styles.summaryTaxesLabel}>(Inclusive of all taxes)</Text>
+                      </View>
+                    </View>
+
+                    {/* Free Delivery Message */}
+                    {subtotal > 0 && subtotal < 599 && (
+                      <Animated.View
+                        style={[
+                          styles.freeDeliveryContainer,
+                          { transform: [{ scale: pulseAnim }], marginTop: 16 }
+                        ]}
+                      >
+                        <Text style={styles.freeDeliveryText}>
+                          Add ₹{(599 - subtotal).toFixed(2)} more to enjoy FREE delivery!
+                        </Text>
+                      </Animated.View>
+                    )}
+                  </View>
+
+                  {/* Feature Badges Card */}
+                  <View style={styles.featureBadgesCard}>
+                    <View style={styles.featureBadgeItem}>
+                      <Ionicons name="leaf-outline" size={24} color="#2b3a1a" />
+                      <Text style={styles.featureBadgeText}>100% Natural{"\n"}& Safe</Text>
+                    </View>
+                    <View style={styles.featureVerticalDivider} />
+                    <View style={styles.featureBadgeItem}>
+                      <Ionicons name="flower-outline" size={24} color="#2b3a1a" />
+                      <Text style={styles.featureBadgeText}>Ayurvedic{"\n"}& Authentic</Text>
+                    </View>
+                    <View style={styles.featureVerticalDivider} />
+                    <View style={styles.featureBadgeItem}>
+                      <Ionicons name="shield-checkmark-outline" size={24} color="#2b3a1a" />
+                      <Text style={styles.featureBadgeText}>Secure{"\n"}Payments</Text>
+                    </View>
+                  </View>
+
+                  {/* Checkout Action Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.checkoutBtn,
+                      selectedItems.length === 0 && styles.checkoutBtnDisabled
+                    ]}
+                    onPress={handleCheckout}
+                    disabled={selectedItems.length === 0}
+                    delayPressIn={0}
+                  >
+                    <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+                  </TouchableOpacity>
+                </>
+              )}
+            </ScrollView>
+          </Animated.View>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -666,30 +590,7 @@ export default function CartPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  headerSection: {
-    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight ?? 0) + 20,
-    paddingBottom: 6,
-    zIndex: 10,
-    position: 'relative',
-  },
-  headerBackButton: {
-    position: 'absolute',
-    left: 16,
-    bottom: 14,
-    padding: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(43,58,26,0.08)',
-    zIndex: 20,
-  },
-  brandTitle: {
-    fontSize: 42,
-    color: '#2b3a1a',
-    textAlign: 'center',
-    fontFamily: 'CormorantGaramond-Bold',
-    letterSpacing: 1,
-    marginBottom: 16,
+    backgroundColor: '#FAF9F6',
   },
   backgroundGradient: {
     position: 'absolute',
@@ -701,6 +602,44 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 10 : (StatusBar.currentHeight ?? 0) + 10,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headerTextContainer: {
+    flex: 1,
+    paddingRight: 80,
+  },
+  brandTitle: {
+    fontSize: 32,
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
+    fontWeight: '700',
+  },
+  brandTitleCount: {
+    fontSize: 32,
+    color: '#3d5229',
+    fontFamily: 'CormorantGaramond-Bold',
+    fontWeight: '700',
+  },
+  brandSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  leafDecoration: {
+    position: 'absolute',
+    right: -10,
+    top: Platform.OS === 'ios' ? -10 : (StatusBar.currentHeight ?? 0) - 20,
+    width: 120,
+    height: 120,
+    opacity: 0.85,
+  },
   content: {
     flex: 1,
   },
@@ -711,10 +650,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-    minHeight: Dimensions.get('window').height * 0.7,
-    paddingTop: 80,
+    paddingVertical: 80,
+    paddingHorizontal: 24,
   },
   emptyIconContainer: {
     width: 80,
@@ -723,18 +660,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
     marginBottom: 8,
-    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
@@ -742,15 +674,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
-    paddingHorizontal: 10,
   },
   shopButton: {
     borderRadius: 20,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
   },
   shopButtonGradient: {
     paddingHorizontal: 24,
@@ -758,7 +684,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   shopButtonText: {
     color: '#fff',
@@ -769,346 +694,313 @@ const styles = StyleSheet.create({
   shopButtonIcon: {
     marginLeft: 4,
   },
-  cartItemsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  cartCard: {
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
-    marginTop: 20,
-    marginBottom: 10,
+    marginVertical: 12,
     borderRadius: 24,
     padding: 16,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: 'rgba(105, 77, 33, 0.05)',
+    borderColor: '#f2f2ef',
   },
-  cartItem: {
+  selectAllRow: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    paddingBottom: 12,
+    paddingHorizontal: 4,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2b3a1a',
+    marginLeft: 6,
   },
   checkboxContainer: {
-    marginRight: 12,
+    marginRight: 10,
     justifyContent: 'center',
-    marginTop: 8,
+    alignItems: 'center',
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  itemImageContainer: {
-    position: 'relative',
-    marginRight: 12,
+  cartItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
   },
-  itemImage: {
+  itemImageWrapper: {
+    marginRight: 16,
+  },
+  productImage: {
     width: 80,
     height: 80,
-    borderRadius: 10,
+    borderRadius: 14,
+    backgroundColor: '#f9f9f9',
   },
-  offerBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#694d21',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  offerText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  itemDetails: {
+  itemDetailsCol: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  itemName: {
-    fontSize: 14,
+  productName: {
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#1a1a1a',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  productSize: {
+    fontSize: 13,
+    color: '#888',
     marginBottom: 6,
-    lineHeight: 18,
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#694d21',
-    marginRight: 6,
-  },
-  originalPrice: {
-    fontSize: 12,
-    color: '#666',
-    textDecorationLine: 'line-through',
-  },
-  stockContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stockText: {
+  productPriceGreen: {
     fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 4,
+    fontWeight: '700',
+    color: '#2b3a1a',
   },
-  lowStockText: {
-    color: '#ff4444',
+  itemActionCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 80,
   },
-  quantityContainer: {
+  productOriginalPriceRight: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  quantityAndTrashRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    paddingHorizontal: 2,
-    alignSelf: 'flex-start',
-    marginTop: 4,
   },
-  quantityButton: {
+  qtyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e8e8e5',
+    borderRadius: 20,
+    paddingHorizontal: 4,
+    backgroundColor: '#fafaf9',
+    marginRight: 12,
+  },
+  qtyBoxBtn: {
     width: 28,
     height: 28,
-    borderRadius: 14,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#2b3a1a',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  quantityButtonDisabled: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#ccc',
+  qtyBoxBtnText: {
+    fontSize: 16,
+    color: '#555',
+    fontWeight: '600',
   },
-  quantityText: {
-    paddingHorizontal: 12,
+  qtyBoxValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1A1A1A',
-    minWidth: 32,
+    color: '#1a1a1a',
+    minWidth: 20,
     textAlign: 'center',
   },
-  deleteButton: {
-    marginLeft: 8,
-    marginTop: 8,
+  trashBtn: {
+    padding: 6,
   },
-  deleteButtonGradient: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#ff4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+  itemDivider: {
+    height: 1,
+    backgroundColor: '#f2f2ef',
+    width: '100%',
   },
-  deliveryMessageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(40, 167, 69, 0.1)',
-    padding: 16,
+  couponCard: {
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
     marginVertical: 8,
-    borderRadius: 12,
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: 'rgba(40, 167, 69, 0.2)',
+    borderColor: '#f2f2ef',
   },
-  deliveryMessage: {
+  couponLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#28a745',
-    fontWeight: '500',
   },
-  proceedButton: {
+  couponIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#f2f4f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  couponTextContainer: {
+    flex: 1,
+  },
+  couponTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  couponSubtitle: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
+  },
+  couponApplyBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  couponApplyText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2b3a1a',
+  },
+  summaryCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f2f2ef',
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontFamily: 'CormorantGaramond-Bold',
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
+  infoIconCircle: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#888',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#f2f2ef',
+    marginVertical: 12,
+  },
+  summaryTotalLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  summaryTotalValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2b3a1a',
+  },
+  summaryTaxesLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+  },
+  featureBadgesCard: {
+    backgroundColor: '#f4f6f0',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  featureBadgeItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2b3a1a',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 15,
+  },
+  featureVerticalDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(43, 58, 26, 0.1)',
+  },
+  checkoutBtn: {
+    backgroundColor: '#2b3a1a',
     marginHorizontal: 16,
     marginVertical: 16,
     borderRadius: 20,
-    shadowColor: '#2b3a1a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  proceedButtonGradient: {
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    borderRadius: 20,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  proceedButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginRight: 6,
-  },
-  proceedButtonIcon: {
-    marginLeft: 4,
-  },
-  proceedButtonDisabled: {
-    opacity: 0.6,
-  },
-  deselectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    marginHorizontal: 12,
-  },
-  deselectButtonText: {
-    fontSize: 13,
-    color: '#2b3a1a',
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  summaryContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 20,
-    marginHorizontal: 16,
-    marginVertical: 10,
-    borderRadius: 20,
-    flexDirection: 'column',
-    alignItems: 'stretch',
     shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
     elevation: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(43, 58, 26, 0.05)',
   },
-  summaryText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  summaryTotal: {
+  checkoutBtnText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2b3a1a',
-  },
-  section: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 10,
-    padding: 20,
-    borderRadius: 24,
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(105, 77, 33, 0.05)',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 12,
-  },
-  suggestedProductsContainer: {
-    paddingBottom: 8,
-  },
-  suggestedProduct: {
-    width: 140,
-    marginRight: 10,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  suggestedProductImage: {
-    width: '100%',
-    height: 140,
-    resizeMode: 'cover',
-  },
-  suggestedProductDetails: {
-    padding: 10,
-  },
-  suggestedProductName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 6,
-    lineHeight: 16,
-  },
-  suggestedProductPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#694d21',
-    marginBottom: 8,
-  },
-  addToCartButton: {
-    backgroundColor: '#694d21',
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  addToCartText: {
+    fontWeight: '700',
     color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
-  itemContentContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  checkoutBtnDisabled: {
+    opacity: 0.6,
   },
   freeDeliveryContainer: {
-    backgroundColor: '#fffbeb',
-    marginHorizontal: 12,
-    marginTop: 16,
-    padding: 12,
+    backgroundColor: '#f5f7f2',
+    borderWidth: 1,
+    borderColor: '#e2ebda',
     borderRadius: 12,
-    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#694d21',
-    shadowColor: '#694d21',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 8,
   },
   freeDeliveryText: {
-    color: '#694d21',
-    fontSize: 14,
+    fontSize: 13,
+    color: '#3d5236',
     fontWeight: '600',
     textAlign: 'center',
   },

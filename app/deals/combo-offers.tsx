@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Animated, Platform, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Animated, Platform, useWindowDimensions, Alert } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 import { useCart } from '../CartContext';
 
-const { width: screenWidth } = Dimensions.get('window');
 
 // Separate component for combo card with animations
 const ComboCard = ({ item, index, router }: { item: any; index: number; router: any }) => {
@@ -320,8 +319,12 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
               <Image
                 key={idx}
                 source={{ uri: apiService.getFullImageUrl(img) }}
-                style={[styles.comboProductImage, idx === comboImages.length - 1 && styles.lastImage]}
-                resizeMode="contain"
+                style={[
+                  styles.comboProductImage,
+                  comboImages.length === 1 ? { width: '100%', height: 180 } : null,
+                  idx === comboImages.length - 1 && styles.lastImage
+                ]}
+                resizeMode={comboImages.length === 1 ? "cover" : "contain"}
               />
             ))
           ) : (
@@ -331,7 +334,7 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
           )}
         </View>
         <View style={styles.comboPriceRow}>
-          <View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
             <Text style={styles.comboPrice}>₹{discountedPrice.toFixed(2)}</Text>
             {totalPrice > discountedPrice && (
               <Text style={styles.originalPrice}>₹{totalPrice.toFixed(2)}</Text>
@@ -524,6 +527,9 @@ export default function ComboOffersPage() {
           <Animated.View
             style={{
               flex: 1,
+              maxWidth: 800,
+              alignSelf: 'center',
+              width: '100%',
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
             }}
@@ -633,7 +639,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   comboProductImage: {
-    width: (screenWidth - 56) / 2,
+    width: '48%',
     height: 100,
     borderRadius: 10,
     backgroundColor: '#fff',
@@ -657,7 +663,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textDecorationLine: 'line-through',
-    marginTop: 2,
+    marginLeft: 8,
   },
   comboSaveText: {
     fontSize: 13,

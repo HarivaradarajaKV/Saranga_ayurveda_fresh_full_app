@@ -25,7 +25,7 @@ import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
 import { API_CONFIG, getBaseUrl, ENDPOINTS } from '../config/api';
-import { Order, OrderStatus } from '../OrderContext';
+import { Order, OrderStatus, OrderSummary } from '../OrderContext';
 import { ErrorBoundary } from '../ErrorBoundary';
 
 const { width } = Dimensions.get('window');
@@ -72,7 +72,7 @@ interface Styles {
   totalValue: TextStyle;
 }
 
-type OrderSummary = Order;
+
 
 const AdminOrdersInner = () => {
   let ordersContext;

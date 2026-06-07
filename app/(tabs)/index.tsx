@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, TouchableHighlight, Dimensions, StyleSheet, Platform, ActivityIndicator, Modal, Animated, TouchableWithoutFeedback, Linking, Easing, Switch, Keyboard, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, TouchableHighlight, Dimensions, StyleSheet, Platform, ActivityIndicator, Modal, Animated, TouchableWithoutFeedback, Linking, Easing, Switch, Keyboard, Alert, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWishlist } from '../WishlistContext';
 import ProductCard from '../components/ProductCard';
 // import { Image, TouchableOpacity, Scroll?View, View, Text } from 'react';
@@ -22,21 +23,24 @@ import { getCategoryImage } from '../constants/categoryImages';
 import { useBottomTabBarHeight } from './_layout';
 
 const screenWidth = Dimensions.get('window').width;
+const bannerWidth = screenWidth - 24;
+const bannerHeight = bannerWidth / 2.3;
 
 // Header Logo Images placeholders - Swap logo.png and name_logo.png in app/assets/images/ with your actual logo files!
 const HEADER_LOGO_URI = require('../assets/images/logo.png');
 const HEADER_NAME_LOGO_URI = require('../assets/images/name_logo.png');
+const OUR_STORY_BANNER_URI = require('../../assets/images/our_story_hero.png');
 
 const SLIDE_DATA = [
   {
     image: require('../assets/images/slide1.jpg'),
-    title: "Helping Feed the Hungry",
-    description: "Nourishing lives with love and compassion.",
+    title: "Educate Students",
+    description: "Empowering minds today for a brighter tomorrow.",
   },
   {
     image: require('../assets/images/slide2.jpg'),
-    title: "Educate Students",
-    description: "Empowering minds today for a brighter tomorrow.",
+    title: "Helping Feed the Hungry",
+    description: "Nourishing lives with love and compassion.",
   },
   {
     image: require('../assets/images/slide3.jpg'),
@@ -44,6 +48,103 @@ const SLIDE_DATA = [
     description: "Bringing quality healthcare to those who need it most.",
   },
 ];
+
+const BANNER_DATA = [
+  {
+    id: 119,
+    image: require('../assets/images/argan_shampoo_banner.png'),
+    name: 'Argan Shampoo'
+  },
+  {
+    id: 136,
+    image: require('../assets/images/charcoal_facewash_banner.png'),
+    name: 'Charcoal and Vitamin C Foaming Facewash'
+  },
+  {
+    id: 130,
+    image: require('../assets/images/teatree_facewash_banner.png'),
+    name: 'Tea Tree and Neem Foaming Facewash'
+  },
+  {
+    id: 196,
+    image: require('../assets/images/intimate_wash_banner.png'),
+    name: 'Intimate Wash'
+  },
+  {
+    id: 117,
+    image: require('../assets/images/hibiscus_shampoo_banner.png'),
+    name: 'Hibiscus Chickpea Shampoo'
+  },
+  {
+    id: 137,
+    image: require('../assets/images/aloevera_gel_banner.png'),
+    name: 'Alovera Gel'
+  },
+  {
+    id: 123,
+    image: require('../assets/images/pomegranate_lipbalm_banner.png'),
+    name: 'Pomegranate Lip balm'
+  }
+];
+
+const BOTTOM_BANNER_DATA = [
+  {
+    id: 152,
+    image: require('../assets/images/kumkumadi_taila_banner.png'),
+    name: 'Kumkumadi Taila'
+  },
+  {
+    id: 188,
+    image: require('../assets/images/eyebrow_oil_banner.png'),
+    name: 'Eye Brow Oil'
+  },
+  {
+    id: 145,
+    image: require('../assets/images/charcoal_soap_banner.png'),
+    name: 'Charcoal Soap'
+  },
+  {
+    id: 151,
+    image: require('../assets/images/hair_serum_banner.png'),
+    name: 'Hair Growth Serum'
+  },
+  {
+    id: 189,
+    image: require('../assets/images/vitc_serum_banner.png'),
+    name: 'Vitamin C Serum'
+  },
+  {
+    id: 150,
+    image: require('../assets/images/saffron_soap_banner.png'),
+    name: 'Milk and Saffron Bar'
+  },
+  {
+    id: 164,
+    image: require('../assets/images/hair_pack_banner.png'),
+    name: 'Hair Pack'
+  },
+  {
+    id: 191,
+    image: require('../assets/images/beard_oil_banner.png'),
+    name: 'Beard Growth Oil'
+  },
+  {
+    id: 196,
+    image: require('../assets/images/intimate_wash_new_banner.png'),
+    name: 'Intimate Wash'
+  },
+  {
+    id: 130,
+    image: require('../assets/images/teatree_facewash_new_banner.png'),
+    name: 'Tea Tree and Neem Foaming Facewash'
+  },
+  {
+    id: 156,
+    image: require('../assets/images/blueberry_facepack_banner.png'),
+    name: 'Blueberry and Vitamin C Face Pack'
+  }
+];
+
 
 interface ProductCardProps {
   product: Product;
@@ -213,6 +314,12 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
   selectedCategory,
   onSelectCategory
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth, 800);
+  const dCategoryCircleWidth = Math.min((screenWidth - 30) / 4 - (categoryMarginHorizontal * 2), 85);
+  const dCategoryIconSize = dCategoryCircleWidth - 4;
+  const dCategoryRadius = dCategoryIconSize / 2;
+
   // Add safety check for categories
   if (!categories || !Array.isArray(categories) || categories.length === 0) {
     return (
@@ -224,6 +331,31 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
 
   const categoryAnims = useRef(categories.map(() => new Animated.Value(0))).current;
   const scaleAnims = useRef(categories.map(() => new Animated.Value(1))).current;
+  const wiggleAnim = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const triggerWiggle = () => {
+    Animated.sequence([
+      Animated.spring(wiggleAnim, {
+        toValue: 15,
+        tension: 80,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.spring(wiggleAnim, {
+        toValue: -10,
+        tension: 80,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.spring(wiggleAnim, {
+        toValue: 0,
+        tension: 60,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   useEffect(() => {
     // Staggered entrance animation for categories
@@ -235,7 +367,28 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
           useNativeDriver: true,
         })
       )
-    ).start();
+    ).start(() => {
+      triggerWiggle();
+    });
+
+    // Run wiggle animation every 5 seconds
+    const interval = setInterval(() => {
+      triggerWiggle();
+    }, 5000);
+
+    // Initial scroll peek only once on mount
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ x: 90, animated: true });
+      const returnTimer = setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+      }, 700);
+      return () => clearTimeout(returnTimer);
+    }, 1200);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleCategoryPress = (categoryId: number, index: number) => {
@@ -270,6 +423,7 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.categoryScrollContainer}
@@ -293,32 +447,35 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
                       inputRange: [0, 1],
                       outputRange: [30, 0]
                     })
-                  }
+                  },
+                  { translateX: wiggleAnim }
                 ]
               }
             ]}
           >
             <TouchableOpacity
-              style={styles.categoryCircle}
+              style={[styles.categoryCircle, { width: dCategoryCircleWidth, height: dCategoryCircleWidth + 32 }]}
               onPress={() => handleCategoryPress(category.id, index)}
               activeOpacity={0.8}
             >
               <View style={[
                 styles.categoryIconContainer,
-                isSelected && styles.selectedCategoryCircle
+                isSelected && styles.selectedCategoryCircle,
+                { width: dCategoryIconSize, height: dCategoryIconSize, borderRadius: dCategoryRadius }
               ]}>
                 <Image
                   source={{ uri: imageUrl }}
-                  style={styles.categoryImage}
+                  style={[styles.categoryImage, { borderRadius: dCategoryRadius }]}
                   resizeMode="cover"
                 />
                 {isSelected && (
-                  <View style={styles.selectedOverlay} />
+                  <View style={[styles.selectedOverlay, { borderRadius: dCategoryRadius }]} />
                 )}
               </View>
               <Text style={[
                 styles.categoryText,
-                isSelected && styles.selectedCategoryText
+                isSelected && styles.selectedCategoryText,
+                { width: dCategoryIconSize }
               ]}>
                 {category.name}
               </Text>
@@ -384,7 +541,7 @@ const ContactUs: React.FC = () => {
         {[
           { icon: 'logo-instagram', color: '#E1306C', url: 'https://instagram.com/curio_spry_official' },
           { icon: 'logo-youtube', color: '#FF0000', url: 'https://youtube.com/yourcompany' },
-          { icon: 'logo-facebook', color: '#4267B2', url: 'https://facebook.com/yourcompany' }
+          { icon: 'logo-facebook', color: '#4267B2', url: 'https://www.facebook.com/people/Saranga-Ayurveda/61565898664471' }
         ].map((social, index) => (
           <TouchableWithoutFeedback
             key={social.icon}
@@ -456,13 +613,107 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fbf7f4',
   },
+  ourStoryBannerCard: {
+    backgroundColor: '#FAF6F0',
+    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(105, 77, 33, 0.06)',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+  },
+  ourStoryBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ourStoryBannerTextCol: {
+    width: '55%',
+    paddingRight: 8,
+  },
+  ourStoryBannerImageCol: {
+    width: '42%',
+    aspectRatio: 0.9,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f5f0e8',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  ourStoryBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  ourStoryBannerSub: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#694d21',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  ourStoryBannerTitle: {
+    fontSize: 22,
+    fontFamily: 'CormorantGaramond-Bold',
+    color: '#2b3a1a',
+    lineHeight: 26,
+    marginBottom: 4,
+  },
+  ourStoryBannerDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  ourStoryBannerDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#694d21',
+    opacity: 0.3,
+  },
+  ourStoryBannerBody: {
+    fontSize: 13,
+    fontFamily: 'CormorantGaramond-Medium',
+    color: '#555',
+    lineHeight: 18,
+  },
+  ourStoryBannerButtonContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  ourStoryBannerReadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3d5236',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    backgroundColor: 'transparent',
+  },
+  ourStoryBannerReadMoreBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3d5236',
+    letterSpacing: 1.5,
+  },
   customFoundationSection: {
     backgroundColor: '#FAF4EB',
     borderRadius: 16,
     paddingVertical: 32,
     paddingHorizontal: 24,
     marginHorizontal: 16,
-    marginVertical: 16,
+    marginTop: 0,
+    marginBottom: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -486,14 +737,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   customFoundationName: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: '600',
     color: '#2c3e50',
     textAlign: 'center',
     marginBottom: 12,
   },
   customFoundationBigText: {
-    fontSize: 48,
+    fontSize: 26,
     fontWeight: '900',
     color: '#2d2d2d',
     textAlign: 'center',
@@ -547,7 +798,8 @@ const styles = StyleSheet.create({
   },
   foundationSlideshowContainer: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginTop: 0,
+    marginBottom: 12,
     borderRadius: 16,
     backgroundColor: '#fff',
     overflow: 'hidden',
@@ -627,14 +879,7 @@ const styles = StyleSheet.create({
   },
   fixedHeader: {
     backgroundColor: '#fbf7f4',
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
+    paddingTop: 0,
   },
   header: {
     flexDirection: 'row',
@@ -1002,7 +1247,7 @@ const styles = StyleSheet.create({
   categorySection: {
     marginTop: 0,
     paddingHorizontal: 10,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   categoryHeader: {
     flexDirection: 'row',
@@ -1020,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     fontSize: 26,
-    color: '#694d21',
+    color: '#2b3a1a',
     textAlign: 'center',
     fontFamily: 'CormorantGaramond-Medium',
   },
@@ -1179,13 +1424,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
     paddingHorizontal: 16,
     width: '100%',
   },
   sectionTitle: {
     fontSize: 26,
-    color: '#694d21',
+    color: '#2b3a1a',
     textAlign: 'center',
     fontFamily: 'CormorantGaramond-Medium',
   },
@@ -1323,30 +1569,47 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  offersHeader: {
-    height: 24,
-    backgroundColor: '#bd9859',
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 8,
+  bannerContainer: {
+    height: bannerHeight,
+    marginHorizontal: 12,
+    marginTop: 0,
+    marginBottom: 12,
+    borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    position: 'relative',
   },
-  offersContainer: {
+  bannerDotsContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    height: '100%',
+    position: 'absolute',
+    bottom: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
-  offersContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginHorizontal: 4,
   },
-  offersTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#ffffff',
-    lineHeight: 16,
-    flexShrink: 1,
+  bannerDotActive: {
+    backgroundColor: '#fff',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   viewAllText: {
     fontSize: 14,
@@ -1399,8 +1662,8 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   comboSection: {
-    marginTop: 16,
-    marginBottom: 24,
+    marginTop: 0,
+    marginBottom: 6,
   },
   comboCard: {
     backgroundColor: '#fff',
@@ -1645,90 +1908,10 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 1000,
   },
-  footerContainer: {
-    backgroundColor: '#f8f9fa',
-    paddingTop: 32,
-    paddingBottom: Platform.OS === 'ios' ? 100 : 80,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  footerSection: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
-  footerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#694d21',
-    marginBottom: 16,
-  },
-  footerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  footerLinkText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-  },
-  footerSocialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  footerSocialButton: {
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    minWidth: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  footerSocialText: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#333',
-  },
-  footerDivider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 16,
-    marginHorizontal: 20,
-  },
-  footerBottom: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  footerBottomText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  footerColumnLink: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  footerColumnText: {
-    fontSize: 13,
-    color: '#666',
-  },
+
   allProductsSection: {
-    marginTop: 24,
-    marginBottom: 24,
+    marginTop: 0,
+    marginBottom: 6,
   },
   allProductsHeader: {
     flexDirection: 'row',
@@ -1868,7 +2051,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#fff',
     zIndex: 1000,
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingTop: 0,
   },
   expandedSearchHeader: {
     flexDirection: 'row',
@@ -2084,6 +2267,163 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
   },
+  // Footer Redesign Styles
+  footerContainer: {
+    backgroundColor: '#FAF4EB',
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
+  footerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(43, 58, 26, 0.1)',
+    marginHorizontal: 20,
+    marginVertical: 10,
+  },
+  footerGridRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  footerGridColumn: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  footerColumnHeader: {
+    fontFamily: 'CormorantGaramond-Bold',
+    fontSize: 15,
+    color: '#2b3a1a',
+    marginBottom: 6,
+  },
+  footerGridLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  footerGridLinkText: {
+    fontSize: 13,
+    color: '#555',
+    fontFamily: 'CormorantGaramond-Medium',
+  },
+  footerSupportSection: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  footerSupportRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 4,
+    columnGap: 10,
+  },
+  footerSupportLink: {
+    paddingVertical: 2,
+  },
+  footerSupportLinkText: {
+    fontSize: 12,
+    color: '#666',
+    textDecorationLine: 'underline',
+    fontFamily: 'CormorantGaramond-Medium',
+  },
+  footerBottomBlock: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  footerCopyrightText: {
+    fontSize: 11,
+    color: '#777',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Medium',
+  },
+  footerCopyrightSub: {
+    fontSize: 11,
+    color: '#555',
+    marginTop: 4,
+    fontWeight: 'bold',
+    fontFamily: 'CormorantGaramond-Medium',
+  },
+  footerConnectContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+    width: '100%',
+  },
+  footerColumnHeaderCentred: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2b3a1a',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  footerSocialIconsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  footerSocialIconBtn: {
+    marginHorizontal: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.2,
+    borderColor: '#7a8f68',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  comboCardCategory: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#8e8e8e',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  comboCardName: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333333',
+    lineHeight: 18,
+  },
+  comboCardPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 'auto',
+  },
+  comboCardPrice: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  comboCardOriginalPrice: {
+    fontSize: 10,
+    color: '#95a5a6',
+    textDecorationLine: 'line-through',
+    marginLeft: 6,
+  },
+  comboCardBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#2b3a1a',
+    elevation: 2,
+    shadowColor: '#2b3a1a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+  },
 });
 
 const formatPrice = (price: number | undefined | null): string => {
@@ -2115,6 +2455,11 @@ const normalizeCategoryName = (name: string) => {
 };
 
 const Page = () => {
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth, 800);
+  const bannerWidth = screenWidth - 24;
+  const bannerHeight = bannerWidth / 2.3;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -2198,6 +2543,34 @@ const Page = () => {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const videoScrollViewRef = useRef<ScrollView | null>(null);
   const scrollAnim = useRef(new Animated.Value(0)).current;
+  const bannerScrollViewRef = useRef<ScrollView | null>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const isUserInteracting = useRef(false);
+  const interactionTimeoutRef = useRef<any>(null);
+
+  const resetUserInteraction = () => {
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+    interactionTimeoutRef.current = setTimeout(() => {
+      isUserInteracting.current = false;
+    }, 6000);
+  };
+
+  const bottomBannerScrollViewRef = useRef<ScrollView | null>(null);
+  const [currentBottomBannerIndex, setCurrentBottomBannerIndex] = useState(0);
+  const isBottomUserInteracting = useRef(false);
+  const bottomInteractionTimeoutRef = useRef<any>(null);
+
+  const resetBottomUserInteraction = () => {
+    if (bottomInteractionTimeoutRef.current) {
+      clearTimeout(bottomInteractionTimeoutRef.current);
+    }
+    bottomInteractionTimeoutRef.current = setTimeout(() => {
+      isBottomUserInteracting.current = false;
+    }, 6000);
+  };
+
 
   // Enhanced animation refs for modern UI
   const headerSlideAnim = useRef(new Animated.Value(-100)).current;
@@ -2275,23 +2648,31 @@ const Page = () => {
     return unsubscribe;
   }, [navigation, isFocused]);
 
-  // Check authentication status first
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem('auth_token');
         setIsAuthenticated(!!token);
-        const storedName = (await AsyncStorage.getItem('name')) || (await AsyncStorage.getItem('user_name'));
-        setUserName(storedName || '');
-        if (!!token && !storedName) {
+        if (!!token) {
+          // Read cached name first to show it immediately
+          const cachedName = (await AsyncStorage.getItem('name')) || (await AsyncStorage.getItem('user_name'));
+          if (cachedName) {
+            setUserName(cachedName);
+          }
+          // Fetch fresh name from profile API
           try {
             const profileRes = await apiService.getUserProfile();
             const fetchedName = (profileRes.data as any)?.name || (profileRes.data as any)?.full_name || '';
             if (fetchedName) {
               setUserName(fetchedName);
               await AsyncStorage.setItem('name', fetchedName);
+              await AsyncStorage.setItem('user_name', fetchedName);
             }
-          } catch { }
+          } catch (e) {
+            console.log('Error fetching fresh profile name:', e);
+          }
+        } else {
+          setUserName('');
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
@@ -2305,16 +2686,17 @@ const Page = () => {
   useEffect(() => {
     const loadUserName = async () => {
       try {
-        let storedName = (await AsyncStorage.getItem('name')) || (await AsyncStorage.getItem('user_name'));
-        if (!storedName) {
-          const profileRes = await apiService.getUserProfile();
-          const fetchedName = (profileRes.data as any)?.name || (profileRes.data as any)?.full_name || '';
-          if (fetchedName) {
-            storedName = fetchedName;
-            await AsyncStorage.setItem('name', fetchedName);
-          }
+        const storedName = (await AsyncStorage.getItem('name')) || (await AsyncStorage.getItem('user_name'));
+        if (storedName) {
+          setUserName(storedName);
         }
-        setUserName(storedName || '');
+        const profileRes = await apiService.getUserProfile();
+        const fetchedName = (profileRes.data as any)?.name || (profileRes.data as any)?.full_name || '';
+        if (fetchedName) {
+          setUserName(fetchedName);
+          await AsyncStorage.setItem('name', fetchedName);
+          await AsyncStorage.setItem('user_name', fetchedName);
+        }
       } catch { }
     };
     if (isMenuOpen && isAuthenticated) {
@@ -2398,30 +2780,22 @@ const Page = () => {
             return dateB - dateA;
           });
 
-          // Get active combos (up to 2)
-          let displayCombos = sortedActive.slice(0, 2);
+          // Get all active combos
+          let displayCombos = sortedActive;
 
-          // If we have less than 2 active combos, add upcoming combos
-          if (displayCombos.length < 2) {
-            // Get active combo IDs to exclude from upcoming
-            const activeIds = new Set(displayCombos.map((c: any) => c.id));
+          // Add upcoming combos to display list too
+          const activeIds = new Set(displayCombos.map((c: any) => c.id));
+          const upcoming = response.data.filter((combo: any) =>
+            isComboUpcoming(combo) && !activeIds.has(combo.id)
+          );
 
-            // Filter upcoming combos (excluding those already in active list)
-            const upcoming = response.data.filter((combo: any) =>
-              isComboUpcoming(combo) && !activeIds.has(combo.id)
-            );
+          const sortedUpcoming = upcoming.sort((a: any, b: any) => {
+            const dateA = new Date(a.created_at || a.id || 0).getTime();
+            const dateB = new Date(b.created_at || b.id || 0).getTime();
+            return dateB - dateA;
+          });
 
-            // Sort upcoming by created_at (newest first)
-            const sortedUpcoming = upcoming.sort((a: any, b: any) => {
-              const dateA = new Date(a.created_at || a.id || 0).getTime();
-              const dateB = new Date(b.created_at || b.id || 0).getTime();
-              return dateB - dateA;
-            });
-
-            // Add upcoming combos to fill up to 2
-            const needed = 2 - displayCombos.length;
-            displayCombos = [...displayCombos, ...sortedUpcoming.slice(0, needed)];
-          }
+          displayCombos = [...displayCombos, ...sortedUpcoming];
 
           setActiveCombos(displayCombos);
         }
@@ -2771,6 +3145,60 @@ const Page = () => {
     }
   };
 
+  // Function to handle banner selection and redirect to details view
+  const handleBannerPress = (productId: number) => {
+    const product = allProducts.find(p => p.id === productId);
+    if (product) {
+      const cleanProduct = {
+        ...product,
+        price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+        offer_percentage: product.offer_percentage || 0,
+        average_rating: product.average_rating || 0,
+        review_count: product.review_count || 0
+      };
+      router.push({
+        pathname: "/(product)/[id]",
+        params: {
+          id: productId.toString(),
+          productData: JSON.stringify(cleanProduct)
+        }
+      });
+    } else {
+      // Fallback if the products are not loaded yet
+      router.push({
+        pathname: "/(product)/[id]",
+        params: { id: productId.toString() }
+      });
+    }
+  };
+
+  const handleBottomBannerPress = (productId: number) => {
+    const product = allProducts.find(p => p.id === productId);
+    if (product) {
+      const cleanProduct = {
+        ...product,
+        price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+        offer_percentage: product.offer_percentage || 0,
+        average_rating: product.average_rating || 0,
+        review_count: product.review_count || 0
+      };
+      router.push({
+        pathname: "/(product)/[id]",
+        params: {
+          id: productId.toString(),
+          productData: JSON.stringify(cleanProduct)
+        }
+      });
+    } else {
+      // Fallback if the products are not loaded yet
+      router.push({
+        pathname: "/(product)/[id]",
+        params: { id: productId.toString() }
+      });
+    }
+  };
+
+
   const toggleDropdown = () => {
     setIsDropdownOpen(!isDropdownOpen);
     Animated.spring(dropdownWidth, {
@@ -2982,31 +3410,6 @@ const Page = () => {
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
-                console.log('Notifications button pressed');
-                handleDrawerClose();
-                router.push('/profile/notifications');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="notifications-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>Notifications</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                console.log('Settings button pressed');
-                handleDrawerClose();
-                router.push('/settings');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="settings-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
                 console.log('Help button pressed');
                 handleDrawerClose();
                 router.push('/help');
@@ -3026,13 +3429,15 @@ const Page = () => {
                 await AsyncStorage.removeItem('user_role');
                 await AsyncStorage.removeItem('cart_items');
                 await AsyncStorage.removeItem('wishlist_items');
+                await AsyncStorage.removeItem('name');
+                await AsyncStorage.removeItem('user_name');
                 setIsAuthenticated(false);
                 router.replace('/auth/login');
               }}
               activeOpacity={0.7}
             >
               <Ionicons name="log-out-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>Logout</Text>
+              <Text style={styles.menuItemText}>Sign Out</Text>
             </TouchableOpacity>
             <View style={styles.menuSpacer} />
           </>
@@ -3069,18 +3474,6 @@ const Page = () => {
             >
               <Ionicons name="help-circle-outline" size={22} color="#f5f5f5" />
               <Text style={styles.menuItemText}>Help & Support</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                console.log('About button pressed');
-                handleDrawerClose();
-                router.push('/about');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="information-circle-outline" size={22} color="#f5f5f5" />
-              <Text style={styles.menuItemText}>About Us</Text>
             </TouchableOpacity>
             <View style={styles.menuSpacer} />
           </>
@@ -3139,6 +3532,39 @@ const Page = () => {
       startAnimation();
     }
   }, [textWidth]);
+
+  // Auto-scroll the new banner slideshow every 4 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!isUserInteracting.current) {
+        const nextIndex = (currentBannerIndex + 1) % BANNER_DATA.length;
+        setCurrentBannerIndex(nextIndex);
+        bannerScrollViewRef.current?.scrollTo({
+          x: nextIndex * (screenWidth - 24),
+          animated: true
+        });
+      }
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [currentBannerIndex]);
+
+  // Auto-scroll the bottom banner slideshow every 5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!isBottomUserInteracting.current) {
+        const nextIndex = (currentBottomBannerIndex + 1) % BOTTOM_BANNER_DATA.length;
+        setCurrentBottomBannerIndex(nextIndex);
+        bottomBannerScrollViewRef.current?.scrollTo({
+          x: nextIndex * (screenWidth - 24),
+          animated: true
+        });
+      }
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [currentBottomBannerIndex]);
+
 
   const scrollToRecommended = () => {
     setShowNewDealsPopup(false);
@@ -3233,8 +3659,9 @@ const Page = () => {
           paddingBottom: bottomTabHeight + 20 // Add extra 20 for spacing
         }}
       >
-        <View style={styles.fixedHeader}>
-          <View style={styles.header}>
+        <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center', flex: 1 }}>
+          <View style={[styles.fixedHeader, { paddingTop: insets.top }]}>
+            <View style={styles.header}>
             <TouchableOpacity
               style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
               onPress={handleDrawerOpen}
@@ -3242,9 +3669,9 @@ const Page = () => {
               activeOpacity={0.7}
             >
               {isMenuLoading ? (
-                <ActivityIndicator size="small" color="#694d21" />
+                <ActivityIndicator size="small" color="#2b3a1a" />
               ) : (
-                <Ionicons name="menu" size={28} color="#694d21" />
+                <Ionicons name="menu" size={28} color="#2b3a1a" />
               )}
             </TouchableOpacity>
 
@@ -3271,33 +3698,8 @@ const Page = () => {
                 }
               }}
             >
-              <Ionicons name="cart-outline" size={24} color="#694d21" />
+              <Ionicons name="cart-outline" size={24} color="#2b3a1a" />
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.offersHeader}>
-            <View style={styles.offersContainer}>
-              <Animated.View
-                style={[
-                  styles.offersContent,
-                  { transform: [{ translateX: scrollAnim }] }
-                ]}
-                onLayout={(event) => {
-                  const { width } = event.nativeEvent.layout;
-                  setTextWidth(width);
-                }}
-              >
-                <Text style={styles.offersTitle} numberOfLines={1}>Weekend Sale! Checkout for new products...</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.offersContent,
-                  { transform: [{ translateX: scrollAnim }] }
-                ]}
-              >
-                <Text style={styles.offersTitle} numberOfLines={1}>Weekend Sale! Checkout for new products...</Text>
-              </Animated.View>
-            </View>
           </View>
         </View>
 
@@ -3397,6 +3799,73 @@ const Page = () => {
               )}
             </View>
 
+            {/* Banner Slideshow Section */}
+            <View style={[styles.bannerContainer, { height: bannerHeight }]}>
+              <ScrollView
+                ref={bannerScrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={screenWidth - 24}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                onScroll={(event) => {
+                  const xOffset = event.nativeEvent.contentOffset.x;
+                  const slideWidth = screenWidth - 24;
+                  if (slideWidth > 0) {
+                    const index = Math.round(xOffset / slideWidth);
+                    const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
+                    if (currentBannerIndex !== validIndex) {
+                      setCurrentBannerIndex(validIndex);
+                    }
+                  }
+                }}
+                scrollEventThrottle={16}
+                onMomentumScrollEnd={(event) => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
+                  const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
+                  if (currentBannerIndex !== validIndex) {
+                    setCurrentBannerIndex(validIndex);
+                  }
+                }}
+                onScrollBeginDrag={() => {
+                  isUserInteracting.current = true;
+                }}
+                onScrollEndDrag={resetUserInteraction}
+                onTouchStart={() => {
+                  isUserInteracting.current = true;
+                }}
+                onTouchEnd={resetUserInteraction}
+                style={{ width: screenWidth - 24 }}
+              >
+                {BANNER_DATA.map((banner) => (
+                  <TouchableOpacity
+                    key={banner.id}
+                    activeOpacity={0.95}
+                    onPress={() => handleBannerPress(banner.id)}
+                    style={{ width: screenWidth - 24, height: bannerHeight }}
+                  >
+                    <Image
+                      source={banner.image}
+                      style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.bannerDotsContainer}>
+                {BANNER_DATA.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.bannerDot,
+                      currentBannerIndex === idx && styles.bannerDotActive
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+
             {videos.length > 0 && (
               <ScrollView
                 ref={videoScrollViewRef}
@@ -3410,9 +3879,9 @@ const Page = () => {
                 }}
               >
                 {videos.map((videoUri, index) => (
-                  <View key={index} style={styles.videoContainer}>
+                  <View key={index} style={[styles.videoContainer, { width: screenWidth }]}>
                     <Video
-                      ref={(ref) => {
+                      ref={(ref: any) => {
                         if (ref) {
                           videoRefs.current[index] = ref;
                         }
@@ -3436,6 +3905,63 @@ const Page = () => {
               </ScrollView>
             )}
 
+            {/* New Arrival Section */}
+            <View style={styles.allProductsSection}>
+              <SectionHeader title="New Arrivals" />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScrollContent}
+                snapToInterval={(screenWidth - 44) / 2}
+                snapToAlignment="start"
+                decelerationRate="fast"
+              >
+                {newArrivalProducts.length > 0 ? (
+                  newArrivalProducts.map((product, index) => (
+                    <Animated.View
+                      key={`newarrival-${product.id}-${index}`}
+                      style={[
+                        styles.horizontalProductItem,
+                        {
+                          width: (screenWidth - 44) / 2,
+                          opacity: fadeAnim,
+                          transform: [
+                            { translateY: productSlideAnim },
+                            { scale: scaleAnim }
+                          ]
+                        }
+                      ]}
+                    >
+                      <ProductCard product={product} />
+                    </Animated.View>
+                  ))
+                ) : (
+                  // Fallback: show most recent products if no new arrivals configured yet
+                  [...allProducts]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(0, 15)
+                    .map((product, index) => (
+                      <Animated.View
+                        key={`newarrival-fallback-${product.id}-${index}`}
+                        style={[
+                          styles.horizontalProductItem,
+                          {
+                            width: (screenWidth - 44) / 2,
+                            opacity: fadeAnim,
+                            transform: [
+                              { translateY: productSlideAnim },
+                              { scale: scaleAnim }
+                            ]
+                          }
+                        ]}
+                      >
+                        <ProductCard product={product} />
+                      </Animated.View>
+                    ))
+                )}
+              </ScrollView>
+            </View>
+
             {/* Best Seller Section */}
             <View style={styles.allProductsSection}>
               <SectionHeader title="Best Seller" />
@@ -3453,6 +3979,7 @@ const Page = () => {
                     style={[
                       styles.horizontalProductItem,
                       {
+                        width: (screenWidth - 44) / 2,
                         opacity: fadeAnim,
                         transform: [
                           { translateY: productSlideAnim },
@@ -3469,18 +3996,15 @@ const Page = () => {
 
             {/* New Combo Offers Section */}
             <View style={styles.comboSection}>
-              <TouchableWithoutFeedback
-                onPress={() => router.push('/deals/combo-offers')}
-              >
-                <Animated.View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Combo Offers</Text>
-                </Animated.View>
-              </TouchableWithoutFeedback>
+              <SectionHeader title="Combo Offers" />
 
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalScrollContent}
+                snapToInterval={(screenWidth - 44) / 2}
+                snapToAlignment="start"
+                decelerationRate="fast"
               >
                 {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
                 {activeCombos.length > 0 ? (
@@ -3526,152 +4050,13 @@ const Page = () => {
                       });
                     };
 
-                    // Apply animations only for first 2 cards; rest render without transform
-                    const isFirstCard = index === 0;
-                    const isSecondCard = index === 1;
-                    const rotate = isFirstCard ? comboCard1Rotate : isSecondCard ? comboCard2Rotate : new Animated.Value(0);
-                    const translateX = isFirstCard ? comboCard1TranslateX : isSecondCard ? comboCard2TranslateX : new Animated.Value(0);
-                    const translateY = isFirstCard ? comboCard1TranslateY : isSecondCard ? comboCard2TranslateY : new Animated.Value(0);
-                    const scale = isFirstCard ? comboCard1Scale : isSecondCard ? comboCard2Scale : new Animated.Value(1);
-
                     return (
                       <Animated.View
-                        key={combo.id}
-                        style={{
-                          transform: [
-                            {
-                              rotate: rotate.interpolate({
-                                inputRange: [-15, 0, 15],
-                                outputRange: ['-15deg', '0deg', '15deg']
-                              })
-                            },
-                            { translateX },
-                            { translateY },
-                            { scale }
-                          ],
-                        }}
-                      >
-                        <TouchableOpacity
-                          style={[styles.comboCard, { width: 280, marginHorizontal: 8, marginBottom: 10 }]}
-                          onPress={handleComboPress}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.comboHeader}>
-                            <Ionicons name="gift-outline" size={24} color="#694d21" />
-                            <Text style={styles.comboTitle}>{combo.title || 'Combo Offer'}</Text>
-                          </View>
-                          {combo.description && (
-                            <Text style={styles.comboDescription} numberOfLines={2}>
-                              {combo.description}
-                            </Text>
-                          )}
-                          <View style={styles.comboProductsRow}>
-                            {comboImages.length > 0 ? (
-                              comboImages.map((img, idx) => (
-                                <View key={idx} style={styles.comboProductImage}>
-                                  <Image
-                                    source={{ uri: apiService.getFullImageUrl(img) }}
-                                    style={{ width: '100%', height: '100%' }}
-                                    resizeMode="cover"
-                                  />
-                                </View>
-                              ))
-                            ) : (
-                              <View style={[styles.comboProductImage, { justifyContent: 'center', alignItems: 'center' }]}>
-                                <Ionicons name="image-outline" size={32} color="#999" />
-                              </View>
-                            )}
-                          </View>
-                          <View style={styles.comboPriceRow}>
-                            <Text style={styles.comboPrice}>₹{discountedPrice.toFixed(2)}</Text>
-                            <Text style={styles.comboSaveText}>
-                              Save {combo.discount_type === 'percentage'
-                                ? `${Number(combo.discount_value || 0)}%`
-                                : `₹${Number(combo.discount_value || 0)}`}
-                            </Text>
-                          </View>
-                          <TouchableOpacity
-                            style={styles.viewComboButton}
-                            onPress={handleComboPress}
-                          >
-                            <Text style={styles.viewComboButtonText}>View Combo</Text>
-                          </TouchableOpacity>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    );
-                  })
-                ) : (
-                  // Fallback: Show placeholder when no active combos
-                  <TouchableOpacity
-                    style={[styles.comboCard, { width: 300, marginHorizontal: 8, marginBottom: 10 }]}
-                    onPress={() => router.push('/deals/combo-offers')}
-                  >
-                    <View style={styles.comboHeader}>
-                      <Ionicons name="gift-outline" size={24} color="#694d21" />
-                      <Text style={styles.comboTitle}>Check Out Our Combo Offers</Text>
-                    </View>
-                    <Text style={styles.comboDescription}>
-                      Discover amazing combo deals and save more on your favorite products
-                    </Text>
-                    <View style={styles.comboProductsRow}>
-                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="gift" size={32} color="#999" />
-                      </View>
-                      <View style={[styles.comboProductImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="star" size={32} color="#999" />
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.viewComboButton}
-                      onPress={() => router.push('/deals/combo-offers')}
-                    >
-                      <Text style={styles.viewComboButtonText}>View All Combo Offers</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-            </View>
-
-            {/* New Arrival Section */}
-            <View style={styles.allProductsSection}>
-              <SectionHeader title="New Arrival" />
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-                snapToInterval={(screenWidth - 44) / 2}
-                snapToAlignment="start"
-                decelerationRate="fast"
-              >
-                {newArrivalProducts.length > 0 ? (
-                  newArrivalProducts.map((product, index) => (
-                    <Animated.View
-                      key={`newarrival-${product.id}-${index}`}
-                      style={[
-                        styles.horizontalProductItem,
-                        {
-                          opacity: fadeAnim,
-                          transform: [
-                            { translateY: productSlideAnim },
-                            { scale: scaleAnim }
-                          ]
-                        }
-                      ]}
-                    >
-                      <ProductCard product={product} />
-                    </Animated.View>
-                  ))
-                ) : (
-                  // Fallback: show most recent products if no new arrivals configured yet
-                  [...allProducts]
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .slice(0, 15)
-                    .map((product, index) => (
-                      <Animated.View
-                        key={`newarrival-fallback-${product.id}-${index}`}
+                        key={`combo-${combo.id}-${index}`}
                         style={[
                           styles.horizontalProductItem,
                           {
+                            width: (screenWidth - 44) / 2,
                             opacity: fadeAnim,
                             transform: [
                               { translateY: productSlideAnim },
@@ -3680,11 +4065,266 @@ const Page = () => {
                           }
                         ]}
                       >
-                        <ProductCard product={product} />
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: '#fff',
+                            borderRadius: 12,
+                            elevation: 4,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 4,
+                            height: 255,
+                            overflow: 'hidden',
+                            marginHorizontal: 6,
+                            marginVertical: 10,
+                            borderWidth: 1,
+                            borderColor: '#f0f0f0',
+                          }}
+                          onPress={handleComboPress}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{
+                            width: '100%',
+                            aspectRatio: 1,
+                            backgroundColor: '#f8f9fa',
+                            borderTopLeftRadius: 12,
+                            borderTopRightRadius: 12,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            overflow: 'hidden',
+                          }}>
+                            {comboImages.length > 0 ? (
+                              <Image
+                                source={{ uri: apiService.getFullImageUrl(comboImages[0]) }}
+                                style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                              />
+                            ) : (
+                              <Ionicons name="image-outline" size={32} color="#999" />
+                            )}
+                          </View>
+                          {Number(combo.discount_value) > 0 && (
+                            <View style={{
+                              position: 'absolute',
+                              top: 8,
+                              left: 8,
+                              backgroundColor: '#27ae60',
+                              borderRadius: 12,
+                              paddingVertical: 3,
+                              paddingHorizontal: 6,
+                              elevation: 2,
+                              shadowColor: '#27ae60',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.2,
+                              shadowRadius: 2,
+                            }}>
+                              <Text style={{
+                                color: '#fff',
+                                fontSize: 9,
+                                fontWeight: 'bold',
+                              }}>
+                                {combo.discount_type === 'percentage'
+                                  ? `${Number(combo.discount_value)}% OFF`
+                                  : `₹${Number(combo.discount_value)} OFF`}
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={{
+                            paddingVertical: 4,
+                            paddingHorizontal: 6,
+                            flex: 1,
+                            justifyContent: 'space-between',
+                          }}>
+                            <View>
+                              <Text style={styles.comboCardCategory}>COMBO OFFER</Text>
+                              <Text style={styles.comboCardName} numberOfLines={2}>{combo.title || 'Combo Offer'}</Text>
+                            </View>
+                            <View style={styles.comboCardPriceRow}>
+                              <Text style={styles.comboCardPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                              <View style={styles.comboCardBtn}>
+                                <Ionicons name="chevron-forward" size={14} color="#2b3a1a" />
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
                       </Animated.View>
-                    ))
+                    );
+                  })
+                ) : (
+                  // Fallback: Show placeholder when no active combos
+                  <View style={[styles.horizontalProductItem, { width: (screenWidth - 44) / 2 }]}>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 12,
+                        elevation: 4,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 4,
+                        height: 255,
+                        overflow: 'hidden',
+                        marginHorizontal: 6,
+                        marginVertical: 10,
+                        borderWidth: 1,
+                        borderColor: '#f0f0f0',
+                      }}
+                      onPress={() => router.push('/deals/combo-offers')}
+                    >
+                      <View style={{
+                        width: '100%',
+                        aspectRatio: 1,
+                        backgroundColor: '#f8f9fa',
+                        borderTopLeftRadius: 12,
+                        borderTopRightRadius: 12,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        overflow: 'hidden',
+                      }}>
+                        <Ionicons name="gift-outline" size={32} color="#999" />
+                      </View>
+
+                      <View style={{
+                        paddingVertical: 4,
+                        paddingHorizontal: 6,
+                        flex: 1,
+                        justifyContent: 'space-between',
+                      }}>
+                        <View>
+
+                          <Text style={{
+                            fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+                            fontSize: 13,
+                            fontWeight: 'bold',
+                            color: '#333333',
+                            lineHeight: 18,
+                            marginBottom: 4,
+                          }} numberOfLines={2}>Check Out Our Combo Offers</Text>
+                        </View>
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginTop: 'auto',
+                        }}>
+                          <Text style={{
+                            fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+                            fontSize: 15,
+                            fontWeight: 'bold',
+                            color: '#333333',
+                          }}>View Offers</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </ScrollView>
+            </View>
+
+            {/* Bottom Banner Slideshow Section */}
+            <View style={[styles.bannerContainer, { height: bannerHeight }]}>
+              <ScrollView
+                ref={bottomBannerScrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={screenWidth - 24}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                onScroll={(event) => {
+                  const xOffset = event.nativeEvent.contentOffset.x;
+                  const slideWidth = screenWidth - 24;
+                  if (slideWidth > 0) {
+                    const index = Math.round(xOffset / slideWidth);
+                    const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
+                    if (currentBottomBannerIndex !== validIndex) {
+                      setCurrentBottomBannerIndex(validIndex);
+                    }
+                  }
+                }}
+                scrollEventThrottle={16}
+                onMomentumScrollEnd={(event) => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
+                  const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
+                  if (currentBottomBannerIndex !== validIndex) {
+                    setCurrentBottomBannerIndex(validIndex);
+                  }
+                }}
+                onScrollBeginDrag={() => {
+                  isBottomUserInteracting.current = true;
+                }}
+                onScrollEndDrag={resetBottomUserInteraction}
+                onTouchStart={() => {
+                  isBottomUserInteracting.current = true;
+                }}
+                onTouchEnd={resetBottomUserInteraction}
+                style={{ width: screenWidth - 24 }}
+              >
+                {BOTTOM_BANNER_DATA.map((banner) => (
+                  <TouchableOpacity
+                    key={banner.id}
+                    activeOpacity={0.95}
+                    onPress={() => handleBottomBannerPress(banner.id)}
+                    style={{ width: screenWidth - 24, height: bannerHeight }}
+                  >
+                    <Image
+                      source={banner.image}
+                      style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.bannerDotsContainer}>
+                {BOTTOM_BANNER_DATA.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.bannerDot,
+                      currentBottomBannerIndex === idx && styles.bannerDotActive
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {/* Our Story Banner Section */}
+            <View style={styles.ourStoryBannerCard}>
+              <View style={styles.ourStoryBannerRow}>
+                <View style={styles.ourStoryBannerTextCol}>
+                  <Text style={styles.ourStoryBannerSub}>OUR STORY</Text>
+                  <Text style={styles.ourStoryBannerTitle}>
+                    Rooted in Ayurveda.{"\n"}Made for You.
+                  </Text>
+                  <View style={styles.ourStoryBannerDividerRow}>
+                    <View style={styles.ourStoryBannerDividerLine} />
+                    <Ionicons name="leaf" size={12} color="#694d21" style={{ marginHorizontal: 8 }} />
+                    <View style={styles.ourStoryBannerDividerLine} />
+                  </View>
+                  <Text style={styles.ourStoryBannerBody}>
+                    At Saranga Ayurveda, we blend ancient wisdom with modern living to create pure, natural and effective wellness solutions for every day.
+                  </Text>
+                </View>
+                <View style={styles.ourStoryBannerImageCol}>
+                  <Image
+                    source={OUR_STORY_BANNER_URI}
+                    style={styles.ourStoryBannerImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.ourStoryBannerButtonContainer}>
+                <TouchableOpacity
+                  style={styles.ourStoryBannerReadMoreBtn}
+                  onPress={() => router.push('/our-story')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.ourStoryBannerReadMoreBtnText}>READ MORE</Text>
+                  <Ionicons name="arrow-forward-outline" size={14} color="#3d5236" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Custom Saranga Anugraha Foundation Section */}
@@ -3696,7 +4336,7 @@ const Page = () => {
               />
               <Text style={styles.customFoundationSubText}>In association with</Text>
               <Text style={styles.customFoundationName}>Saranga Anugraha Foundation</Text>
-              <Text style={styles.customFoundationBigText}>is support</Text>
+              <Text style={styles.customFoundationBigText}>need your support</Text>
 
               <View style={styles.customFoundationButtonsRow}>
                 <TouchableOpacity
@@ -3709,7 +4349,7 @@ const Page = () => {
 
                 <TouchableOpacity
                   style={styles.customFoundationHelpButton}
-                  onPress={() => Alert.alert('Support Request', 'Our team will contact you shortly to provide assistance.')}
+                  onPress={() => router.push('/donate')}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.customFoundationHelpButtonText}>I NEED HELP</Text>
@@ -3734,14 +4374,14 @@ const Page = () => {
                 showsHorizontalScrollIndicator={false}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
-                style={styles.slideshowScrollView}
+                style={[styles.slideshowScrollView, { height: screenWidth - 34 }]}
               >
                 {SLIDE_DATA.map((slide, idx) => (
                   <TouchableOpacity
                     key={idx}
                     activeOpacity={0.9}
                     onPress={() => router.push('/donate')}
-                    style={styles.slideTouch}
+                    style={[styles.slideTouch, { width: screenWidth - 34, height: screenWidth - 34 }]}
                   >
                     <Image
                       source={slide.image}
@@ -3755,6 +4395,19 @@ const Page = () => {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+
+              {/* Slideshow Indicators / Dots */}
+              <View style={styles.slideshowDotsContainer}>
+                {SLIDE_DATA.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.slideshowDot,
+                      activeSlide === idx && styles.slideshowDotActive
+                    ]}
+                  />
+                ))}
+              </View>
             </View>
 
             {/* Pillars of Beauty Section */}
@@ -3972,13 +4625,13 @@ const Page = () => {
                             {chunk.map((category) => (
                               <TouchableOpacity
                                 key={category.id}
-                                style={styles.concernCircle}
+                                style={[styles.concernCircle, { width: screenWidth * 0.28 }]}
                                 onPress={() => router.push({
                                   pathname: '/category/[id]',
                                   params: { id: category.id.toString(), name: category.name }
                                 })}
                               >
-                                <View style={styles.concernIconContainer}>
+                                <View style={[styles.concernIconContainer, { width: screenWidth * 0.24, height: screenWidth * 0.24 }]}>
                                   <Image
                                     source={{ uri: category.image }}
                                     style={styles.concernCircleImage}
@@ -4084,102 +4737,89 @@ const Page = () => {
             )}
 
             <View style={styles.footerContainer}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
-                {/* Quick Links Section */}
-                <View style={[styles.footerSection, { flex: 1, paddingRight: 8 }]}>
-                  <Text style={[styles.footerTitle, { fontSize: 16 }]}>Quick Links</Text>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => {
+              {/* Navigation Grid (2 Columns) */}
+              <View style={styles.footerGridRow}>
+                {/* Column 1: Get To Know Us */}
+                <View style={styles.footerGridColumn}>
+                  <Text style={styles.footerColumnHeader}>Get To Know Us</Text>
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/our-story')}>
+                    <Text style={styles.footerGridLinkText}>Our Story</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/careers')}>
+                    <Text style={styles.footerGridLinkText}>Careers</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/internships')}>
+                    <Text style={styles.footerGridLinkText}>Internships</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Column 2: Quick Links (Swapped with Connect With Us) */}
+                <View style={styles.footerGridColumn}>
+                  <Text style={styles.footerColumnHeader}>Quick Links</Text>
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/explore')}>
+                    <Text style={styles.footerGridLinkText}>Trending</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => {
                     if (!isAuthenticated) {
                       router.push('/auth/login');
                     } else {
                       router.push('/profile');
                     }
                   }}>
-                    <Ionicons name="person-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>My Account</Text>
+                    <Text style={styles.footerGridLinkText}>My Account</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => {
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => {
                     if (!isAuthenticated) {
                       router.push('/auth/login');
                     } else {
                       router.push('/profile/orders');
                     }
                   }}>
-                    <Ionicons name="bag-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>Track Order</Text>
+                    <Text style={styles.footerGridLinkText}>My Orders</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => {
-                    if (!isAuthenticated) {
-                      router.push('/auth/login');
-                    } else {
-                      router.push('/wishlist');
-                    }
-                  }}>
-                    <Ionicons name="heart-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>Wishlist</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/explore')}>
-                    <Ionicons name="pricetag-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>Offers & Deals</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Customer Service Section */}
-                <View style={[styles.footerSection, { flex: 1, paddingLeft: 8 }]}>
-                  <Text style={[styles.footerTitle, { fontSize: 16 }]}>Customer Service</Text>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/contact')}>
-                    <Ionicons name="call-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>Contact Us</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/faq')}>
-                    <Ionicons name="help-circle-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>FAQs</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/shipping-info')}>
-                    <Ionicons name="car-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>Shipping Info</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerLink} onPress={() => router.push('/return-policy')}>
-                    <Ionicons name="refresh-outline" size={20} color="#694d21" />
-                    <Text style={styles.footerLinkText}>Return Policy</Text>
+                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/contact')}>
+                    <Text style={styles.footerGridLinkText}>Contact Us</Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Social Links */}
-              <View style={styles.footerSocialContainer}>
-                {[
-                  { icon: 'logo-instagram', color: '#E1306C', url: 'https://www.instagram.com/saranga_ayurveda' },
-                  { icon: 'logo-whatsapp', color: '#25D366', url: 'https://whatsapp.com/channel/0029Vb76UKxL2ATwk9Z5Sd1z' }
-                ].map((social, index) => (
-                  <TouchableOpacity
-                    key={social.icon}
-                    style={styles.footerSocialButton}
-                    onPress={() => Linking.openURL(social.url)}
-                  >
-                    <Ionicons name={social.icon as any} size={24} color={social.color} />
-                    <Text style={styles.footerSocialText}>
-                      {social.icon.replace('logo-', '').charAt(0).toUpperCase() + social.icon.slice(6)}
-                    </Text>
+              {/* Row 2: Connect With Us Centered (without Names, horizontal layout) */}
+              <View style={styles.footerConnectContainer}>
+                <Text style={styles.footerColumnHeaderCentred}>Connect With Us</Text>
+                <View style={styles.footerSocialIconsRow}>
+                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://whatsapp.com/channel/0029Vb76UKxL2ATwk9Z5Sd1z')}>
+                    <Ionicons name="logo-whatsapp" size={20} color="#2b3a1a" />
                   </TouchableOpacity>
-                ))}
+                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.instagram.com/saranga_ayurveda')}>
+                    <Ionicons name="logo-instagram" size={20} color="#2b3a1a" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.facebook.com/people/Saranga-Ayurveda/61565898664471')}>
+                    <Ionicons name="logo-facebook" size={20} color="#2b3a1a" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.youtube.com/@saranga_ayurveda')}>
+                    <Ionicons name="logo-youtube" size={20} color="#2b3a1a" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.footerDivider} />
 
-              {/* Bottom Section */}
-              <View style={styles.footerBottom}>
-                <Text style={styles.footerBottomText}>© 2026 Saranga Ayurveda. All rights reserved.</Text>
-                <View style={styles.footerRow}>
+              {/* Support Links Section (Stacked or inline flow) */}
+              <View style={styles.footerSupportSection}>
+                <Text style={styles.footerColumnHeader}>Support Links</Text>
+                <View style={styles.footerSupportRow}>
                   {[
+                    { title: 'Terms & Conditions', route: '/legal/terms' },
                     { title: 'Privacy Policy', route: '/legal/privacy-policy' },
-                    { title: 'Terms of Service', route: '/legal/terms' },
-                    { title: 'Shipping Policy', route: '/legal/shipping' },
-                    { title: 'Refund Policy', route: '/legal/refund' }
-                  ].map((item, index) => (
+                    { title: 'Shipping and Delivery Policy', route: '/legal/shipping' },
+                    { title: 'Return/Cancellation Policy', route: '/legal/refund' },
+                    { title: 'Refund Policy', route: '/legal/refund' },
+                    { title: 'FAQs', route: '/faq' },
+                    { title: 'Help', route: '/help' }
+                  ].map((item) => (
                     <TouchableOpacity
-                      key={item.route}
-                      style={styles.footerColumnLink}
+                      key={item.title}
+                      style={styles.footerSupportLink}
                       onPress={() => {
                         if (item.route === '/legal/privacy-policy') {
                           router.push('/legal/privacy-policy');
@@ -4189,24 +4829,30 @@ const Page = () => {
                           router.push('/legal/shipping');
                         } else if (item.route === '/legal/refund') {
                           router.push('/legal/refund');
+                        } else if (item.route === '/faq') {
+                          router.push('/faq');
+                        } else if (item.route === '/help') {
+                          router.push('/help');
                         }
                       }}
                     >
-                      <Text style={styles.footerColumnText}>{item.title}</Text>
+                      <Text style={styles.footerSupportLinkText}>{item.title}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-                <Text style={[styles.footerBottomText, { marginTop: 16 }]}>
-                  Made with ♥ in India
+              </View>
 
-                </Text>
-                <Text style={styles.footerBottomText}>Crafted and powered with care by Curiospry Technologies
+              <View style={styles.footerDivider} />
 
-                </Text>
+              {/* Footer Bottom Block */}
+              <View style={styles.footerBottomBlock}>
+                <Text style={styles.footerCopyrightText}>© 2026 Saranga Ayurveda. All Rights Reserved.</Text>
+                <Text style={styles.footerCopyrightSub}>Proudly Made In India</Text>
               </View>
             </View>
           </>
         )}
+        </View>
       </ScrollView>
 
       {/* New Deals Popup Modal */}

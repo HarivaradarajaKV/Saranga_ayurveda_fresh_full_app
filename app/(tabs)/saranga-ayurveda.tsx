@@ -127,12 +127,6 @@ const SarangaAyurvedaScreen = () => {
         ]}>
           <View style={styles.header}>
             <Text style={styles.title}>Saranga Ayurveda</Text>
-            <TouchableOpacity 
-              style={styles.notificationButton}
-              onPress={() => router.push('/profile/notifications' as any)}
-            >
-              <Ionicons name="notifications-outline" size={20} color="#694d21" />
-            </TouchableOpacity>
           </View>
 
           <Animated.View style={[

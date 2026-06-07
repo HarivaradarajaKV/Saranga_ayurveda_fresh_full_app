@@ -5,7 +5,10 @@
     "version": "4.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": [
+      "myapp",
+      "com.googleusercontent.apps.1097721701701-512f9iebeukgklma28bup4qo0m90g2d7"
+    ],
     "userInterfaceStyle": "automatic",
     "sdkVersion": "54.0.0",
     "ios": {

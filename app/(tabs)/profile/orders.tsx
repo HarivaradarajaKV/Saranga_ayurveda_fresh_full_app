@@ -146,7 +146,7 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
+        <ActivityIndicator size="large" color="#2b3a1a" />
       </View>
     );
   }
@@ -165,10 +165,10 @@ export default function OrdersPage() {
 
         {/* Debug button */}
         <TouchableOpacity
-          style={[styles.shopButton, { marginTop: 20, backgroundColor: '#666' }]}
+          style={[styles.shopButton, { marginTop: 20, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#2b3a1a' }]}
           onPress={checkAuthAndOrders}
         >
-          <Text style={styles.shopButtonText}>Refresh Orders</Text>
+          <Text style={[styles.shopButtonText, { color: '#2b3a1a' }]}>Refresh Orders</Text>
         </TouchableOpacity>
       </View>
     );
@@ -184,9 +184,19 @@ export default function OrdersPage() {
               onPress={checkAuthAndOrders}
               style={{ marginRight: 15 }}
             >
-              <Ionicons name="refresh-outline" size={24} color="#007bff" />
+              <Ionicons name="refresh-outline" size={24} color="#2b3a1a" />
             </TouchableOpacity>
           ),
+          headerStyle: {
+            backgroundColor: '#fbf7f4',
+          },
+          headerTitleStyle: {
+            fontFamily: 'CormorantGaramond-Bold',
+            color: '#2b3a1a',
+            fontSize: 20,
+          },
+          headerTintColor: '#2b3a1a',
+          headerShadowVisible: false,
         }}
       />
       <ScrollView
@@ -196,7 +206,7 @@ export default function OrdersPage() {
           <RefreshControl
             refreshing={loading}
             onRefresh={onRefresh}
-            colors={['#007bff']}
+            colors={['#2b3a1a']}
           />
         }
       >
@@ -222,8 +232,7 @@ export default function OrdersPage() {
               <View style={styles.orderHeader}>
                 <View>
                   <Text style={styles.orderId}>Order #{order.id}</Text>
-                  <Text style={styles.orderDate}>{orderDate.relative}</Text>
-                  <Text style={styles.orderFullDate}>{orderDate.full}</Text>
+                  <Text style={styles.orderDate}>{orderDate.full}</Text>
                 </View>
                 <View style={styles.orderStatus}>
                   <View
@@ -277,14 +286,14 @@ export default function OrdersPage() {
                       generateInvoice(order);
                     }}
                   >
-                    <Ionicons name="document-text-outline" size={20} color="#007bff" />
+                    <Ionicons name="document-text-outline" size={20} color="#fff" />
                     <Text style={styles.actionButtonText}>Invoice</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => router.push('/support/live-chat')}
+                    onPress={() => router.push('/help')}
                   >
-                    <Ionicons name="chatbubble-outline" size={20} color="#007bff" />
+                    <Ionicons name="chatbubble-outline" size={20} color="#fff" />
                     <Text style={styles.actionButtonText}>Help</Text>
                   </TouchableOpacity>
                 </View>
@@ -300,25 +309,25 @@ export default function OrdersPage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fbf7f4',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,
   },
   emptyText: {
@@ -328,9 +337,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: 'center',
     paddingHorizontal: 32,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   shopButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -343,6 +353,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   orderCard: {
     backgroundColor: '#fff',
@@ -350,9 +361,11 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 12,
     padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(43, 58, 26, 0.08)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
@@ -364,19 +377,21 @@ const styles = StyleSheet.create({
   },
   orderId: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
+    fontFamily: 'CormorantGaramond-Bold',
+    color: '#2b3a1a',
     marginBottom: 2,
   },
   orderDate: {
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   orderFullDate: {
     fontSize: 11,
     color: '#999',
     marginTop: 1,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   orderStatus: {
     flexDirection: 'row',
@@ -398,6 +413,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     textTransform: 'capitalize',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   itemsContainer: {
     borderTopWidth: 1,
@@ -421,17 +437,19 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 2,
     flexWrap: 'wrap',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   itemQuantity: {
     fontSize: 12,
     color: '#666',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   itemPrice: {
     fontSize: 13,
-    fontWeight: '500',
     color: '#000',
     minWidth: 60,
     textAlign: 'right',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   orderFooter: {
     flexDirection: 'row',
@@ -451,36 +469,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginRight: 4,
+    fontFamily: 'CormorantGaramond-Medium',
   },
   totalAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#007bff',
+    fontSize: 15,
+    color: '#2b3a1a',
+    fontFamily: 'CormorantGaramond-Bold',
   },
   actionButtons: {
     flexDirection: 'row',
     marginLeft: 8,
+    gap: 8,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#2b3a1a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   actionButtonText: {
-    fontSize: 11,
-    color: '#007bff',
-    marginLeft: 3,
+    fontSize: 12,
+    color: '#fff',
+    marginLeft: 4,
     fontWeight: '500',
+    fontFamily: 'CormorantGaramond-Medium',
   },
   noDataText: {
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
     marginTop: 10,
+    fontFamily: 'CormorantGaramond-Medium',
   },
 }); 

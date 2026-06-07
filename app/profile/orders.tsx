@@ -9,11 +9,13 @@ import {
   Alert,
   Linking,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Mock orders data with ISO date strings
 const orders = [
@@ -140,7 +142,7 @@ export default function OrdersPage() {
                 const invoiceUrl = `https://example.com/invoices/${order.id}.pdf`;
                 
                 if (Platform.OS === 'android') {
-                  const downloadPath = `${FileSystem.documentDirectory}invoice_${order.id}.pdf`;
+                  const downloadPath = `${(FileSystem as any).documentDirectory}invoice_${order.id}.pdf`;
                   const { uri } = await FileSystem.downloadAsync(invoiceUrl, downloadPath);
                   await Sharing.shareAsync(uri);
                 } else {
@@ -175,111 +177,126 @@ export default function OrdersPage() {
 
   return (
     <>
+      <StatusBar backgroundColor="#fbf7f4" barStyle="dark-content" />
       <Stack.Screen
         options={{
           title: 'My Orders',
           headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fbf7f4',
+          },
+          headerTintColor: '#2b3a1a',
+          headerTitleStyle: {
+            fontFamily: 'CormorantGaramond-Bold',
+            fontSize: 20,
+          },
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}>
-        <Text style={styles.sectionTitle}>Saranga Ayurveda My Orders</Text>
-        {orders.map((order) => {
-          const orderDate = formatDate(order.date);
-          return (
-            <TouchableOpacity
-              key={order.id}
-              style={styles.orderCard}
-              onPress={() => router.push({
-                pathname: '/orders/[id]',
-                params: { id: order.id }
-              })}
-            >
-              <View style={styles.orderHeader}>
-                <View>
-                  <Text style={styles.orderId}>Order #{order.id}</Text>
-                  <Text style={styles.orderDate}>{orderDate.relative}</Text>
-                  <Text style={styles.orderFullDate}>{orderDate.full}</Text>
-                </View>
-                <View style={styles.orderStatus}>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      { backgroundColor: getStatusColor(order.status) },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: getStatusColor(order.status) },
-                    ]}
-                  >
-                    {order.status}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.itemsContainer}>
-                {order.items.map((item) => (
-                  <View key={item.id} style={styles.itemRow}>
-                    <Image source={{ uri: item.image }} style={styles.itemImage} />
-                    <View style={styles.itemDetails}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                    </View>
+      <View style={{ flex: 1 }}>
+        <LinearGradient
+          colors={['#fbf7f4', '#fbf7f4', '#fbf7f4']}
+          style={StyleSheet.absoluteFill}
+        />
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.mainTitle}>Saranga Ayurveda</Text>
+          <Text style={styles.subTitle}>My Orders</Text>
+          {orders.map((order) => {
+            const orderDate = formatDate(order.date);
+            return (
+              <TouchableOpacity
+                key={order.id}
+                style={styles.orderCard}
+                onPress={() => router.push({
+                  pathname: '/orders/[id]',
+                  params: { id: order.id }
+                })}
+              >
+                <View style={styles.orderHeader}>
+                  <View>
+                    <Text style={styles.orderId}>Order #{order.id}</Text>
+                    <Text style={styles.orderDate}>{orderDate.full}</Text>
                   </View>
-                ))}
-              </View>
-
-              <View style={styles.orderFooter}>
-                <View style={styles.footerLeft}>
-                  <Text style={styles.totalAmount}>₹{order.totalAmount}</Text>
-                  <TouchableOpacity
-                    style={styles.invoiceButton}
-                    onPress={() => handleDownloadInvoice(order)}
-                  >
-                    <Ionicons name="document-text-outline" size={16} color="#666" />
-                    <Text style={styles.invoiceButtonText}>Invoice</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => router.push('/support/live-chat')}
-                  >
-                    <Ionicons name="chatbubble-outline" size={20} color="#007bff" />
-                    <Text style={styles.actionButtonText}>Help</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.viewButton]}
-                    onPress={() => router.push({
-                      pathname: '/orders/[id]',
-                      params: { id: order.id }
-                    })}
-                  >
-                    <Text style={[styles.actionButtonText, styles.viewButtonText]}>
-                      View Details
+                  <View style={styles.orderStatus}>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: getStatusColor(order.status) },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: getStatusColor(order.status) },
+                      ]}
+                    >
+                      {order.status}
                     </Text>
-                    <Ionicons name="chevron-forward" size={20} color="#fff" />
-                  </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
 
-        {orders.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="bag-handle-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyStateText}>No orders yet</Text>
-            <TouchableOpacity
-              style={styles.shopButton}
-              onPress={() => router.push('/')}
-            >
-              <Text style={styles.shopButtonText}>Start Shopping</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
+                <View style={styles.itemsContainer}>
+                  {order.items.map((item) => (
+                    <View key={item.id} style={styles.itemRow}>
+                      <Image source={{ uri: item.image }} style={styles.itemImage} />
+                      <View style={styles.itemDetails}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.orderFooter}>
+                  <View style={styles.footerLeft}>
+                    <Text style={styles.totalAmount}>₹{order.totalAmount}</Text>
+                    <TouchableOpacity
+                      style={styles.invoiceButton}
+                      onPress={() => handleDownloadInvoice(order)}
+                    >
+                      <Ionicons name="document-text-outline" size={16} color="#2b3a1a" />
+                      <Text style={styles.invoiceButtonText}>Invoice</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => router.push('/help')}
+                    >
+                      <Ionicons name="chatbubble-outline" size={20} color="#fff" />
+                      <Text style={styles.actionButtonText}>Help</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.viewButton]}
+                      onPress={() => router.push({
+                        pathname: '/orders/[id]',
+                        params: { id: order.id }
+                      })}
+                    >
+                      <Text style={[styles.actionButtonText, styles.viewButtonText]}>
+                        View Details
+                      </Text>
+                      <Ionicons name="chevron-forward" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {orders.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="bag-handle-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyStateText}>No orders yet</Text>
+              <TouchableOpacity
+                style={styles.shopButton}
+                onPress={() => router.push('/')}
+              >
+                <Text style={styles.shopButtonText}>Start Shopping</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </>
   );
 }
@@ -287,21 +304,42 @@ export default function OrdersPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
+    backgroundColor: 'transparent',
+  },
+  scrollContent: {
+    paddingBottom: 100,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  mainTitle: {
+    fontFamily: 'CormorantGaramond-Bold',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2b3a1a',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  subTitle: {
+    fontFamily: 'CormorantGaramond-Medium',
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   orderCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'rgba(43, 58, 26, 0.08)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -310,16 +348,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   orderId: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000',
   },
   orderDate: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
     marginTop: 4,
   },
   orderFullDate: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 12,
     color: '#999',
     marginTop: 2,
@@ -335,6 +376,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -346,7 +388,12 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#fbf7f4',
+    borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(43, 58, 26, 0.08)',
   },
   itemImage: {
     width: 60,
@@ -358,12 +405,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     fontWeight: '500',
     color: '#000',
     marginBottom: 4,
   },
   itemQuantity: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 12,
     color: '#666',
   },
@@ -381,6 +430,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   totalAmount: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000',
@@ -392,8 +442,9 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   invoiceButtonText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 12,
-    color: '#666',
+    color: '#2b3a1a',
     marginLeft: 4,
   },
   actionButtons: {
@@ -407,17 +458,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     marginLeft: 12,
+    backgroundColor: '#2b3a1a',
   },
   actionButtonText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     fontWeight: '500',
-    color: '#007bff',
+    color: '#fff',
     marginLeft: 4,
   },
   viewButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
   },
   viewButtonText: {
+    fontFamily: 'CormorantGaramond-Medium',
     color: '#fff',
   },
   emptyState: {
@@ -427,26 +481,22 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   emptyStateText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 18,
     color: '#666',
     marginTop: 16,
     marginBottom: 24,
   },
   shopButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   shopButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 16,
   },
 }); 

@@ -32,14 +32,14 @@ const bundles = [
 
 export default function BundleOfferPage() {
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen 
         options={{
           title: 'Bundle Offers',
           headerShown: true,
         }}
       />
-      <View style={styles.container}>
+      <View style={{ flex: 1, width: '100%', maxWidth: 750, alignSelf: 'center' }}>
         <FlatList
           data={bundles}
           renderItem={({ item }) => (
@@ -53,7 +53,7 @@ export default function BundleOfferPage() {
               <View style={styles.bundleProducts}>
                 {item.products.map((product, index) => (
                   <View key={product.id} style={styles.bundleProduct}>
-                    <ProductCard product={product} />
+                    <ProductCard product={product as any} />
                     {index < item.products.length - 1 && (
                       <View style={styles.plusContainer}>
                         <Ionicons name="add" size={24} color="#007bff" />
@@ -75,7 +75,7 @@ export default function BundleOfferPage() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-    </>
+    </View>
   );
 }
 

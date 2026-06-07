@@ -99,29 +99,6 @@ function CouponsPageInner() {
     };
   }, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!mountedRef.current) return;
-      const now = Date.now();
-
-      if (couponsCache && now - couponsCache.ts < CACHE_TTL) {
-        setCoupons(couponsCache.data);
-        setVisibleCount(Math.min(PAGE_SIZE, couponsCache.data.length || PAGE_SIZE));
-        setLoading(false);
-      } else {
-        fetchCoupons();
-      }
-
-      return () => {
-        if (!mountedRef.current) return;
-        setCoupons([]);
-        setVisibleCount(PAGE_SIZE);
-        setShowAddModal(false);
-        setLoading(false);
-      };
-    }, [fetchCoupons])
-  );
-
   const fetchCoupons = React.useCallback(async (force = false) => {
     if (!mountedRef.current) return;
     const now = Date.now();
@@ -191,6 +168,31 @@ function CouponsPageInner() {
       }
     }
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!mountedRef.current) return;
+      const now = Date.now();
+
+      if (couponsCache && now - couponsCache.ts < CACHE_TTL) {
+        setCoupons(couponsCache.data);
+        setVisibleCount(Math.min(PAGE_SIZE, couponsCache.data.length || PAGE_SIZE));
+        setLoading(false);
+      } else {
+        fetchCoupons();
+      }
+
+      return () => {
+        if (!mountedRef.current) return;
+        setCoupons([]);
+        setVisibleCount(PAGE_SIZE);
+        setShowAddModal(false);
+        setLoading(false);
+      };
+    }, [fetchCoupons])
+  );
+
+
 
   const handleAddCoupon = async () => {
     if (!mountedRef.current) return;

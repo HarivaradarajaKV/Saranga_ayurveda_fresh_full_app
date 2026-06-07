@@ -577,7 +577,7 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
 
             try {
                 console.log('[Direct Upload] Attempting secure signed URL direct uploads for adding product...');
-                
+
                 const mediaItems = await Promise.all(
                     selectedImages.map(async (item) => {
                         if (item && item.uri) {
@@ -768,7 +768,7 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                 // Handle specific error cases
                 const errorMsg = typeof response.error === 'string'
                     ? response.error
-                    : (response.error.message || JSON.stringify(response.error));
+                    : ((response.error as any).message || JSON.stringify(response.error));
 
                 if (errorMsg.includes('Unauthorized')) {
                     Alert.alert('Session Expired', 'Please log in again to continue.');
@@ -1238,7 +1238,7 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                                                 { url: selectedProductForDetails.image_url3, type: 'image' },
                                                 { url: selectedProductForDetails.image_url4, type: 'image' }
                                             ].filter(m => m.url);
-                                            
+
                                         return mediaList.map((m: any, index: number) => {
                                             const fullUrl = apiService.getFullImageUrl(m.url);
                                             if (m.type === 'video') {
@@ -1274,7 +1274,7 @@ function AdminProductsInner({ initialShowAddForm = false }: AdminProductsProps) 
                                                         Alert.alert('Error', 'Could not open document.');
                                                     }
                                                 };
-                                                
+
                                                 return (
                                                     <TouchableOpacity key={index} onPress={handleOpenDoc} style={styles.productDetailsImageWrapper}>
                                                         <View style={{ flex: 1, backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
@@ -1671,11 +1671,12 @@ const styles = StyleSheet.create({
         padding: 12,
     },
     productCardName: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: themeColors.text,
-        marginBottom: 6,
-        lineHeight: 20,
+        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#333333',
+        marginBottom: 4,
+        lineHeight: 18,
     },
     productCardPrice: {
         flexDirection: 'row',
@@ -1689,20 +1690,25 @@ const styles = StyleSheet.create({
         textDecorationLine: 'line-through',
     },
     productCardDiscountedPrice: {
+        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
         fontSize: 15,
-        color: themeColors.primary,
-        fontWeight: '700',
+        color: '#333333',
+        fontWeight: 'bold',
     },
     productCardPriceText: {
+        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
         fontSize: 15,
-        color: themeColors.primary,
-        fontWeight: '700',
+        color: '#333333',
+        fontWeight: 'bold',
     },
     productCardCategory: {
-        fontSize: 12,
-        color: themeColors.textSecondary,
+        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontSize: 10,
+        color: '#8e8e8e',
         marginBottom: 4,
-        fontWeight: '500',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     productCardStock: {
         fontSize: 11,

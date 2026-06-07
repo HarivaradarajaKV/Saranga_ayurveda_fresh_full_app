@@ -4,13 +4,11 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import ProductCard from '../components/ProductCard';
 import { products } from '../../data/products';
-
-const { width } = Dimensions.get('window');
 
 // Filter products for flash sale (example: products with high discount)
 const flashSaleProducts = products.filter(product => {
@@ -19,25 +17,31 @@ const flashSaleProducts = products.filter(product => {
 });
 
 export default function FlashSalePage() {
+  const { width } = useWindowDimensions();
+  const screenWidth = Math.min(width, 800);
+  const numColumns = screenWidth < 480 ? 2 : (screenWidth < 768 ? 3 : 4);
+  const itemWidth = (screenWidth - 16) / numColumns;
+
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen 
         options={{
           title: 'Flash Sale',
           headerShown: true,
         }}
       />
-      <View style={styles.container}>
+      <View style={{ flex: 1, width: '100%', maxWidth: 800, alignSelf: 'center' }}>
         <View style={styles.header}>
           <Text style={styles.timerTitle}>Flash Sale Ends In</Text>
           <Text style={styles.timer}>23:59:59</Text>
         </View>
         <FlatList
+          key={numColumns}
           data={flashSaleProducts}
-          numColumns={2}
+          numColumns={numColumns}
           renderItem={({ item }) => (
-            <View style={styles.productWrapper}>
-              <ProductCard product={item} />
+            <View style={{ width: itemWidth, padding: 8 }}>
+              <ProductCard product={item as any} />
             </View>
           )}
           keyExtractor={item => item.id.toString()}
@@ -45,7 +49,7 @@ export default function FlashSalePage() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-    </>
+    </View>
   );
 }
 
@@ -68,10 +72,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#d63384',
-  },
-  productWrapper: {
-    width: width / 2,
-    padding: 8,
   },
   productList: {
     padding: 8,

@@ -17,8 +17,7 @@ export default function AdminLayout() {
                 headerTitleStyle: {
                     fontWeight: 'bold',
                 },
-                detachInactiveScreens: true,
-                // Removed unmountOnBlur to prevent crashes when navigating
+                // detachInactiveScreens removed (not supported in NativeStack screen options)
             }}
         >
             <Stack.Screen 

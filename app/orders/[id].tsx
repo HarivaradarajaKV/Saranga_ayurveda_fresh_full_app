@@ -10,11 +10,11 @@ import {
   Share,
   Alert,
   SafeAreaView,
-  Dimensions,
   Platform,
   StatusBar,
   ActivityIndicator,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,9 +50,6 @@ interface ShippingAddress {
 }
 
 // Constants moved outside component to prevent recreation
-const { width, height } = Dimensions.get('window');
-const CARD_MARGIN = 8;
-const CARD_WIDTH = (width - (CARD_MARGIN * 4)) / 2;
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0;
 const ACTIVE_OPACITY = 0.7;
 const PRESS_DELAY = 150;
@@ -321,7 +318,7 @@ export default function OrderDetailsPage() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#694d21" />
+          <ActivityIndicator size="large" color="#2b3a1a" />
           <Text style={styles.loadingText}>Loading order details...</Text>
         </View>
       </SafeAreaView>
@@ -362,19 +359,20 @@ export default function OrderDetailsPage() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient
-        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
+        colors={['#fbf7f4', '#fbf7f4', '#fbf7f4']}
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar backgroundColor="#f8f6f0" barStyle="dark-content" />
+        <StatusBar backgroundColor="#fbf7f4" barStyle="dark-content" />
         <Stack.Screen
           options={{
             title: `Order #${order.id}`,
             headerStyle: {
-              backgroundColor: '#f8f6f0',
+              backgroundColor: '#fbf7f4',
             },
-            headerTintColor: '#694d21',
+            headerTintColor: '#2b3a1a',
             headerTitleStyle: {
+              fontFamily: 'CormorantGaramond-Bold',
               fontWeight: '700',
               fontSize: 20,
             },
@@ -388,7 +386,7 @@ export default function OrderDetailsPage() {
                   activeOpacity={ACTIVE_OPACITY}
                   delayPressIn={PRESS_DELAY}
                 >
-                  <Ionicons name="help-circle-outline" size={24} color="#694d21" />
+                  <Ionicons name="help-circle-outline" size={24} color="#2b3a1a" />
                 </TouchableOpacity>
               </View>
             ),
@@ -401,6 +399,7 @@ export default function OrderDetailsPage() {
           bounces={true}
           removeClippedSubviews={true}
         >
+          <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center' }}>
           <Animated.View
             style={{
               opacity: fadeAnim,
@@ -422,7 +421,7 @@ export default function OrderDetailsPage() {
           >
             <View style={styles.sectionHeader}>
               <View style={styles.titleContainer}>
-                <Ionicons name="checkmark-circle" size={24} color="#694d21" style={styles.icon} />
+                <Ionicons name="checkmark-circle" size={24} color="#2b3a1a" style={styles.icon} />
                 <Text style={styles.sectionTitle}>Order Status</Text>
               </View>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
@@ -443,12 +442,12 @@ export default function OrderDetailsPage() {
             ]}
           >
             <View style={styles.titleContainer}>
-              <Ionicons name="location" size={22} color="#694d21" style={styles.icon} />
+              <Ionicons name="location" size={22} color="#2b3a1a" style={styles.icon} />
               <Text style={styles.sectionTitle}>Shipping Address</Text>
             </View>
             <View style={styles.addressCard}>
               <View style={styles.addressHeader}>
-                <Ionicons name="person" size={18} color="#694d21" />
+                <Ionicons name="person" size={18} color="#2b3a1a" />
                 <Text style={styles.addressName}>{order.shipping_address.full_name}</Text>
               </View>
               <View style={styles.addressRow}>
@@ -490,7 +489,7 @@ export default function OrderDetailsPage() {
             ]}
           >
             <View style={styles.titleContainer}>
-              <Ionicons name="cube" size={22} color="#694d21" style={styles.icon} />
+              <Ionicons name="cube" size={22} color="#2b3a1a" style={styles.icon} />
               <Text style={styles.sectionTitle}>Order Items</Text>
             </View>
             {order.items.map((item, index) => (
@@ -536,13 +535,13 @@ export default function OrderDetailsPage() {
             ]}
           >
             <View style={styles.titleContainer}>
-              <Ionicons name="card" size={22} color="#694d21" style={styles.icon} />
+              <Ionicons name="card" size={22} color="#2b3a1a" style={styles.icon} />
               <Text style={styles.sectionTitle}>Payment Details</Text>
             </View>
             <View style={styles.paymentCard}>
               <View style={styles.paymentRow}>
                 <View style={styles.paymentLeft}>
-                  <Ionicons name="wallet" size={18} color="#694d21" />
+                  <Ionicons name="wallet" size={18} color="#2b3a1a" />
                   <Text style={styles.paymentLabel}>Payment Method</Text>
                 </View>
                 <Text style={styles.paymentValue}>
@@ -561,7 +560,7 @@ export default function OrderDetailsPage() {
                   <>
                     <View style={styles.paymentRow}>
                       <View style={styles.paymentLeft}>
-                        <Ionicons name="pricetag" size={18} color="#694d21" />
+                        <Ionicons name="pricetag" size={18} color="#2b3a1a" />
                         <Text style={styles.paymentLabel}>Items Subtotal</Text>
                       </View>
                       <Text style={styles.paymentValue}>₹{itemsSubtotal.toFixed(2)}</Text>
@@ -569,7 +568,7 @@ export default function OrderDetailsPage() {
                     {discount > 0 && (
                       <View style={styles.paymentRow}>
                         <View style={styles.paymentLeft}>
-                          <Ionicons name="remove-circle" size={18} color="#694d21" />
+                          <Ionicons name="remove-circle" size={18} color="#2b3a1a" />
                           <Text style={styles.paymentLabel}>Discount</Text>
                         </View>
                         <Text style={styles.paymentValue}>-₹{discount.toFixed(2)}</Text>
@@ -578,7 +577,7 @@ export default function OrderDetailsPage() {
                     {gst > 0 && (
                       <View style={styles.paymentRow}>
                         <View style={styles.paymentLeft}>
-                          <Ionicons name="receipt" size={18} color="#694d21" />
+                          <Ionicons name="receipt" size={18} color="#2b3a1a" />
                           <Text style={styles.paymentLabel}>GST (included in prices)</Text>
                         </View>
                         <Text style={styles.paymentValue}>₹{gst.toFixed(2)}</Text>
@@ -586,7 +585,7 @@ export default function OrderDetailsPage() {
                     )}
                     <View style={styles.paymentRow}>
                       <View style={styles.paymentLeft}>
-                        <Ionicons name="bicycle" size={18} color="#694d21" />
+                        <Ionicons name="bicycle" size={18} color="#2b3a1a" />
                         <Text style={styles.paymentLabel}>Delivery Charges</Text>
                       </View>
                       <Text style={styles.paymentValue}>₹{delivery.toFixed(2)}</Text>
@@ -594,7 +593,7 @@ export default function OrderDetailsPage() {
                     <View style={styles.divider} />
                     <View style={styles.paymentRow}>
                       <View style={styles.paymentLeft}>
-                        <Ionicons name="cash" size={18} color="#694d21" />
+                        <Ionicons name="cash" size={18} color="#2b3a1a" />
                         <Text style={styles.paymentLabel}>Total Amount</Text>
                       </View>
                       <Text style={[styles.paymentValue, styles.totalAmount]}>₹{payable.toFixed(2)}</Text>
@@ -622,7 +621,7 @@ export default function OrderDetailsPage() {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#694d21', '#5a3f1a']}
+                  colors={['#2b3a1a', '#2b3a1a']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.trackButtonGradient}
@@ -646,40 +645,27 @@ export default function OrderDetailsPage() {
             ]}
           >
             <View style={styles.titleContainer}>
-              <Ionicons name="help-buoy" size={22} color="#694d21" style={styles.icon} />
+              <Ionicons name="help-buoy" size={22} color="#2b3a1a" style={styles.icon} />
               <Text style={styles.sectionTitle}>Need Help?</Text>
             </View>
-            <View style={styles.helpButtons}>
-              <TouchableOpacity
-                style={styles.helpButton}
-                onPress={() => router.push('/support/live-chat')}
+            <TouchableOpacity
+              style={styles.trackButton}
+              onPress={() => router.push('/help')}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#2b3a1a', '#2b3a1a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.trackButtonGradient}
               >
-                <LinearGradient
-                  colors={['#694d21', '#5a3f1a']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.helpButtonGradient}
-                >
-                  <Ionicons name="chatbubble-ellipses" size={24} color="#fff" />
-                  <Text style={styles.helpButtonText}>Chat with Us</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.helpButton}
-                onPress={() => router.push('/support/call')}
-              >
-                <LinearGradient
-                  colors={['#694d21', '#5a3f1a']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.helpButtonGradient}
-                >
-                  <Ionicons name="call" size={24} color="#fff" />
-                  <Text style={styles.helpButtonText}>Call Support</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+                <Ionicons name="help-circle-outline" size={24} color="#fff" />
+                <Text style={styles.trackButtonText}>Help & Support</Text>
+                <Ionicons name="chevron-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
           </Animated.View>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -700,14 +686,16 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   mainTitle: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 28,
     fontWeight: '700',
-    color: '#694d21',
+    color: '#2b3a1a',
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: 1,
   },
   subTitle: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 18,
     fontWeight: '500',
     color: '#666',
@@ -751,9 +739,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 20,
     fontWeight: '700',
-    color: '#2c3e50',
+    color: '#2b3a1a',
     letterSpacing: 0.5,
   },
   statusBadge: {
@@ -767,22 +756,24 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   statusText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
   },
   dateText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
   },
   addressCard: {
     padding: 16,
-    backgroundColor: '#f8f6f0',
+    backgroundColor: '#fbf7f4',
     borderRadius: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e8e5e1',
+    borderColor: 'rgba(43, 58, 26, 0.08)',
   },
   addressHeader: {
     flexDirection: 'row',
@@ -798,13 +789,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addressName: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 18,
     fontWeight: '700',
-    color: '#2c3e50',
+    color: '#2b3a1a',
     marginLeft: 8,
     letterSpacing: 0.3,
   },
   addressText: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#555',
     marginLeft: 10,
@@ -814,11 +807,11 @@ const styles = StyleSheet.create({
   itemCard: {
     flexDirection: 'row',
     padding: 16,
-    backgroundColor: '#f8f6f0',
+    backgroundColor: '#fbf7f4',
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e8e5e1',
+    borderColor: 'rgba(43, 58, 26, 0.08)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -829,13 +822,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 17,
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#2b3a1a',
     marginBottom: 6,
     letterSpacing: 0.2,
   },
   itemVariant: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
@@ -847,27 +842,29 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   quantityBadge: {
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
   },
   itemQuantity: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 13,
     color: '#fff',
     fontWeight: '600',
   },
   itemPrice: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 18,
     fontWeight: '700',
-    color: '#694d21',
+    color: '#2b3a1a',
   },
   paymentCard: {
-    backgroundColor: '#f8f6f0',
+    backgroundColor: '#fbf7f4',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e8e5e1',
+    borderColor: 'rgba(43, 58, 26, 0.08)',
   },
   paymentRow: {
     flexDirection: 'row',
@@ -881,19 +878,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   paymentLabel: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 15,
     color: '#555',
     fontWeight: '600',
   },
   paymentValue: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 16,
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#2b3a1a',
   },
   totalAmount: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 20,
     fontWeight: '700',
-    color: '#694d21',
+    color: '#2b3a1a',
   },
   divider: {
     height: 1,
@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginHorizontal: 4,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -924,6 +924,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   helpButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 15,
     color: '#fff',
     fontWeight: '600',
@@ -932,7 +933,7 @@ const styles = StyleSheet.create({
   trackButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -946,6 +947,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   trackButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 17,
     color: '#fff',
     fontWeight: '700',
@@ -960,12 +962,14 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
+    fontFamily: 'CormorantGaramond-Medium',
     marginTop: 16,
     fontSize: 16,
-    color: '#694d21',
+    color: '#2b3a1a',
     fontWeight: '500',
   },
   errorText: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 18,
     fontWeight: '600',
     color: '#f44336',
@@ -973,28 +977,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   errorSubtext: {
+    fontFamily: 'CormorantGaramond-Medium',
     fontSize: 14,
     color: '#666',
     marginBottom: 24,
   },
   backButton: {
-    backgroundColor: '#694d21',
+    backgroundColor: '#2b3a1a',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
     marginTop: 12,
   },
   backButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   refreshButton: {
     padding: 12,
-    backgroundColor: '#007bff',
+    backgroundColor: '#2b3a1a',
     borderRadius: 8,
   },
   refreshButtonText: {
+    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',

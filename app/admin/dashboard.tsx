@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authEvents } from '../services/authEvents';
 import { Ionicons } from '@expo/vector-icons';
 import { Buffer } from 'buffer';
 
@@ -98,6 +99,9 @@ export default function AdminDashboard() {
     try {
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_role');
+      await AsyncStorage.removeItem('name');
+      await AsyncStorage.removeItem('user_name');
+      authEvents.notify();
       if (isMountedRef.current) {
         try {
           router.replace('/auth/login');
@@ -110,7 +114,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const navigateTo = (route: '/admin/products' | '/admin/categories' | '/admin/orders' | '/admin/users' | '/admin/coupons' | '/admin/combos' | '/admin/settings' | '/admin/add-product') => {
+  const navigateTo = (route: '/admin/products' | '/admin/categories' | '/admin/orders' | '/admin/users' | '/admin/coupons' | '/admin/combos' | '/admin/settings' | '/admin/add-product' | '/admin/gst') => {
     if (!isMountedRef.current) return;
     try {
       if (!router || typeof router.push !== 'function') {

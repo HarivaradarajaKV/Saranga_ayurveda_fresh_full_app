@@ -6,6 +6,7 @@ export interface ProductNavigationData {
   description: string;
   price: number;
   category: string;
+  category_name?: string;
   image_url: string;
   stock_quantity: number;
   offer_percentage?: number;
@@ -24,6 +25,7 @@ export const navigateToProduct = (router: Router, product: ProductNavigationData
     const cleanProduct = {
       ...product,
       id: typeof product.id === 'string' ? parseInt(product.id) : product.id,
+      category_name: product.category_name,
       price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
       stock_quantity: typeof product.stock_quantity === 'string' ? 
         parseInt(product.stock_quantity) : product.stock_quantity,

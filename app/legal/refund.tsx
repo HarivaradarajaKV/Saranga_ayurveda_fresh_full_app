@@ -1,130 +1,53 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RefundPolicyScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-
   return (
-    <>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
-      <View style={[styles.safeContainer, { paddingTop: insets.top }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color="#2b3a1a" />
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView style={styles.container}>
         <View style={styles.content}>
-          <Text style={styles.title}>Refund Policy</Text>
-          <Text style={styles.lastUpdated}>Last updated: February 24, 2024</Text>
-          
-          <Text style={styles.section}>1. Return Period</Text>
-          <Text style={styles.text}>
-            We accept returns within 30 days of delivery for unused items in their
-            original packaging with all tags attached.
-          </Text>
+          <Text style={styles.title}>RETURN, CANCELLATION & REFUND POLICY</Text>
 
-          <Text style={styles.section}>2. Return Process</Text>
           <Text style={styles.text}>
-            To initiate a return, please contact our customer service team through the app
-            or email. You will receive a return shipping label and instructions.
-          </Text>
-
-          <Text style={styles.section}>3. Refund Timeline</Text>
-          <Text style={styles.text}>
-            Once we receive and inspect your return, we will process your refund within
-            5-7 business days. The refund will be issued to your original payment method.
-          </Text>
-
-          <Text style={styles.section}>4. Non-Returnable Items</Text>
-          <Text style={styles.text}>
-            For hygiene reasons, certain items such as opened cosmetics, personal care products,
-            and intimate items cannot be returned unless defective.
-          </Text>
-
-          <Text style={styles.section}>5. Damaged or Defective Items</Text>
-          <Text style={styles.text}>
-            If you receive a damaged or defective item, please contact us within 48 hours
-            of delivery. We will arrange a replacement or full refund.
-          </Text>
-
-          <Text style={styles.section}>6. Return Shipping</Text>
-          <Text style={styles.text}>
-            Return shipping is free for defective items. For other returns, shipping costs
-            may be deducted from your refund unless otherwise specified.
+            All orders placed on the Saranga Ayurveda LLP application are prepaid orders only. Cash on Delivery (COD) is not available. As products are manufactured specifically against confirmed orders, processing, manufacturing, quality checks, packaging, and dispatch may require approximately 10–20 working days. Delivery timelines are estimates only and may vary depending on operational, logistical, seasonal, or unforeseen circumstances. The Company shall not be liable for delays caused by courier partners, transportation disruptions, weather conditions, governmental restrictions, force majeure events, or circumstances beyond its reasonable control. Customers are responsible for providing accurate shipping information. The Company shall not be responsible for delivery failures resulting from incorrect or incomplete customer details. Due to the nature of products being manufactured against confirmed orders, requests for cancellation, modification, return, exchange, or replacement may not be accepted once production has commenced. All sales are generally considered final. Refunds are not ordinarily provided for completed or dispatched orders. However, Saranga Ayurveda LLP reserves the sole right to review exceptional cases and determine whether any refund, replacement, store credit, or other resolution may be offered. Shipping charges, payment gateway fees, processing fees, handling charges, and similar costs are non-refundable. Any approved refund shall be processed through the original payment method within a reasonable period, subject to banking and payment partner timelines. Saranga Ayurveda LLP reserves the right to amend this policy at any time without prior notice.
           </Text>
         </View>
       </ScrollView>
-      </View>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeContainer: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#fbf7f4',
-  },
-  headerRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fbf7f4',
-  },
-  backButton: {
-    padding: 4,
   },
   container: {
     flex: 1,
     backgroundColor: '#fbf7f4',
   },
-  contentContainer: {
-    padding: 16,
-  },
   content: {
     padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(43, 58, 26, 0.08)',
   },
   title: {
     fontSize: 24,
     fontFamily: 'CormorantGaramond-Bold',
-    marginBottom: 8,
+    marginBottom: 20,
     color: '#2b3a1a',
-  },
-  lastUpdated: {
-    fontSize: 14,
-    fontFamily: 'CormorantGaramond-Medium',
-    color: '#556C3A',
-    marginBottom: 24,
-  },
-  section: {
-    fontSize: 18,
-    fontFamily: 'CormorantGaramond-Bold',
-    marginTop: 24,
-    marginBottom: 12,
-    color: '#2b3a1a',
+    textAlign: 'center',
   },
   text: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'CormorantGaramond-Medium',
-    color: '#556C3A',
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#333',
     marginBottom: 16,
+    fontFamily: 'CormorantGaramond-Medium',
   },
-}); 
+});

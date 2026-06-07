@@ -12,7 +12,7 @@ import {
   Platform,
   SafeAreaView,
   Animated,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,10 +21,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-const { width } = Dimensions.get('window');
-
 export default function AddressesScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { addresses, addAddress, updateAddress, deleteAddress, setDefaultAddress, fetchAddresses } = useAddress();
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -285,6 +284,7 @@ export default function AddressesScreen() {
             />
           }
         >
+        <View style={{ width: '100%', maxWidth: 700, alignSelf: 'center' }}>
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#694d21" />
@@ -466,8 +466,8 @@ export default function AddressesScreen() {
                           city: address.city,
                           state: address.state,
                           postal_code: address.postal_code,
-                          country: address.country,
-                          address_type: address.address_type,
+                          country: address.country || 'India',
+                          address_type: address.address_type || 'Home',
                           is_default: address.is_default,
                         });
                         setIsAdding(true);
@@ -508,6 +508,7 @@ export default function AddressesScreen() {
             ))}
           </View>
         )}
+        </View>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -713,18 +714,20 @@ const styles = StyleSheet.create({
   },
   nameText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: '700',
+    color: '#1a1a1a',
     marginBottom: 4,
   },
   phoneText: {
     fontSize: 14,
     color: '#666',
+    fontWeight: '500',
     marginBottom: 8,
   },
   addressText: {
     fontSize: 14,
-    color: '#444',
+    color: '#666',
+    fontWeight: '500',
     marginBottom: 4,
     lineHeight: 20,
   },

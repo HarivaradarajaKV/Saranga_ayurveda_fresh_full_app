@@ -25,8 +25,8 @@ interface FormData {
   addressType: AddressType;
 }
 
-const isValidAddressType = (type: string): type is AddressType => {
-  return ['Home', 'Work', 'Other'].includes(type);
+const isValidAddressType = (type: string | undefined): type is AddressType => {
+  return typeof type === 'string' && ['Home', 'Work', 'Other'].includes(type);
 };
 
 export default function EditAddressPage() {
@@ -174,8 +174,9 @@ export default function EditAddressPage() {
           },
         }}
       />
-      <ScrollView style={styles.container}>
-        <View style={styles.form}>
+      <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={{ width: '100%', maxWidth: 650, alignSelf: 'center', flex: 1 }}>
+          <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Full Name *</Text>
             <TextInput
@@ -262,7 +263,7 @@ export default function EditAddressPage() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Address Type</Text>
             <View style={styles.addressTypeContainer}>
-              {['Home', 'Work', 'Other'].map((type) => (
+              {(['Home', 'Work', 'Other'] as const).map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[
@@ -305,6 +306,7 @@ export default function EditAddressPage() {
             <Text style={styles.deleteButtonText}>Delete Address</Text>
           </TouchableOpacity>
         </View>
+        </View>
       </ScrollView>
     </>
   );
@@ -322,14 +324,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
     marginBottom: 8,
   },
   input: {
-    fontFamily: 'CormorantGaramond-Medium',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -342,7 +342,6 @@ const styles = StyleSheet.create({
     borderColor: '#ff4444',
   },
   errorText: {
-    fontFamily: 'CormorantGaramond-Medium',
     color: '#ff4444',
     fontSize: 12,
     marginTop: 4,

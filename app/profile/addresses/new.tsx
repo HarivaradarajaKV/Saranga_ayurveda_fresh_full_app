@@ -218,9 +218,10 @@ export default function AddNewAddressPage() {
         style={StyleSheet.absoluteFill}
       />
       
-      <View style={styles.headerSection}>
-        <Text style={styles.brandTitle}>Add New Address</Text>
-      </View>
+      <View style={{ width: '100%', maxWidth: 650, alignSelf: 'center', flex: 1 }}>
+        <View style={styles.headerSection}>
+          <Text style={styles.brandTitle}>Add New Address</Text>
+        </View>
 
       <Modal
         visible={showCountryModal}
@@ -455,6 +456,7 @@ export default function AddNewAddressPage() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -505,7 +507,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   label: {
-    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 14,
     fontWeight: '600',
     color: '#2c3e50',
@@ -513,7 +514,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   input: {
-    fontFamily: 'CormorantGaramond-Medium',
     borderWidth: 1.5,
     borderColor: '#e0e0e0',
     borderRadius: 12,
@@ -533,7 +533,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   errorText: {
-    fontFamily: 'CormorantGaramond-Medium',
     color: '#ff4444',
     fontSize: 12,
     marginTop: 6,
@@ -561,7 +560,6 @@ const styles = StyleSheet.create({
     height: 52,
   },
   countryCodeText: {
-    fontFamily: 'CormorantGaramond-Bold',
     fontSize: 16,
     color: '#2b3a1a',
     fontWeight: '700',

@@ -8,9 +8,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Dimensions,
   Animated,
   Platform,
+  useWindowDimensions,
+  Dimensions,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -566,7 +567,7 @@ export default function ComboDetailPage() {
     <>
       <Stack.Screen
         options={{
-          title: combo.title || 'Combo Details',
+          title: 'Combo Details',
           headerShown: true,
           headerStyle: { backgroundColor: '#fbf7f4' },
           headerTintColor: '#2b3a1a',
@@ -584,21 +585,38 @@ export default function ComboDetailPage() {
         contentContainerStyle={[styles.contentContainer, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={{ width: '100%', maxWidth: 900, alignSelf: 'center' }}>
         <Animated.View
           style={{
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
           }}
         >
-          {/* Images Section - 2-column square grid */}
+          {/* Images Section - 2-column square grid or full-width banner */}
           {comboImages.length > 0 && (
             <View style={styles.imagesGrid}>
               {comboImages.map((img, idx) => (
-                <View key={idx} style={styles.imageGridCell}>
+                <View 
+                  key={idx} 
+                  style={[
+                    styles.imageGridCell,
+                    comboImages.length === 1
+                      ? {
+                          width: '100%',
+                          aspectRatio: 1,
+                          backgroundColor: 'transparent',
+                          borderRadius: 0,
+                          overflow: 'visible',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }
+                      : null
+                  ]}
+                >
                   <Image
                     source={{ uri: apiService.getFullImageUrl(img) }}
                     style={styles.imageGridImg}
-                    resizeMode="cover"
+                    resizeMode={comboImages.length === 1 ? 'contain' : 'cover'}
                   />
                 </View>
               ))}
@@ -856,6 +874,7 @@ export default function ComboDetailPage() {
             </Animated.View>
           )}
         </Animated.View>
+        </View>
       </ScrollView>
     </>
   );

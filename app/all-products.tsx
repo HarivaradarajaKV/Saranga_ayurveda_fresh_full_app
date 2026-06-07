@@ -324,11 +324,12 @@ export default function AllProductsPage() {
         edges={['left', 'right', 'bottom']}
       >
       {products.length === 0 && !loading ? (
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, { maxWidth: 600, alignSelf: 'center', width: '100%' }]}>
           <Ionicons name="cube-outline" size={64} color="#8E8E93" />
           <Text style={styles.emptyText}>No products available</Text>
         </View>
       ) : (
+        <View style={{ flex: 1, maxWidth: 960, alignSelf: 'center', width: '100%' }}>
         <FlatList
           data={products}
           renderItem={renderItem}
@@ -365,6 +366,7 @@ export default function AllProductsPage() {
             />
           }
         />
+        </View>
       )}
       </SafeAreaView>
     </View>

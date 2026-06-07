@@ -7,6 +7,33 @@ import React, { useEffect, useState } from 'react';
 import * as RN from 'react-native';
 import 'react-native-reanimated';
 
+// Polyfill atob for React Native environment (Hermes/JSC)
+if (typeof (global as any).atob === 'undefined') {
+  (global as any).atob = function (input: string): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    const str = String(input).replace(/=+$/, '');
+    let output = '';
+
+    if (str.length % 4 === 1) {
+      throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
+    }
+
+    for (let bc = 0, bs = 0, buffer, idx = 0; idx < str.length; idx++) {
+      const char = str.charAt(idx);
+      const pos = chars.indexOf(char);
+      if (pos === -1) continue;
+
+      buffer = bc % 4 ? (buffer ?? 0) * 64 + pos : pos;
+
+      if (bc++ % 4) {
+        output += String.fromCharCode(255 & (buffer >> ((-2 * bc) & 6)));
+      }
+    }
+
+    return output;
+  };
+}
+
 const DEFAULT_FONT = 'CormorantGaramond-Medium';
 
 const OriginalText = RN.Text;
@@ -152,9 +179,10 @@ function RootLayoutNav() {
         animation: 'slide_from_right',
         contentStyle: { backgroundColor: '#fff' },
         animationDuration: 300,
+        headerBackTitle: '',
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '', headerBackTitle: '' }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
       <Stack.Screen name="home" options={{ title: 'Saranga Ayurveda', headerShown: true }} />

@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 interface HowToUseProps {
   steps: {
@@ -10,20 +9,15 @@ interface HowToUseProps {
 }
 
 export const HowToUse: React.FC<HowToUseProps> = ({ steps }) => {
+  const paragraphText = steps
+    .map((s) => s.instruction.replace(/^\s*(?:step\s*\d+\s*[:.-]?\s*|\d+\s*[:.-]\s*)/i, '').trim())
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>How to Use</Text>
-      {steps.map((step) => (
-        <View key={step.step} style={styles.stepContainer}>
-          <View style={styles.stepNumberContainer}>
-            <Ionicons name="information-circle" size={20} color="#007AFF" />
-          </View>
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Step {step.step}</Text>
-            <Text style={styles.stepInstruction}>{step.instruction}</Text>
-          </View>
-        </View>
-      ))}
+      <Text style={styles.paragraph}>{paragraphText}</Text>
     </View>
   );
 };
@@ -35,26 +29,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  stepContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  stepNumberContainer: {
-    marginRight: 12,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  stepInstruction: {
+  paragraph: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 22,
   },
-}); 
+});

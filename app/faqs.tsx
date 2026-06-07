@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -26,82 +26,42 @@ const FAQItem = ({ q, a }: { q: string; a: string }) => {
 };
 
 export default function FAQsScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-
   return (
-    <>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
-      <View style={[styles.safeContainer, { paddingTop: insets.top }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color="#2b3a1a" />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.headerCard}>
-          <Ionicons name="help-circle-outline" size={28} color="#2b3a1a" />
-          <View style={{ marginLeft: 12 }}>
-            <Text style={styles.headerTitle}>Frequently Asked Questions</Text>
-            <Text style={styles.headerSubtitle}>Tap a question to view the answer.</Text>
-          </View>
-        </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.title}>FREQUENTLY ASKED QUESTIONS</Text>
+        
         <FAQItem q="How long is shipping?" a="Orders typically ship within 2-5 business days." />
         <FAQItem q="Can I return a product?" a="Yes, within 7 days of delivery in unused condition." />
         <FAQItem q="How do I contact support?" a="Email us at sarangaconsumershelp@gmail.com." />
       </ScrollView>
-      </View>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeContainer: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#fbf7f4',
   },
-  headerRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fbf7f4',
-  },
-  backButton: {
-    padding: 4,
-  },
   container: {
-    padding: 16,
+    flex: 1,
     backgroundColor: '#fbf7f4',
   },
-  headerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(43, 58, 26, 0.08)',
-    marginBottom: 16,
+  contentContainer: {
+    padding: 20,
   },
-  headerTitle: {
-    fontSize: 20,
+  title: {
+    fontSize: 24,
     fontFamily: 'CormorantGaramond-Bold',
+    marginBottom: 20,
     color: '#2b3a1a',
-  },
-  headerSubtitle: {
-    marginTop: 2,
-    fontSize: 14,
-    fontFamily: 'CormorantGaramond-Medium',
-    color: '#556C3A',
+    textAlign: 'center',
   },
   faqItem: {
     backgroundColor: '#fff',
@@ -131,5 +91,3 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
-
-

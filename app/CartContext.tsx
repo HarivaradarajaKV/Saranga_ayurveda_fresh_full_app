@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from './services/api';
+import { authEvents } from './services/authEvents';
 
 interface FAQ {
   question: string;
@@ -55,6 +56,7 @@ export interface CartItem {
   ingredients?: string | string[];
   shades?: string[];
   sizes?: string[];
+  size?: string;
   discounted_price: number;
   // Combo offer fields
   is_from_combo?: boolean;
@@ -68,7 +70,7 @@ export interface CartItem {
 interface CartContextType {
   items: CartItem[];
   selectedItems: number[];
-  addItem: (product: Product, variant?: string, comboInfo?: { comboId: number; comboDiscountType: 'percentage' | 'fixed'; comboDiscountValue: number; comboTotalPrice: number; comboDiscountedPrice: number; itemOriginalPrice: number }) => void;
+  addItem: (product: Product, variant?: string, comboInfo?: { comboId: number; comboDiscountType: 'percentage' | 'fixed'; comboDiscountValue: number; comboTotalPrice: number; comboDiscountedPrice: number; itemOriginalPrice: number }, quantity?: number) => void;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, increment: boolean) => void;
   getItemCount: () => number;
@@ -121,10 +123,16 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
     checkAuthToken();
     
+    // Subscribe to real-time auth events
+    const unsubscribe = authEvents.subscribe(checkAuthToken);
+    
     // Check auth token every 5 seconds
     const interval = setInterval(checkAuthToken, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   // Load cart items from backend when userId changes
@@ -218,6 +226,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
             };
           }));
           setItems(transformedItems);
+          setSelectedItems(transformedItems.filter(item => item.stock_quantity > 0).map(item => item.id));
           await AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(transformedItems));
         } else {
           setItems([]);
@@ -231,7 +240,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     loadCartItems();
   }, [userId]);
 
-  const addItem = async (product: Product, variant?: string, comboInfo?: { comboId: number; comboDiscountType: 'percentage' | 'fixed'; comboDiscountValue: number; comboTotalPrice: number; comboDiscountedPrice: number; itemOriginalPrice: number }) => {
+  const addItem = async (product: Product, variant?: string, comboInfo?: { comboId: number; comboDiscountType: 'percentage' | 'fixed'; comboDiscountValue: number; comboTotalPrice: number; comboDiscountedPrice: number; itemOriginalPrice: number }, quantity: number = 1) => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token || !userId) {
@@ -239,7 +248,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         throw new Error('Authentication required');
       }
 
-      console.log('Adding item to cart:', { productId: product.id, variant, price: product.price });
+      console.log('Adding item to cart:', { productId: product.id, variant, price: product.price, quantity });
       console.log('Current cart items before adding:', items);
 
       // Check for existing item in the cart
@@ -249,7 +258,54 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
       if (existingItem) {
         console.log('Item already in cart, incrementing quantity. Existing item:', existingItem);
-        await updateQuantity(existingItem.id, true);
+        const originalQuantity = existingItem.quantity;
+        const newQuantity = existingItem.quantity + quantity;
+        
+        // 1. Optimistic Update (Immediate state change)
+        setItems(prevItems => {
+          const newItems = prevItems.map(item =>
+            item.id === product.id && item.variant === variant
+              ? { ...item, quantity: newQuantity }
+              : item
+          );
+          AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(newItems))
+            .catch(error => console.error('Error saving to storage:', error));
+          return newItems;
+        });
+
+        // 2. Background API call
+        apiService.put(apiService.ENDPOINTS.CART_ITEM(existingItem.cartId || 0), {
+          quantity: newQuantity
+        }).then(response => {
+          if (response.error) {
+            // Revert on error
+            setItems(prevItems => {
+              const revertedItems = prevItems.map(item =>
+                item.id === product.id && item.variant === variant
+                  ? { ...item, quantity: originalQuantity }
+                  : item
+              );
+              AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(revertedItems))
+                .catch(error => console.error('Error saving to storage:', error));
+              return revertedItems;
+            });
+            Alert.alert('Error', 'Failed to update quantity. Please try again.');
+          }
+        }).catch(err => {
+          console.error('Error updating quantity:', err);
+          // Revert
+          setItems(prevItems => {
+            const revertedItems = prevItems.map(item =>
+              item.id === product.id && item.variant === variant
+                ? { ...item, quantity: originalQuantity }
+                : item
+            );
+            AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(revertedItems))
+              .catch(error => console.error('Error saving to storage:', error));
+            return revertedItems;
+          });
+          Alert.alert('Error', 'Connection error. Failed to update quantity.');
+        });
         return; // Exit the function to prevent adding again
       }
 
@@ -282,6 +338,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         }
       }
       
+      const tempCartId = -Date.now();
       const newItem: CartItem = {
         id: product.id,
         name: product.name,
@@ -292,9 +349,9 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         stock_quantity: typeof product.stock_quantity === 'number' ? product.stock_quantity : (parseInt(String(product.stock_quantity)) || 0),
         created_at: product.created_at || new Date().toISOString(),
         offer_percentage: itemOfferPercentage,
-        quantity: 1,
+        quantity: quantity,
         variant: variant,
-        cartId: 0, // Placeholder, will be updated after backend response
+        cartId: tempCartId, // Temporary cart ID
         usage_instructions: product.usage_instructions,
         benefits: product.benefits,
         ingredients: product.ingredients,
@@ -310,30 +367,55 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         combo_discounted_price: comboInfo ? finalDiscountedPrice : undefined,
       };
 
-      // Add to backend first
-      const response = await apiService.post<{ id: number }>(apiService.ENDPOINTS.CART, {
-        product_id: product.id,
-        quantity: 1,
-        variant: variant
-      });
-
-      if (response.error || !response.data || typeof response.data.id !== 'number') {
-        console.error('Backend error:', response.error || 'Invalid response from server');
-        throw new Error(response.error || 'Invalid response from server');
-      }
-
-      const cartId = response.data.id;
-      newItem.cartId = cartId; // Update newItem with the cartId
-
-      console.log('No existing item found, adding new item:', newItem);
-
-      // If backend succeeds, update local state and storage
+      // 1. Optimistic Update (Immediate state change)
       setItems(prevItems => {
         const updatedItems = [...prevItems, newItem];
         AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(updatedItems))
           .catch(error => console.error('Error saving to storage:', error));
         return updatedItems;
       });
+      setSelectedItems(prev => {
+        if (!prev.includes(product.id)) {
+          return [...prev, product.id];
+        }
+        return prev;
+      });
+
+      // 2. Perform API call in background
+      apiService.post<{ id: number }>(apiService.ENDPOINTS.CART, {
+        product_id: product.id,
+        quantity: quantity,
+        variant: variant
+      }).then(response => {
+        if (response.error || !response.data || typeof response.data.id !== 'number') {
+          throw new Error(response.error || 'Invalid response from server');
+        }
+
+        const realCartId = response.data.id;
+        
+        // Update temp cartId in state
+        setItems(prevItems => {
+          const updatedItems = prevItems.map(item =>
+            item.id === product.id && item.variant === variant && item.cartId === tempCartId
+              ? { ...item, cartId: realCartId }
+              : item
+          );
+          AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(updatedItems))
+            .catch(error => console.error('Error saving to storage:', error));
+          return updatedItems;
+        });
+      }).catch(err => {
+        console.error('Error adding item to cart backend:', err);
+        // Revert the optimistic add
+        setItems(prevItems => {
+          const revertedItems = prevItems.filter(item => !(item.id === product.id && item.variant === variant && item.cartId === tempCartId));
+          AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(revertedItems))
+            .catch(error => console.error('Error saving to storage:', error));
+          return revertedItems;
+        });
+        Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+      });
+
     } catch (error) {
       console.error('Error adding item to cart:', error);
       throw error;
@@ -355,20 +437,30 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         return;
       }
 
-      // Remove from backend first using the cartId
-      const response = await apiService.delete(apiService.ENDPOINTS.CART_ITEM(cartItem.cartId));
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
+      const originalItems = [...items];
 
-      // If backend succeeds, update local state and storage
+      // 1. Optimistic Update (Immediate state change)
       setItems(prevItems => {
         const newItems = prevItems.filter(item => item.id !== productId);
         AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(newItems))
           .catch(error => console.error('Error saving to storage:', error));
         return newItems;
       });
+
+      // 2. Perform API call in background
+      apiService.delete(apiService.ENDPOINTS.CART_ITEM(cartItem.cartId)).then(response => {
+        if (response.error) {
+          throw new Error(response.error);
+        }
+      }).catch(err => {
+        console.error('Error removing item:', err);
+        // Revert on error
+        setItems(originalItems);
+        AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(originalItems))
+          .catch(e => console.error('Error saving to storage:', e));
+        Alert.alert('Error', 'Failed to remove item. Please try again.');
+      });
+
     } catch (error) {
       console.error('Error removing item from cart:', error);
     }
@@ -388,31 +480,51 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         return;
       }
 
+      const originalQuantity = cartItem.quantity;
       const newQuantity = increment ? cartItem.quantity + 1 : Math.max(1, cartItem.quantity - 1);
 
-      // Update in backend first using the cartId
-      const response = await apiService.put(apiService.ENDPOINTS.CART_ITEM(cartItem.cartId), {
-        quantity: newQuantity
-      });
+      if (newQuantity === originalQuantity) return;
 
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      // If backend succeeds, update local state and storage
+      // 1. Optimistic Update (Immediate state change)
       setItems(prevItems => {
         const newItems = prevItems.map(item =>
-          item.id === productId
-            ? {
-                ...item,
-                quantity: newQuantity
-              }
-            : item
+          item.id === productId ? { ...item, quantity: newQuantity } : item
         );
         AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(newItems))
           .catch(error => console.error('Error saving to storage:', error));
         return newItems;
       });
+
+      // 2. Perform API call in background
+      apiService.put(apiService.ENDPOINTS.CART_ITEM(cartItem.cartId), {
+        quantity: newQuantity
+      }).then(response => {
+        if (response.error) {
+          // Revert on error
+          setItems(prevItems => {
+            const revertedItems = prevItems.map(item =>
+              item.id === productId ? { ...item, quantity: originalQuantity } : item
+            );
+            AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(revertedItems))
+              .catch(e => console.error('Error saving to storage:', e));
+            return revertedItems;
+          });
+          Alert.alert('Error', 'Failed to update quantity. Please try again.');
+        }
+      }).catch(err => {
+        console.error('Error updating quantity:', err);
+        // Revert on error
+        setItems(prevItems => {
+          const revertedItems = prevItems.map(item =>
+            item.id === productId ? { ...item, quantity: originalQuantity } : item
+          );
+          AsyncStorage.setItem(`cart_items_${userId}`, JSON.stringify(revertedItems))
+            .catch(e => console.error('Error saving to storage:', e));
+          return revertedItems;
+        });
+        Alert.alert('Error', 'Connection error. Failed to update quantity.');
+      });
+
     } catch (error) {
       console.error('Error updating quantity:', error);
     }

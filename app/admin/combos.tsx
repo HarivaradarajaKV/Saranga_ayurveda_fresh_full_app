@@ -267,7 +267,7 @@ function AdminCombosInner() {
                 const combosData = Array.isArray(res.data) ? res.data : [];
                 combosCache = { data: combosData, ts: Date.now() };
                 if (isMountedRef.current) {
-                    comboDetailsRef.current = new Map(combosData.map(combo => [combo.id, combo]));
+                    comboDetailsRef.current = new Map(combosData.map((combo: Combo) => [combo.id, combo]));
                     const summaries = buildComboSummaries(combosData);
                     setCombos(summaries);
                     adjustVisibleCount(summaries.length);
@@ -409,88 +409,7 @@ function AdminCombosInner() {
         }
     };
 
-    const renderComboItem = React.useCallback(({ item }: { item: any }) => {
-        if (!item || !item.id) return null;
-        try {
-            // Prefer precomputed summary prices when items are not available (e.g., from admin/all endpoint)
-            const hasItems = Array.isArray(item.items) && item.items.length > 0;
-            const totalPriceValue: number = typeof item.totalPrice === 'number'
-                ? item.totalPrice
-                : (hasItems ? calculateComboTotalPrice(item as Combo) : 0);
-            const discountedPriceValue: number = typeof item.discountedPrice === 'number'
-                ? item.discountedPrice
-                : (hasItems ? calculateComboDiscountedPrice(item as Combo) : 0);
-            // DISABLED: Images removed from list view to prevent memory crashes in Expo Go
-            // Images will only show in detail modal when explicitly opened
-            return (
-                <TouchableOpacity 
-                    style={styles.card}
-                    onPress={() => openDetailView(item)}
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.cardContent}>
-                        {/* Image placeholder removed to save memory */}
-                        <View style={[styles.cardImagesContainer, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', minHeight: 80 }]}>
-                            <Ionicons name="image-outline" size={32} color="#ccc" />
-                        </View>
-                        <View style={styles.cardDetails}>
-                            <View style={styles.cardHeader}>
-                                <Text style={styles.cardTitle}>{item.title}</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    {(() => {
-                                        const status = getComboStatus(item);
-                                        const statusText = status === 'active' ? 'Active' : status === 'upcoming' ? 'Upcoming' : 'Expired';
-                                        const statusColor = getStatusColor(status);
-                                        const statusIcon = getStatusIcon(status);
-                                        return (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
-                                                <Ionicons name={statusIcon} size={14} color={statusColor} />
-                                                <Text style={{ color: statusColor, marginLeft: 4, fontSize: 12, fontWeight: '600' }}>
-                                                    {statusText}
-                                                </Text>
-                                            </View>
-                                        );
-                                    })()}
-                                    <TouchableOpacity 
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            deleteCombo(item.id);
-                                        }}
-                                    >
-                                        <Ionicons name="trash" size={18} color="#d33" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                            <Text style={styles.cardSub}>{item.discount_type === 'percentage' ? `${Number(item.discount_value || 0)}% off` : `₹${Number(item.discount_value || 0)} off`}</Text>
-                            {item.description && (
-                                <Text numberOfLines={2} style={styles.cardDesc}>{item.description}</Text>
-                            )}
-                            <Text style={styles.itemsTitle}>Items:</Text>
-                            <Text style={styles.itemsLine}>{(item.items || []).map((it: ComboItem) => `${Number(it.quantity || 1)} x ${it.name || `Product ${it.product_id}`}`).join(', ')}</Text>
-                            <View style={styles.cardPriceContainer}>
-                                <View style={styles.cardPriceRow}>
-                                    <Text style={styles.cardPriceLabel}>Total Price:</Text>
-                                    <Text style={styles.cardTotalPrice}>₹{(totalPriceValue || 0).toFixed(2)}</Text>
-                                </View>
-                                <View style={styles.cardPriceRow}>
-                                    <Text style={styles.cardPriceLabel}>Offer Price:</Text>
-                                    <Text style={styles.cardOfferPrice}>₹{(discountedPriceValue || 0).toFixed(2)}</Text>
-                                </View>
-                                {(totalPriceValue || 0) > (discountedPriceValue || 0) && (
-                                    <Text style={styles.cardSavings}>
-                                        You save ₹{((totalPriceValue || 0) - (discountedPriceValue || 0)).toFixed(2)}
-                                    </Text>
-                                )}
-                            </View>
-                        </View>
-                    </View>
-                </TouchableOpacity>
-            );
-        } catch (error) {
-            console.error('Error rendering combo item:', error);
-            return null;
-        }
-    }, [calculateComboDiscountedPrice, calculateComboTotalPrice, getComboStatus, getStatusColor, getStatusIcon, deleteCombo, openDetailView]);
+
 
     const visibleCombos = React.useMemo(() => {
         return Array.isArray(combos) ? combos.slice(0, visibleCount) : [];
@@ -815,6 +734,89 @@ function AdminCombosInner() {
                 return 'close-circle';
         }
     }, []);
+
+    const renderComboItem = React.useCallback(({ item }: { item: any }) => {
+        if (!item || !item.id) return null;
+        try {
+            // Prefer precomputed summary prices when items are not available (e.g., from admin/all endpoint)
+            const hasItems = Array.isArray(item.items) && item.items.length > 0;
+            const totalPriceValue: number = typeof item.totalPrice === 'number'
+                ? item.totalPrice
+                : (hasItems ? calculateComboTotalPrice(item as Combo) : 0);
+            const discountedPriceValue: number = typeof item.discountedPrice === 'number'
+                ? item.discountedPrice
+                : (hasItems ? calculateComboDiscountedPrice(item as Combo) : 0);
+            // DISABLED: Images removed from list view to prevent memory crashes in Expo Go
+            // Images will only show in detail modal when explicitly opened
+            return (
+                <TouchableOpacity 
+                    style={styles.card}
+                    onPress={() => openDetailView(item)}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.cardContent}>
+                        {/* Image placeholder removed to save memory */}
+                        <View style={[styles.cardImagesContainer, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', minHeight: 80 }]}>
+                            <Ionicons name="image-outline" size={32} color="#ccc" />
+                        </View>
+                        <View style={styles.cardDetails}>
+                            <View style={styles.cardHeader}>
+                                <Text style={styles.cardTitle}>{item.title}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    {(() => {
+                                        const status = getComboStatus(item);
+                                        const statusText = status === 'active' ? 'Active' : status === 'upcoming' ? 'Upcoming' : 'Expired';
+                                        const statusColor = getStatusColor(status);
+                                        const statusIcon = getStatusIcon(status);
+                                        return (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+                                                <Ionicons name={statusIcon} size={14} color={statusColor} />
+                                                <Text style={{ color: statusColor, marginLeft: 4, fontSize: 12, fontWeight: '600' }}>
+                                                    {statusText}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })()}
+                                    <TouchableOpacity 
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            deleteCombo(item.id);
+                                        }}
+                                    >
+                                        <Ionicons name="trash" size={18} color="#d33" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <Text style={styles.cardSub}>{item.discount_type === 'percentage' ? `${Number(item.discount_value || 0)}% off` : `₹${Number(item.discount_value || 0)} off`}</Text>
+                            {item.description && (
+                                <Text numberOfLines={2} style={styles.cardDesc}>{item.description}</Text>
+                            )}
+                            <Text style={styles.itemsTitle}>Items:</Text>
+                            <Text style={styles.itemsLine}>{(item.items || []).map((it: ComboItem) => `${Number(it.quantity || 1)} x ${it.name || `Product ${it.product_id}`}`).join(', ')}</Text>
+                            <View style={styles.cardPriceContainer}>
+                                <View style={styles.cardPriceRow}>
+                                    <Text style={styles.cardPriceLabel}>Total Price:</Text>
+                                    <Text style={styles.cardTotalPrice}>₹{(totalPriceValue || 0).toFixed(2)}</Text>
+                                </View>
+                                <View style={styles.cardPriceRow}>
+                                    <Text style={styles.cardPriceLabel}>Offer Price:</Text>
+                                    <Text style={styles.cardOfferPrice}>₹{(discountedPriceValue || 0).toFixed(2)}</Text>
+                                </View>
+                                {(totalPriceValue || 0) > (discountedPriceValue || 0) && (
+                                    <Text style={styles.cardSavings}>
+                                        You save ₹{((totalPriceValue || 0) - (discountedPriceValue || 0)).toFixed(2)}
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                </TouchableOpacity>
+            );
+        } catch (error) {
+            console.error('Error rendering combo item:', error);
+            return null;
+        }
+    }, [calculateComboDiscountedPrice, calculateComboTotalPrice, getComboStatus, getStatusColor, getStatusIcon, deleteCombo, openDetailView]);
 
     return (
         <SafeAreaView style={styles.safeArea}>

@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,9 @@ const { width } = Dimensions.get('window');
 
 export default function WishlistPage() {
   const { wishlist = [], setWishlist, removeFromWishlist } = useWishlist() || {};
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth, 800);
+  const numColumns = screenWidth < 480 ? 2 : (screenWidth < 768 ? 3 : 4);
   const { addItem, getCartItems, updateQuantity } = useCart() || {};
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -67,7 +71,7 @@ export default function WishlistPage() {
 
   // Handle tab press for scroll to top
   useEffect(() => {
-    const unsubscribe = navigation.addListener('tabPress', (e) => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
       if (isFocused) {
         e.preventDefault();
         scrollToTop();
@@ -197,7 +201,7 @@ export default function WishlistPage() {
             ]}
           >
             <LinearGradient
-              colors={['#694d21', '#5a3f1a']}
+              colors={['#2b3a1a', '#1e2912']}
               style={styles.emptyIconContainer}
             >
               <View style={styles.heartsContainer}>
@@ -214,7 +218,7 @@ export default function WishlistPage() {
               onPress={() => router.push('/')}
             >
               <LinearGradient
-                colors={['#694d21', '#5a3f1a']}
+                colors={['#2b3a1a', '#1e2912']}
                 style={styles.exploreButtonGradient}
               >
                 <Text style={styles.exploreButtonText}>Explore Collection</Text>
@@ -228,7 +232,7 @@ export default function WishlistPage() {
   }
 
   const renderItem = ({ item }: { item: any }) => (
-    <View style={styles.gridItem}>
+    <View style={[styles.gridItem, { flex: 1 / numColumns }]}>
       <ProductCard product={item} showTrash={true} />
     </View>
   );
@@ -252,10 +256,10 @@ export default function WishlistPage() {
           style={styles.backgroundGradient}
         />
         
-        <View style={styles.headerSection}>
-          <Text style={styles.brandTitle}>Wishlist</Text>
-        </View>
-        
+        <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center', flex: 1 }}>
+          <View style={styles.headerSection}>
+            <Text style={styles.brandTitle}>Wishlist</Text>
+          </View>
         <Animated.View 
           style={[
             styles.content,
@@ -271,7 +275,8 @@ export default function WishlistPage() {
             data={wishlist}
             renderItem={renderItem}
             keyExtractor={(item) => item.id.toString()}
-            numColumns={2}
+            key={numColumns}
+            numColumns={numColumns}
             columnWrapperStyle={styles.columnWrapper}
             contentContainerStyle={{
               paddingBottom: bottomTabHeight + 20,
@@ -282,7 +287,8 @@ export default function WishlistPage() {
           />
         </Animated.View>
       </View>
-    </>
+    </View>
+  </>
   );
 }
 
@@ -338,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -361,7 +367,7 @@ const styles = StyleSheet.create({
   },
   exploreButton: {
     borderRadius: 20,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -389,13 +395,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     marginBottom: 20,
     padding: 24,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
     elevation: 6,
     borderWidth: 1,
-    borderColor: 'rgba(105, 77, 33, 0.05)',
+    borderColor: 'rgba(43, 58, 26, 0.05)',
   },
   productImage: {
     width: '100%',
@@ -408,7 +414,7 @@ const styles = StyleSheet.create({
   },
   category: {
     fontSize: 12,
-    color: '#694d21',
+    color: '#2b3a1a',
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
@@ -429,7 +435,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#694d21',
+    color: '#2b3a1a',
   },
   stockContainer: {
     flexDirection: 'row',
@@ -456,7 +462,7 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     borderRadius: 16,
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 10,

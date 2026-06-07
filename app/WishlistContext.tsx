@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from './services/api';
+import { authEvents } from './services/authEvents';
 
 interface Product {
   id: number;
@@ -70,10 +72,16 @@ const WishlistProvider: React.FC<WishlistProviderProps> = ({ children }) => {
 
     checkAuthToken();
     
+    // Subscribe to real-time auth events
+    const unsubscribe = authEvents.subscribe(checkAuthToken);
+    
     // Check auth token every 5 seconds
     const interval = setInterval(checkAuthToken, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   const setWishlist = (newItems: Product[]) => {
@@ -125,53 +133,38 @@ const WishlistProvider: React.FC<WishlistProviderProps> = ({ children }) => {
         throw new Error('User not authenticated');
       }
 
-      // Validate token before proceeding
-      try {
-        const tokenParts = token.replace('Bearer ', '').split('.');
-        if (tokenParts.length !== 3) {
-          throw new Error('Invalid token format');
-        }
-        const payload = tokenParts[1];
-        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-        const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-        const decodedToken = JSON.parse(atob(paddedBase64));
-        
-        if (!decodedToken.id || !decodedToken.exp) {
-          throw new Error('Invalid token payload');
-        }
-
-        // Check if token is expired
-        if (Date.now() >= decodedToken.exp * 1000) {
-          await AsyncStorage.removeItem('auth_token');
-          throw new Error('Token expired');
-        }
-      } catch (tokenError) {
-        await AsyncStorage.removeItem('auth_token');
-        throw new Error('Invalid or expired token');
+      // Check if already in wishlist
+      if (items.some(item => item.id === product.id)) {
+        return;
       }
 
-      // Add to backend first
-      const response = await apiService.post(apiService.ENDPOINTS.WISHLIST, {
-        product_id: product.id
-      });
-
-      if (response.error) {
-        if (response.error === 'Item already in wishlist') {
-          return; // Silently ignore if item is already in wishlist
-        }
-        throw new Error(response.error);
-      }
-
-      // If backend succeeds, update local state and storage
+      // 1. Optimistic Update (Immediate state change)
       setItems(prev => {
-        if (!prev.find(item => item.id === product.id)) {
-          const newItems = [...prev, product];
-          AsyncStorage.setItem(`wishlist_items_${userId}`, JSON.stringify(newItems))
-            .catch(error => console.error('Error saving to storage:', error));
-          return newItems;
-        }
-        return prev;
+        const newItems = [...prev, product];
+        AsyncStorage.setItem(`wishlist_items_${userId}`, JSON.stringify(newItems))
+          .catch(error => console.error('Error saving to storage:', error));
+        return newItems;
       });
+
+      // 2. Perform API call in background
+      apiService.post(apiService.ENDPOINTS.WISHLIST, {
+        product_id: product.id
+      }).then(response => {
+        if (response.error && response.error !== 'Item already in wishlist') {
+          throw new Error(response.error);
+        }
+      }).catch(err => {
+        console.error('Error adding to wishlist backend:', err);
+        // Revert on error
+        setItems(prev => {
+          const revertedItems = prev.filter(item => item.id !== product.id);
+          AsyncStorage.setItem(`wishlist_items_${userId}`, JSON.stringify(revertedItems))
+            .catch(error => console.error('Error saving to storage:', error));
+          return revertedItems;
+        });
+        Alert.alert('Error', 'Failed to add item to wishlist. Please try again.');
+      });
+      
     } catch (error: any) {
       console.error('Error adding to wishlist:', error);
       throw error; // Re-throw to handle in the UI
@@ -186,20 +179,33 @@ const WishlistProvider: React.FC<WishlistProviderProps> = ({ children }) => {
         return;
       }
 
-      // Remove from backend first
-      const response = await apiService.delete(apiService.ENDPOINTS.WISHLIST_ITEM(productId));
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
+      const originalItems = [...items];
+      const itemToRemove = items.find(item => item.id === productId);
 
-      // If backend succeeds, update local state and storage
+      if (!itemToRemove) return;
+
+      // 1. Optimistic Update (Immediate state change)
       setItems(prev => {
         const newItems = prev.filter(item => item.id !== productId);
         AsyncStorage.setItem(`wishlist_items_${userId}`, JSON.stringify(newItems))
           .catch(error => console.error('Error saving to storage:', error));
         return newItems;
       });
+
+      // 2. Perform API call in background
+      apiService.delete(apiService.ENDPOINTS.WISHLIST_ITEM(productId)).then(response => {
+        if (response.error) {
+          throw new Error(response.error);
+        }
+      }).catch(err => {
+        console.error('Error removing from wishlist backend:', err);
+        // Revert on error
+        setItems(originalItems);
+        AsyncStorage.setItem(`wishlist_items_${userId}`, JSON.stringify(originalItems))
+          .catch(error => console.error('Error saving to storage:', error));
+        Alert.alert('Error', 'Failed to remove item from wishlist. Please try again.');
+      });
+
     } catch (error) {
       console.error('Error removing from wishlist:', error);
     }

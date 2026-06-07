@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import ProductCard from './ProductCard';
+import { imagePreloader } from '../utils/imagePreloader';
 
 interface Product {
   id: number;
@@ -8,6 +9,7 @@ interface Product {
   description: string;
   price: number;
   category: string;
+  category_name?: string;
   image_url: string;
   image_url2?: string;
   image_url3?: string;
@@ -26,15 +28,26 @@ interface ProductGridProps {
   numColumns?: number;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ products, numColumns = 2 }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ products, numColumns }) => {
+  const { width } = useWindowDimensions();
+  
+  // Calculate dynamic columns based on screen width
+  const cols = numColumns || (width > 768 ? 4 : width > 480 ? 3 : 2);
+  const itemWidth = `${100 / cols}%`;
+
+  // Prefetch all product images as soon as the grid receives its data
+  useEffect(() => {
+    if (products && products.length > 0) {
+      imagePreloader.preloadProductImages(products);
+    }
+  }, [products]);
+
   return (
     <View style={styles.grid}>
       {products.map((product) => (
-        <View 
-          key={product.id} 
-          style={[
-            styles.gridItem
-          ]}
+        <View
+          key={product.id}
+          style={[styles.gridItem, { width: itemWidth as any }]}
         >
           <ProductCard product={product} />
         </View>
@@ -50,9 +63,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   gridItem: {
-    width: '50%',
     padding: 8,
   }
 });
 
-export default ProductGrid; 
+export default ProductGrid;

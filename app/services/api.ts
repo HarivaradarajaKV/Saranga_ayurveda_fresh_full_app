@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { API_BASE_URL, API_CONFIG, getBaseUrl, checkNetworkConnection } from '../config/api';
+import { authEvents } from './authEvents';
 import { ApiService, ApiResponse, ProductData, AuthResponse, GoogleAuthResponse, Category, Address, UserProfile } from '../types/api';
 
 // Gate verbose logs to avoid memory pressure in dev
@@ -74,6 +75,11 @@ export class Api implements ApiService {
     private couponsInFlight: Promise<ApiResponse<any[]>> | null = null;
     private combosCache: { data: any[]; ts: number } | null = null;
     private combosInFlight: Promise<ApiResponse<any[]>> | null = null;
+    // Public data caches (safe to cache longer — data rarely changes mid-session)
+    private categoriesCache: { data: Category[]; ts: number } | null = null;
+    private productsListCache: Map<string, { data: ProductData[]; ts: number }> = new Map();
+    private static readonly CATEGORIES_TTL = 5 * 60 * 1000;  // 5 minutes
+    private static readonly PRODUCTS_TTL = 60 * 1000;        // 60 seconds
 
     constructor() {
         const baseURL = getBaseUrl();
@@ -89,7 +95,6 @@ export class Api implements ApiService {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
             },
             maxContentLength: Infinity,
             maxBodyLength: Infinity
@@ -107,6 +112,13 @@ export class Api implements ApiService {
                     // if (!isConnected) {
                     //     throw new Error('Cannot connect to server. Please check your network connection.');
                     // }
+
+                    // Dynamically set Authorization header if token exists in AsyncStorage
+                    const token = await AsyncStorage.getItem('auth_token');
+                    if (token) {
+                        config.headers = config.headers || {};
+                        config.headers['Authorization'] = `Bearer ${token}`;
+                    }
 
                     // Log request details only when debug flag is enabled
                     if (DEBUG_API) {
@@ -428,6 +440,7 @@ export class Api implements ApiService {
                     }
                 }
 
+                authEvents.notify();
                 return { data: response.data };
             }
 
@@ -475,6 +488,7 @@ export class Api implements ApiService {
             if (response.data?.token) {
                 await AsyncStorage.setItem('auth_token', response.data.token);
                 this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+                authEvents.notify();
             }
 
             return response;
@@ -499,9 +513,13 @@ export class Api implements ApiService {
         try {
             await AsyncStorage.removeItem('auth_token');
             await AsyncStorage.removeItem('user_role');
+            await AsyncStorage.removeItem('user_id');
             await AsyncStorage.removeItem('cart_items');
             await AsyncStorage.removeItem('wishlist_items');
+            await AsyncStorage.removeItem('name');
+            await AsyncStorage.removeItem('user_name');
             this.client.defaults.headers.common['Authorization'] = '';
+            authEvents.notify();
             return { data: null };
         } catch (error) {
             return {
@@ -516,7 +534,15 @@ export class Api implements ApiService {
     }
 
     async getCategories(): Promise<ApiResponse<Category[]>> {
-        return this.get<Category[]>(this.ENDPOINTS.CATEGORIES);
+        const now = Date.now();
+        if (this.categoriesCache && now - this.categoriesCache.ts < Api.CATEGORIES_TTL) {
+            return { data: this.categoriesCache.data };
+        }
+        const result = await this.get<Category[]>(this.ENDPOINTS.CATEGORIES);
+        if (result.data) {
+            this.categoriesCache = { data: result.data, ts: Date.now() };
+        }
+        return result;
     }
 
     async getCategoryDetails<T>(id: number): Promise<ApiResponse<T>> {
@@ -1034,6 +1060,7 @@ export class Api implements ApiService {
             if (response.data?.token) {
                 await AsyncStorage.setItem('auth_token', response.data.token);
                 this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+                authEvents.notify();
             }
 
             return response;
@@ -1066,8 +1093,12 @@ export class Api implements ApiService {
         if (!imageUrl) return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
 
         try {
-            // If it's already a full URL, return it
+            // If it's already a full URL, return it (with on-the-fly Supabase optimization if applicable)
             if (imageUrl.startsWith('http')) {
+                if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                    return imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+                        + '?width=600&height=600&resize=contain&quality=80&format=webp';
+                }
                 return imageUrl;
             }
 
@@ -1517,8 +1548,23 @@ export class Api implements ApiService {
             });
 
             if (response.data?.token) {
-                await AsyncStorage.setItem('auth_token', response.data.token);
-                this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+                const token = response.data.token;
+                await AsyncStorage.setItem('auth_token', token);
+                this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                try {
+                    const tokenData = JSON.parse(atob(token.split('.')[1]));
+                    await AsyncStorage.setItem('user_role', tokenData.role || 'user');
+                    if (tokenData.id) {
+                        await AsyncStorage.setItem('user_id', String(tokenData.id));
+                    }
+                    if (tokenData.name) {
+                        await AsyncStorage.setItem('name', tokenData.name);
+                        await AsyncStorage.setItem('user_name', tokenData.name);
+                    }
+                } catch (decodeErr) {
+                    console.error('Error decoding token in verifySignupOTP:', decodeErr);
+                }
+                authEvents.notify();
             }
             return response;
         } catch (error: any) {

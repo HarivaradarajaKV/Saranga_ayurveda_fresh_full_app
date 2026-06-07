@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -11,9 +11,6 @@ import { springConfig } from '../animations/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-
-const { width } = Dimensions.get('window');
-const TAB_WIDTH = width / 5;
 
 const styles = StyleSheet.create({
   container: {
@@ -43,7 +40,6 @@ const styles = StyleSheet.create({
   },
   indicator: {
     position: 'absolute',
-    width: TAB_WIDTH,
     height: 6,
     backgroundColor: '#2b3a1a',
     top: 56,
@@ -57,6 +53,8 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
   navigation,
 }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const TAB_WIDTH = width / 5;
   
   const indicatorStyle = useAnimatedStyle(() => {
     return {
@@ -80,7 +78,7 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
         height: 60 + Math.max(insets.bottom, 4)
       }
     ]}>
-      <Animated.View style={[styles.indicator, indicatorStyle]} />
+      <Animated.View style={[styles.indicator, { width: TAB_WIDTH }, indicatorStyle]} />
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;

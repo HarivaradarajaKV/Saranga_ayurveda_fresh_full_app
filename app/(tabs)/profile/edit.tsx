@@ -12,6 +12,8 @@ import {
   Alert,
   Animated,
   Dimensions,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -178,6 +180,9 @@ export default function EditProfileScreen() {
         throw new Error(response.error);
       }
 
+      await AsyncStorage.setItem('name', profile.name);
+      await AsyncStorage.setItem('user_name', profile.name);
+
       Alert.alert('Success', 'Profile updated successfully');
       router.back();
     } catch (error) {
@@ -189,18 +194,14 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <Stack.Screen
         options={{
-          title: 'Edit Profile',
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerShadowVisible: false,
+          headerShown: false,
         }}
       />
       <LinearGradient
-        colors={['#f8f9fa', '#ffffff', '#f1f3f4']}
+        colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
         style={styles.backgroundGradient}
       />
       <View style={styles.floatingElements}>
@@ -208,113 +209,110 @@ export default function EditProfileScreen() {
         <View style={styles.floatingCircle2} />
         <View style={styles.floatingCircle3} />
       </View>
-      <ScrollView 
-        style={styles.container}
-        contentContainerStyle={{
-          paddingBottom: 80 + Math.max(insets.bottom, 4) // Tab bar height (60) + extra padding (20) + safe area
-        }}
-      >
-        <Animated.View style={[styles.photoContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: pulseAnim }] }]}>
-          <TouchableOpacity onPress={handlePhotoUpload} style={styles.photoWrapper} activeOpacity={0.8}>
-            <BlurView intensity={20} style={styles.photoBlur}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
-                style={styles.photoGradient}
-              >
-                {profile.photo_url ? (
-                  <Image
-                    source={{ uri: profile.photo_url }}
-                    style={styles.photo}
-                  />
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="person" size={50} color="#694d21" />
-                  </View>
-                )}
-                <View style={styles.editIconContainer}>
-                  <LinearGradient
-                    colors={['#694d21', '#5a3f1a']}
-                    style={styles.editIconGradient}
-                  >
-                    <Ionicons name="camera" size={20} color="#fff" />
-                  </LinearGradient>
-                </View>
-              </LinearGradient>
-            </BlurView>
-          </TouchableOpacity>
-        </Animated.View>
+      
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ width: '100%', maxWidth: 650, alignSelf: 'center', flex: 1 }}>
+          <View style={styles.headerSection}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
+              <Ionicons name="arrow-back" size={24} color="#2b3a1a" />
+            </TouchableOpacity>
+            <Text style={styles.brandTitle}>Edit Profile</Text>
+          </View>
 
-        <Animated.View style={[styles.form, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <BlurView intensity={15} style={styles.formBlur}>
-            <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-              <Text style={styles.label}>Name</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#694d21" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={profile.name}
-                  onChangeText={(text) => setProfile(prev => ({ ...prev, name: text }))}
-                  placeholder="Enter your name"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-              <Text style={styles.label}>Email</Text>
-              <View style={[styles.inputContainer, styles.disabledInputContainer]}>
-                <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, styles.disabledInput]}
-                  value={profile.email}
-                  editable={false}
-                  placeholder="Your email"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-              <Text style={styles.label}>Phone Number</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="call-outline" size={20} color="#694d21" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={profile.phone}
-                  onChangeText={(text) => setProfile(prev => ({ ...prev, phone: text }))}
-                  placeholder="Enter your phone number"
-                  placeholderTextColor="#999"
-                  keyboardType="phone-pad"
-                />
-              </View>
-            </Animated.View>
-
-            <Animated.View style={[styles.saveButtonContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSave}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
+        <ScrollView 
+          style={styles.container}
+          contentContainerStyle={{
+            paddingBottom: 80 + Math.max(insets.bottom, 4) // Tab bar height (60) + extra padding (20) + safe area
+          }}
+        >
+          <Animated.View style={[styles.photoContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: pulseAnim }] }]}>
+            <View style={styles.photoWrapper}>
+              <BlurView intensity={20} style={styles.photoBlur}>
                 <LinearGradient
-                  colors={['#694d21', '#5a3f1a']}
-                  style={styles.saveButtonGradient}
+                  colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
+                  style={styles.photoGradient}
                 >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={20} color="#fff" style={styles.saveButtonIcon} />
-                      <Text style={styles.saveButtonText}>Save Changes</Text>
-                    </>
-                  )}
+                  <View style={styles.photoPlaceholder}>
+                    <Ionicons name="person" size={50} color="#2b3a1a" />
+                  </View>
                 </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </BlurView>
-        </Animated.View>
-      </ScrollView>
-    </>
+              </BlurView>
+            </View>
+          </Animated.View>
+
+          <Animated.View style={[styles.form, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <BlurView intensity={15} style={styles.formBlur}>
+              <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                <Text style={styles.label}>Name</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="person-outline" size={20} color="#2b3a1a" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={profile.name}
+                    onChangeText={(text) => setProfile(prev => ({ ...prev, name: text }))}
+                    placeholder="Enter your name"
+                    placeholderTextColor="#999"
+                  />
+                </View>
+              </Animated.View>
+
+              <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                <Text style={styles.label}>Email</Text>
+                <View style={[styles.inputContainer, styles.disabledInputContainer]}>
+                  <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.input, styles.disabledInput]}
+                    value={profile.email}
+                    editable={false}
+                    placeholder="Your email"
+                    placeholderTextColor="#999"
+                  />
+                </View>
+              </Animated.View>
+
+              <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                <Text style={styles.label}>Phone Number</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="call-outline" size={20} color="#2b3a1a" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={profile.phone}
+                    onChangeText={(text) => setProfile(prev => ({ ...prev, phone: text }))}
+                    placeholder="Enter your phone number"
+                    placeholderTextColor="#999"
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </Animated.View>
+
+              <Animated.View style={[styles.saveButtonContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSave}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#2b3a1a', '#1e2912']}
+                    style={styles.saveButtonGradient}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={20} color="#fff" style={styles.saveButtonIcon} />
+                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
+            </BlurView>
+          </Animated.View>
+        </ScrollView>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -509,7 +507,7 @@ const styles = StyleSheet.create({
   saveButton: {
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#694d21',
+    shadowColor: '#2b3a1a',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -530,5 +528,31 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 10 : (StatusBar.currentHeight ?? 0) + 10,
+    paddingBottom: 6,
+    zIndex: 10,
+    position: 'relative',
+  },
+  headerBackButton: {
+    position: 'absolute',
+    left: 16,
+    bottom: 14,
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(43,58,26,0.08)',
+    zIndex: 20,
+  },
+  brandTitle: {
+    fontSize: 42,
+    color: '#2b3a1a',
+    textAlign: 'center',
+    fontFamily: 'CormorantGaramond-Bold',
+    letterSpacing: 1,
+    marginBottom: 16,
   },
 }); 

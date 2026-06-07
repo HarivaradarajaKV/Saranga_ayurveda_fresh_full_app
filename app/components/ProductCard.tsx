@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -14,6 +15,7 @@ import { useWishlist } from '../WishlistContext';
 import { useCart, CartItem } from '../CartContext';
 import { apiService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authEvents } from '../services/authEvents';
 import { OptimizedImage } from './OptimizedImage';
 
 const { width } = Dimensions.get('window');
@@ -24,6 +26,7 @@ interface Product {
   description: string;
   price: number;
   category: string;
+  category_name?: string;
   image_url: string;
   image_url2?: string;
   image_url3?: string;
@@ -156,10 +159,14 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
         await addToWishlist(product);
       }
     } catch (error: any) {
-      if (error.message === 'User not authenticated' || 
-          error.message === 'Invalid or expired token' ||
-          error.message === 'Token expired') {
+      if (error.message === 'User not authenticated' ||
+        error.message === 'Invalid or expired token' ||
+        error.message === 'Token expired') {
         await AsyncStorage.removeItem('auth_token');
+        await AsyncStorage.removeItem('user_role');
+        await AsyncStorage.removeItem('name');
+        await AsyncStorage.removeItem('user_name');
+        authEvents.notify();
         setIsAuthenticated(false);
         handleAuthRequired();
       } else if (error.message === 'Item already in wishlist') {
@@ -240,6 +247,7 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
       name: product.name,
       description: product.description,
       category: product.category,
+      category_name: product.category_name,
       image_url: product.image_url,
       stock_quantity: product.stock_quantity,
       offer_percentage: product.offer_percentage || 0,
@@ -252,7 +260,7 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
 
     router.push({
       pathname: "/(product)/[id]",
-      params: { 
+      params: {
         id: product.id.toString(),
         productData: JSON.stringify(serializableProduct)
       }
@@ -276,10 +284,11 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
         }
       ]}
     >
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={handlePress}
-        activeOpacity={0.9}
-        style={styles.cardTouchable}
+        activeOpacity={product.stock_quantity === 0 ? 1 : 0.9}
+        disabled={product.stock_quantity === 0}
+        style={[styles.cardTouchable, product.stock_quantity === 0 && { opacity: 0.6 }]}
       >
         <View style={styles.imageContainer}>
           <OptimizedImage
@@ -306,7 +315,7 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
                 { transform: [{ scale: wishlistScaleAnim }] }
               ]}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleWishlistPress}
                 activeOpacity={0.6}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -314,15 +323,15 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
                 style={styles.wishlistTouchable}
               >
                 {showTrash ? (
-                  <Ionicons 
-                    name="trash" 
-                    size={16} 
+                  <Ionicons
+                    name="trash"
+                    size={16}
                     color="#e74c3c"
                   />
                 ) : (
-                  <Ionicons 
-                    name={inWishlist ? "heart" : "heart-outline"} 
-                    size={18} 
+                  <Ionicons
+                    name={inWishlist ? "heart" : "heart-outline"}
+                    size={18}
                     color="#2b3a1a"
                   />
                 )}
@@ -331,16 +340,15 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
           )}
         </View>
         <View style={styles.content}>
-          <Text style={styles.category} numberOfLines={1}>{product.category}</Text>
+          <Text style={styles.category} numberOfLines={1}>{product.category_name || product.category}</Text>
           <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
-          {product.stock_quantity > 0 && product.stock_quantity < 10 && (
+          {((product.stock_quantity > 0 && product.stock_quantity < 10) || product.stock_quantity === 0) && (
             <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
               <Ionicons name="flame" size={10} color="#e74c3c" style={{ marginRight: 2 }} />
-              <Text style={[styles.sellingFastText, { marginBottom: 0 }]}>Selling fast</Text>
+              <Text style={[styles.sellingFastText, { marginBottom: 0 }]}>
+                {product.stock_quantity === 0 ? 'Sold out' : 'Selling fast'}
+              </Text>
             </Animated.View>
-          )}
-          {product.stock_quantity === 0 && (
-            <Text style={styles.outOfStockText}>Out of Stock</Text>
           )}
           <View style={styles.priceContainer}>
             <View style={styles.priceWrapper}>
@@ -359,7 +367,7 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
                   { transform: [{ scale: cartScaleAnim }] }
                 ]}
               >
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={handleAddToCart}
                   activeOpacity={0.6}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -386,7 +394,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    height: 235,
+    height: 255,
     position: 'relative',
     overflow: 'hidden',
     marginHorizontal: 6,
@@ -422,20 +430,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   category: {
-    fontFamily: 'CormorantGaramond-Medium',
-    fontSize: 9,
-    fontWeight: 'normal',
-    color: '#7f8c8d',
-    marginBottom: 1,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#8e8e8e',
+    marginBottom: 4,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   name: {
-    fontFamily: 'CormorantGaramond-Medium',
-    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 13,
     fontWeight: 'bold',
-    marginBottom: 1,
-    color: '#1a1a1a',
-    lineHeight: 14,
+    marginBottom: 4,
+    color: '#333333',
+    lineHeight: 18,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -444,19 +453,21 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   priceWrapper: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
   },
   price: {
-    fontFamily: 'CormorantGaramond-Medium',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
     fontSize: 15,
-    fontWeight: '700',
-    color: '#2c3e50',
+    fontWeight: 'bold',
+    color: '#333333',
   },
   originalPrice: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#95a5a6',
     textDecorationLine: 'line-through',
-    marginTop: 0,
+    marginLeft: 6,
   },
   offerBadge: {
     position: 'absolute',
@@ -582,4 +593,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 2,
   },
-}); 
+});

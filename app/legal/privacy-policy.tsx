@@ -1,92 +1,53 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PrivacyPolicyScreen() {
   return (
-    <>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Stack.Screen
         options={{
-          title: 'Privacy Policy',
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <ScrollView style={styles.container}>
         <View style={styles.content}>
-          <Text style={styles.title}>Privacy Policy</Text>
-          <Text style={styles.lastUpdated}>Last updated: February 24, 2024</Text>
+          <Text style={styles.title}>PRIVACY POLICY</Text>
           
-          <Text style={styles.section}>1. Information We Collect</Text>
           <Text style={styles.text}>
-            We collect information that you provide directly to us, including when you create an account,
-            make a purchase, or contact us for support.
-          </Text>
-
-          <Text style={styles.section}>2. How We Use Your Information</Text>
-          <Text style={styles.text}>
-            We use the information we collect to provide, maintain, and improve our services,
-            to process your transactions, and to communicate with you.
-          </Text>
-
-          <Text style={styles.section}>3. Information Sharing</Text>
-          <Text style={styles.text}>
-            We do not sell your personal information. We may share your information with
-            third-party service providers who assist us in operating our business.
-          </Text>
-
-          <Text style={styles.section}>4. Data Security</Text>
-          <Text style={styles.text}>
-            We implement appropriate technical and organizational measures to protect
-            your personal information against unauthorized access or disclosure.
-          </Text>
-
-          <Text style={styles.section}>5. Your Rights</Text>
-          <Text style={styles.text}>
-            You have the right to access, correct, or delete your personal information.
-            You can also opt out of marketing communications at any time.
-          </Text>
-
-          <Text style={styles.section}>6. Contact Us</Text>
-          <Text style={styles.text}>
-            If you have any questions about this Privacy Policy, please contact us at:
-            privacy@yourcompany.com
+            Saranga Ayurveda LLP respects customer privacy and is committed to protecting personal information. We may collect information including name, contact details, billing and shipping addresses, payment information, device information, IP address, and order history. The information collected may be used for order processing, manufacturing, delivery, customer support, fraud prevention, marketing communications, analytics, business operations, and legal compliance. By providing your contact information, you consent to receive communications from Saranga Ayurveda LLP through phone calls, SMS, WhatsApp, email, or other lawful communication channels. We may share information with payment processors, logistics partners, technology providers, marketing service providers, legal advisors, government authorities, or other parties where necessary for legitimate business purposes or legal compliance. While reasonable security measures are implemented, no method of data transmission or storage can be guaranteed to be completely secure. The Company shall not be liable for unauthorized access, data breaches, or losses occurring beyond its reasonable control. Saranga Ayurveda LLP reserves the right to modify this Privacy Policy at any time. Continued use of our services constitutes acceptance of the revised policy.
           </Text>
         </View>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fbf7f4',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fbf7f4',
   },
   content: {
     padding: 20,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#000',
-  },
-  lastUpdated: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 24,
-  },
-  section: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 12,
-    color: '#000',
+    fontFamily: 'CormorantGaramond-Bold',
+    marginBottom: 20,
+    color: '#2b3a1a',
+    textAlign: 'center',
   },
   text: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 13,
+    lineHeight: 18,
     color: '#333',
     marginBottom: 16,
+    fontFamily: 'CormorantGaramond-Medium',
   },
-}); 
+});

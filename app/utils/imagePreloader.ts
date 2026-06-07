@@ -1,92 +1,93 @@
 /**
- * Image preloader utility for improving perceived performance
- * Preloads images that are likely to be viewed next
+ * Image preloader utility — uses expo-image prefetch so preloaded images
+ * share the same disk cache used by OptimizedImage.
+ * Preloading stores them on disk: subsequent renders are instant.
  */
 
-import { Image } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 
 class ImagePreloader {
-  private preloadedImages: Set<string> = new Set();
-  private preloadingQueue: string[] = [];
+  private preloadedUris: Set<string> = new Set();
+  private inFlight: Map<string, Promise<void>> = new Map();
 
   /**
-   * Preload a single image using React Native's Image.prefetch
+   * Prefetch a single image into expo-image's disk cache.
    */
   preloadImage(uri: string): Promise<void> {
-    if (this.preloadedImages.has(uri)) {
-      return Promise.resolve();
-    }
+    if (!uri || !uri.startsWith('http')) return Promise.resolve();
+    if (this.preloadedUris.has(uri)) return Promise.resolve();
 
-    return Image.prefetch(uri)
+    // Deduplicate in-flight requests
+    if (this.inFlight.has(uri)) return this.inFlight.get(uri)!;
+
+    const promise = ExpoImage.prefetch(uri, 'memory-disk')
       .then(() => {
-        this.preloadedImages.add(uri);
+        this.preloadedUris.add(uri);
       })
       .catch(() => {
-        // Silently fail for preloading - it's just an optimization
+        // Silently fail — prefetch is best-effort
+      })
+      .finally(() => {
+        this.inFlight.delete(uri);
       });
+
+    this.inFlight.set(uri, promise);
+    return promise;
   }
 
   /**
-   * Preload multiple images
+   * Prefetch multiple images in parallel batches.
+   * Uses a larger batch size now that expo-image handles queuing natively.
    */
   async preloadImages(uris: string[]): Promise<void> {
-    const uniqueUris = uris.filter(uri => !this.preloadedImages.has(uri));
-    if (uniqueUris.length === 0) return;
+    const unique = uris.filter(
+      uri => uri && uri.startsWith('http') && !this.preloadedUris.has(uri)
+    );
+    if (unique.length === 0) return;
 
-    // Preload up to 3 images at a time to avoid overwhelming the network
-    const batchSize = 3;
-    for (let i = 0; i < uniqueUris.length; i += batchSize) {
-      const batch = uniqueUris.slice(i, i + batchSize);
-      await Promise.allSettled(
-        batch.map(uri => this.preloadImage(uri).catch(() => {
-          // Silently fail for preloading - it's just an optimization
-        }))
-      );
+    // Prefetch in batches of 6 — expo-image queues internally so this is safe
+    const batchSize = 6;
+    for (let i = 0; i < unique.length; i += batchSize) {
+      const batch = unique.slice(i, i + batchSize);
+      await Promise.allSettled(batch.map(uri => this.preloadImage(uri)));
     }
   }
 
   /**
-   * Preload images for a carousel (current, next, previous)
+   * Preload images for a carousel — current, next, and previous.
    */
   preloadCarouselImages(imageUrls: string[], currentIndex: number): void {
-    const urisToPreload: string[] = [];
-    
-    // Preload current image (if not already loaded)
-    if (imageUrls[currentIndex]) {
-      urisToPreload.push(imageUrls[currentIndex]);
-    }
-    
-    // Preload next image
-    if (currentIndex + 1 < imageUrls.length) {
-      urisToPreload.push(imageUrls[currentIndex + 1]);
-    }
-    
-    // Preload previous image
-    if (currentIndex - 1 >= 0) {
-      urisToPreload.push(imageUrls[currentIndex - 1]);
-    }
+    const toPreload: string[] = [];
 
-    // Preload in background without blocking
-    this.preloadImages(urisToPreload).catch(() => {
-      // Silently fail
+    // Current + adjacent images
+    [-1, 0, 1, 2].forEach(offset => {
+      const idx = currentIndex + offset;
+      if (idx >= 0 && idx < imageUrls.length && imageUrls[idx]) {
+        toPreload.push(imageUrls[idx]);
+      }
     });
+
+    this.preloadImages(toPreload).catch(() => { /* best-effort */ });
   }
 
   /**
-   * Check if an image is already preloaded
+   * Preload the first image of every product in a list (for product grids).
    */
+  preloadProductImages(products: Array<{ image_url?: string }>): void {
+    const uris = products
+      .map(p => p.image_url)
+      .filter(Boolean) as string[];
+    this.preloadImages(uris).catch(() => { /* best-effort */ });
+  }
+
   isPreloaded(uri: string): boolean {
-    return this.preloadedImages.has(uri);
+    return this.preloadedUris.has(uri);
   }
 
-  /**
-   * Clear preloaded images cache (useful for memory management)
-   */
   clearCache(): void {
-    this.preloadedImages.clear();
+    this.preloadedUris.clear();
   }
 }
 
-// Export singleton instance
+// Singleton instance
 export const imagePreloader = new ImagePreloader();
-
