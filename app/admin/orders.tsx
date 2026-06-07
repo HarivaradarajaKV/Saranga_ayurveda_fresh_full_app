@@ -922,74 +922,78 @@ const AdminOrdersInner = () => {
               {/* Shiprocket Management Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>📦 Shipment Management</Text>
-
-                {!hasShiprocketData(selectedOrderForDetails) ? (
-                  // Not created yet
-                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
-                    <Text style={{ color: '#666', marginBottom: 12 }}>No shipment created yet</Text>
-                    <TouchableOpacity
-                      style={{ backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
-                      onPress={() => handleCreateShipment(selectedOrderForDetails.id)}
-                      disabled={shiprocketLoading}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                        {shiprocketLoading && shiprocketAction === 'create' ? '⏳ Creating...' : '📦 Create Shiprocket Shipment'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : !hasAWB(selectedOrderForDetails) ? (
-                  // Created but no AWB
-                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
-                    <Text style={{ color: '#28a745', fontWeight: '600', marginBottom: 8 }}>✓ Shipment Created</Text>
-                    <Text style={{ color: '#666', fontSize: 12, marginBottom: 12 }}>
-                      Shipment ID: {(selectedOrderForDetails as any).shiprocket_shipment_id}
+                <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', gap: 12 }}>
+                  {/* Step 1: Create Shipment */}
+                  <TouchableOpacity
+                    style={{ 
+                      backgroundColor: hasShiprocketData(selectedOrderForDetails) ? '#ccc' : '#694d21', 
+                      padding: 12, 
+                      borderRadius: 8, 
+                      alignItems: 'center' 
+                    }}
+                    onPress={() => handleCreateShipment(selectedOrderForDetails.id)}
+                    disabled={hasShiprocketData(selectedOrderForDetails) || shiprocketLoading}
+                  >
+                    <Text style={{ color: hasShiprocketData(selectedOrderForDetails) ? '#666' : '#fff', fontWeight: '600', fontSize: 14 }}>
+                      {hasShiprocketData(selectedOrderForDetails) ? '✓ Shipment Created' : (shiprocketLoading && shiprocketAction === 'create' ? '⏳ Creating...' : '📦 Create Shiprocket Shipment')}
                     </Text>
+                  </TouchableOpacity>
+
+                  {/* Step 2: Assign Courier & Get AWB */}
+                  {hasShiprocketData(selectedOrderForDetails) && (
                     <TouchableOpacity
-                      style={{ backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                      style={{ 
+                        backgroundColor: hasAWB(selectedOrderForDetails) ? '#ccc' : '#694d21', 
+                        padding: 12, 
+                        borderRadius: 8, 
+                        alignItems: 'center',
+                        marginTop: 8
+                      }}
                       onPress={() => handleAssignCourier(selectedOrderForDetails.id)}
-                      disabled={shiprocketLoading}
+                      disabled={hasAWB(selectedOrderForDetails) || shiprocketLoading}
                     >
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                        {shiprocketLoading && shiprocketAction === 'assign' ? '⏳ Assigning...' : '🚚 Assign Courier & Get AWB'}
+                      <Text style={{ color: hasAWB(selectedOrderForDetails) ? '#666' : '#fff', fontWeight: '600', fontSize: 14 }}>
+                        {hasAWB(selectedOrderForDetails) ? '✓ Courier Assigned & AWB Generated' : (shiprocketLoading && shiprocketAction === 'assign' ? '⏳ Assigning...' : '🚚 Assign Courier & Get AWB')}
                       </Text>
                     </TouchableOpacity>
-                  </View>
-                ) : (
-                  // AWB generated - ready to ship
-                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
-                    <Text style={{ color: '#28a745', fontWeight: '600', marginBottom: 8 }}>✓ Ready to Ship</Text>
-                    <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 6, marginVertical: 8 }}>
-                      <Text style={{ color: '#666', fontSize: 12 }}>AWB Number:</Text>
-                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>
-                        {(selectedOrderForDetails as any).awb_number}
-                      </Text>
-                    </View>
-                    <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
-                      Courier: {(selectedOrderForDetails as any).courier_name || 'Assigned'}
-                    </Text>
+                  )}
 
-                    <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
-                      <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
-                        onPress={() => handleDownloadLabel(selectedOrderForDetails.id)}
-                        disabled={shiprocketLoading}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                          {shiprocketLoading && shiprocketAction === 'label' ? '⏳' : '🏷️ Label'}
+                  {/* Step 3: Courier details & Action buttons (Label, Pickup) */}
+                  {hasAWB(selectedOrderForDetails) && (
+                    <View style={{ marginTop: 12 }}>
+                      <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 6, marginVertical: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
+                        <Text style={{ color: '#666', fontSize: 12 }}>AWB Number:</Text>
+                        <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>
+                          {(selectedOrderForDetails as any).awb_number}
                         </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
-                        onPress={() => handleSchedulePickup(selectedOrderForDetails.id)}
-                        disabled={shiprocketLoading}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                          {shiprocketLoading && shiprocketAction === 'pickup' ? '⏳' : '📍 Pickup'}
+                        <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
+                          Courier: {(selectedOrderForDetails as any).courier_name || 'Assigned'}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                          onPress={() => handleDownloadLabel(selectedOrderForDetails.id)}
+                          disabled={shiprocketLoading}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                            {shiprocketLoading && shiprocketAction === 'label' ? '⏳' : '🏷️ Label'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                          onPress={() => handleSchedulePickup(selectedOrderForDetails.id)}
+                          disabled={shiprocketLoading}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                            {shiprocketLoading && shiprocketAction === 'pickup' ? '⏳' : '📍 Pickup'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                )}
+                  )}
+                </View>
               </View>
 
               <View style={styles.section}>
