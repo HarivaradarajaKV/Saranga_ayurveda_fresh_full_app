@@ -15,6 +15,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { Asset } from 'expo-asset';
+import { apiService } from './services/api';
 
 const HERO_IMG = require('../assets/images/internships_hero.png');
 
@@ -125,7 +126,7 @@ export default function InternshipsScreen() {
   };
 
   // Submit Application
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!fullName.trim()) {
       Alert.alert('Validation Error', 'Please enter your full name.');
       return;
@@ -172,15 +173,49 @@ export default function InternshipsScreen() {
     }
 
     setIsSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append('positionType', 'Internship');
+      formData.append('fullName', fullName);
+      formData.append('email', email);
+      formData.append('phoneCode', phonePrefix);
+      formData.append('phoneNumber', phoneNumber);
+      formData.append('college', college);
+      formData.append('degree', degree);
+      formData.append('fieldInterest', fieldOfInterest);
+      formData.append('semester', semester);
+      formData.append('about', aboutText.trim());
+
+      formData.append('resume', {
+        uri: resume.uri,
+        name: resume.name,
+        type: resume.mimeType || 'application/octet-stream'
+      } as any);
+
+      if (coverLetterFile) {
+        formData.append('cover', {
+          uri: coverLetterFile.uri,
+          name: coverLetterFile.name,
+          type: coverLetterFile.mimeType || 'application/octet-stream'
+        } as any);
+      }
+
+      const response = await apiService.submitCareer(formData);
+
+      if (response.error) {
+        Alert.alert('Submission Failed', response.error);
+      } else {
+        Alert.alert(
+          'Application Submitted',
+          'Thank you for contacting, we will get back to you soon.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to submit application.');
+    } finally {
       setIsSubmitting(false);
-      Alert.alert(
-        'Application Submitted',
-        'Thank you for contacting, we will get back to you soon.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    }, 1500);
+    }
   };
 
   return (

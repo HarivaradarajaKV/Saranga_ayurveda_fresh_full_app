@@ -817,6 +817,20 @@ export class Api implements ApiService {
         return response;
     }
 
+    async submitCareer(formData: FormData): Promise<ApiResponse<any>> {
+        try {
+            const response = await this.client.post('/submissions/career', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                transformRequest: (data) => data,
+            });
+            return { data: response.data };
+        } catch (error: any) {
+            return { data: null, error: error.message };
+        }
+    }
+
     // Add method to handle incoming WebSocket updates
     private handleWebSocketUpdate = (data: any) => {
         switch (data.type) {

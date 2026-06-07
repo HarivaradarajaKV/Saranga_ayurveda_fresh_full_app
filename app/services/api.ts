@@ -722,6 +722,24 @@ export class Api implements ApiService {
         }
     }
 
+    async submitCareer(formData: FormData): Promise<ApiResponse<any>> {
+        try {
+            const response = await this.client.post('/submissions/career', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                transformRequest: (data) => data,
+            });
+            return { data: response.data };
+        } catch (error: any) {
+            console.error('submitCareer error:', error);
+            return {
+                data: null,
+                error: error.response?.data?.error || error.message || 'Failed to submit application'
+            };
+        }
+    }
+
     async getAdminCategories(): Promise<ApiResponse<Category[]>> {
         return this.get<Category[]>(this.ENDPOINTS.ADMIN_CATEGORIES);
     }

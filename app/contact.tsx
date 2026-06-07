@@ -15,6 +15,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Asset } from 'expo-asset';
+import { apiService } from './services/api';
 
 const HERO_IMG = require('../assets/images/contact_hero.png');
 
@@ -51,7 +52,7 @@ export default function ContactScreen() {
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
   // Submit Handler
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!fullName.trim()) {
       Alert.alert('Validation Error', 'Please enter your full name.');
       return;
@@ -70,15 +71,30 @@ export default function ContactScreen() {
     }
 
     setIsSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await apiService.post('/submissions/contact', {
+        fullName,
+        email,
+        phoneCode: phonePrefix,
+        phoneNumber,
+        subject,
+        message
+      });
+
+      if (response.error) {
+        Alert.alert('Error', response.error);
+      } else {
+        Alert.alert(
+          'Message Sent',
+          'Thank you for contacting, we will get back to you soon.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to submit contact form');
+    } finally {
       setIsSubmitting(false);
-      Alert.alert(
-        'Message Sent',
-        'Thank you for contacting, we will get back to you soon.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    }, 1500);
+    }
   };
 
   return (

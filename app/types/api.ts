@@ -95,6 +95,7 @@ export interface ApiService {
     getUserProfile: () => Promise<ApiResponse<UserProfile>>;
     updateUserProfile: (data: Partial<UserProfile>) => Promise<ApiResponse<UserProfile>>;
     uploadProfilePhoto: (formData: FormData) => Promise<ApiResponse<{ photo_url: string }>>;
+    submitCareer: (formData: FormData) => Promise<ApiResponse<any>>;
     getAdminCategories: () => Promise<ApiResponse<Category[]>>;
     addCategory: (data: FormData | { name: string; description: string }) => Promise<ApiResponse<Category>>;
     updateCategory: (id: number, data: FormData | Partial<Category>) => Promise<ApiResponse<Category>>;
