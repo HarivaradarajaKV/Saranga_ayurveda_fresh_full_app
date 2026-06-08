@@ -23,6 +23,7 @@ import type { CartItem } from '../CartContext';
 import { useBottomTabBarHeight } from './_layout';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import ProductCard from '../components/ProductCard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +49,7 @@ interface Product {
 import { useAddress } from '../AddressContext';
 
 export default function CartPage() {
+  const insets = useSafeAreaInsets();
   const {
     items,
     removeItem,
@@ -286,7 +288,7 @@ export default function CartPage() {
 
       <SafeAreaView style={styles.safeArea}>
         <View style={{ width: '100%', maxWidth: 700, alignSelf: 'center', flex: 1 }}>
-          <View style={styles.headerSection}>
+          <View style={[styles.headerSection, { paddingTop: insets.top > 0 ? insets.top + 10 : (Platform.OS === 'ios' ? 10 : (StatusBar.currentHeight ?? 0) + 10) }]}>
             <View style={styles.headerTextContainer}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                 <Text style={styles.brandTitle}>My Cart</Text>
@@ -296,7 +298,7 @@ export default function CartPage() {
             </View>
             <Image
               source={require('../assets/images/leaf_decoration.png')}
-              style={styles.leafDecoration}
+              style={[styles.leafDecoration, { top: insets.top > 0 ? insets.top - 20 : (Platform.OS === 'ios' ? -10 : (StatusBar.currentHeight ?? 0) - 20) }]}
               resizeMode="contain"
             />
           </View>
@@ -435,7 +437,7 @@ export default function CartPage() {
                             
                             <View style={styles.itemDetailsCol}>
                               <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                              <Text style={styles.productSize}>{item.size || item.variant || 'Standard'}</Text>
+                              <Text style={styles.productSize} numberOfLines={1}>{item.size || item.variant || 'Standard'}</Text>
                               <Text style={styles.productPriceGreen} numberOfLines={1}>₹{finalPrice.toFixed(2)}</Text>
                             </View>
                             

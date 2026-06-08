@@ -3338,7 +3338,7 @@ const Page = () => {
 
   const renderMenu = () => (
     <View style={styles.menuContainer}>
-      <View style={styles.menuHeader}>
+      <View style={[styles.menuHeader, { paddingTop: insets.top > 0 ? insets.top + 10 : (Platform.OS === 'ios' ? 44 : 18) }]}>
         <Text style={styles.menuTitle}>Saranga Ayurveda</Text>
         <TouchableOpacity onPress={handleDrawerClose}>
           <Ionicons name="close" size={24} color="#333333" />
