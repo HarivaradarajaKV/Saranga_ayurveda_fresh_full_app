@@ -662,6 +662,10 @@ export class Api implements ApiService {
         return this.put<UserProfile>(this.ENDPOINTS.USER_PROFILE, data);
     }
 
+    async deleteAccount(): Promise<ApiResponse<void>> {
+        return this.delete<void>(this.ENDPOINTS.USER_PROFILE);
+    }
+
     async uploadProfilePhoto(formData: FormData): Promise<ApiResponse<{ photo_url: string }>> {
         try {
             console.log('Uploading profile photo to:', this.ENDPOINTS.USER_PROFILE_PHOTO);
@@ -1095,6 +1099,34 @@ export class Api implements ApiService {
             return {
                 data: null,
                 error: 'An unexpected error occurred during Google Sign-In'
+            };
+        }
+    }
+
+    async appleSignIn(identityToken: string, email?: string, name?: string): Promise<ApiResponse<AuthResponse>> {
+        try {
+            const response = await this.post<AuthResponse>('/auth/apple', { identityToken, email, name });
+
+            if (response.data?.token) {
+                await AsyncStorage.setItem('auth_token', response.data.token);
+                this.client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+                authEvents.notify();
+            }
+
+            return response;
+        } catch (error) {
+            console.error('Apple Sign-In error:', error);
+
+            if (axios.isAxiosError(error)) {
+                return {
+                    data: null,
+                    error: error.response?.data?.error || 'Apple Sign-In failed. Please try again.'
+                };
+            }
+
+            return {
+                data: null,
+                error: 'An unexpected error occurred during Apple Sign-In'
             };
         }
     }

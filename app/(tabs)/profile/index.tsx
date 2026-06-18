@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api';
+import { authEvents } from '../../services/authEvents';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GenderAvatar } from '../../components/GenderAvatar';
@@ -239,6 +240,42 @@ export default function ProfilePage() {
     );
   };
 
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account? This action cannot be undone, and all your orders, wishlist, address, and profile data will be lost.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Permanently',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const response = await apiService.deleteAccount();
+              if (response.error) {
+                throw new Error(response.error);
+              }
+              await AsyncStorage.removeItem('auth_token');
+              await AsyncStorage.removeItem('user_role');
+              await AsyncStorage.removeItem('user_id');
+              await AsyncStorage.removeItem('name');
+              await AsyncStorage.removeItem('user_name');
+              authEvents.notify();
+              setIsLoggedIn(false);
+              Alert.alert('Success', 'Your account has been deleted successfully.');
+              router.replace('/auth/login');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete account. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleEditProfile = () => {
     router.push('/profile/edit');
   };
@@ -299,6 +336,13 @@ export default function ProfilePage() {
       subtitle: 'Contact our customer support team',
       icon: 'chatbubble-ellipses-outline',
       action: () => setShowSupportModal(true),
+    },
+    {
+      id: 'delete_account',
+      title: 'Delete Account',
+      subtitle: 'Permanently delete your account',
+      icon: 'trash-outline',
+      action: handleDeleteAccount,
     },
     {
       id: 'logout',
@@ -413,12 +457,8 @@ export default function ProfilePage() {
               <View style={[styles.profileCard, { padding: isTablet ? 24 : 20 }]}>
                 
                 {/* Profile Row */}
-                <TouchableOpacity 
-                  style={styles.profileRow} 
-                  onPress={handleEditProfile}
-                  activeOpacity={0.7}
-                >
-                  <TouchableOpacity onPress={handleAvatarPress}>
+                <View style={styles.profileRow}>
+                  <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.8}>
                     {userProfile?.photo_url ? (
                       <View style={styles.avatarContainer}>
                         <Image
@@ -443,13 +483,19 @@ export default function ProfilePage() {
                     )}
                   </TouchableOpacity>
                   
-                  <View style={styles.profileInfo}>
-                    <Text style={[styles.profileName, { fontSize: isTablet ? 21 : 19 }]}>{userProfile?.name}</Text>
-                    <Text style={[styles.profileEmail, { fontSize: isTablet ? 14 : 13 }]}>{userProfile?.email}</Text>
-                  </View>
-                  
-                  <Ionicons name="chevron-forward" size={20} color="#888" />
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.profileInfoContainer}
+                    onPress={handleEditProfile}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.profileInfo}>
+                      <Text style={[styles.profileName, { fontSize: isTablet ? 21 : 19 }]}>{userProfile?.name}</Text>
+                      <Text style={[styles.profileEmail, { fontSize: isTablet ? 14 : 13 }]}>{userProfile?.email}</Text>
+                    </View>
+                    
+                    <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 8 }} />
+                  </TouchableOpacity>
+                </View>
 
                 {/* Stats Inner Card Box */}
                 <View style={styles.statsInnerContainer}>
@@ -548,12 +594,21 @@ export default function ProfilePage() {
                         <View style={[styles.menuItemIconContainer, { 
                           width: isTablet ? 40 : 36, 
                           height: isTablet ? 40 : 36,
-                          borderRadius: isTablet ? 20 : 18 
+                          borderRadius: isTablet ? 20 : 18,
+                          backgroundColor: item.id === 'delete_account' ? '#fdeced' : '#f3f6f1'
                         }]}>
-                          <Ionicons name={item.icon} size={isTablet ? 22 : 20} color="#2b3a1a" />
+                          <Ionicons 
+                            name={item.icon} 
+                            size={isTablet ? 22 : 20} 
+                            color={item.id === 'delete_account' ? '#d9534f' : '#2b3a1a'} 
+                          />
                         </View>
                         <View style={styles.menuItemTextContainer}>
-                          <Text style={[styles.menuItemTitle, { fontSize: isTablet ? 16 : 15 }]}>{item.title}</Text>
+                          <Text style={[
+                            styles.menuItemTitle, 
+                            { fontSize: isTablet ? 16 : 15 },
+                            item.id === 'delete_account' && { color: '#d9534f' }
+                          ]}>{item.title}</Text>
                           <Text style={[styles.menuItemSubtitle, { fontSize: isTablet ? 13 : 12 }]} numberOfLines={1}>{item.subtitle}</Text>
                         </View>
                       </View>
@@ -826,6 +881,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  profileInfoContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   profileInfo: {
     flex: 1,

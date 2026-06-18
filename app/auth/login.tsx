@@ -22,6 +22,7 @@ import { authEvents } from '../services/authEvents';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -106,6 +107,55 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     }
   };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (credential.identityToken) {
+        let fullNameStr = undefined;
+        if (credential.fullName) {
+          const { givenName, familyName } = credential.fullName;
+          fullNameStr = [givenName, familyName].filter(Boolean).join(' ').trim() || undefined;
+        }
+
+        const response = await apiService.appleSignIn(
+          credential.identityToken,
+          credential.email || undefined,
+          fullNameStr
+        );
+
+        if (response.error) {
+          setError(response.error);
+          return;
+        }
+
+        if (response.data?.token) {
+          await processAuthToken(response.data.token);
+        } else {
+          setError('Apple Sign-In failed. Please try again.');
+        }
+      } else {
+        setError('Apple Sign-In failed: No identity token returned.');
+      }
+    } catch (err: any) {
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
+        console.error('Apple Sign-In error:', err);
+        setError('Apple Sign-In failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -403,6 +453,16 @@ export default function LoginScreen() {
                 <Text style={styles.googleButtonText}>Sign In with Google</Text>
               </TouchableOpacity>
 
+              {/* Apple Sign In Button (iOS only) */}
+              {Platform.OS === 'ios' && (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  style={styles.appleButton}
+                  onPress={handleAppleSignIn}
+                />
+              )}
+
               {/* Footer Link */}
               <View style={styles.signupPrompt}>
                 <Text style={styles.signupText}>New to Saranga Ayurveda? </Text>
@@ -592,6 +652,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
+    marginBottom: 8,
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
+    borderRadius: 6,
     marginBottom: 8,
   },
   googleButtonText: {

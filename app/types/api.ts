@@ -105,6 +105,7 @@ export interface ApiService {
     updateProduct: (id: number, formData: FormData) => Promise<ApiResponse<ProductData>>;
     deleteProduct: (id: number) => Promise<ApiResponse<void>>;
     googleSignIn: (idToken: string) => Promise<ApiResponse<GoogleAuthResponse>>;
+    appleSignIn: (identityToken: string, email?: string, name?: string) => Promise<ApiResponse<AuthResponse>>;
     getNotifications: () => Promise<ApiResponse<any>>;
     markNotificationAsRead: (id: number) => Promise<ApiResponse<void>>;
     getFullImageUrl: (imageUrl: string | undefined) => string;
@@ -122,4 +123,5 @@ export interface ApiService {
     createOrder: (orderData: any) => Promise<any>;
     requestSignupOTP: (email: string) => Promise<ApiResponse<{ message: string }>>;
     verifySignupOTP: (email: string, otp: string, name: string, password: string) => Promise<ApiResponse<AuthResponse>>;
+    deleteAccount: () => Promise<ApiResponse<void>>;
 } 

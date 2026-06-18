@@ -977,6 +977,14 @@ export class Api implements ApiService {
     async googleSignIn(idToken: string): Promise<ApiResponse<GoogleAuthResponse>> {
         return this.post('/auth/google', { idToken });
     }
+
+    async appleSignIn(identityToken: string, email?: string, name?: string): Promise<ApiResponse<AuthResponse>> {
+        return this.post('/auth/apple', { identityToken, email, name });
+    }
+
+    async deleteAccount(): Promise<ApiResponse<void>> {
+        return this.delete<void>(this.ENDPOINTS.USER_PROFILE);
+    }
 }
 
 // Export both the base URL and endpoints

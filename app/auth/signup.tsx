@@ -21,6 +21,7 @@ import { authEvents } from '../services/authEvents';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -136,6 +137,52 @@ export default function SignUpPage() {
     } catch (err) {
       console.error('Token processing error:', err);
       router.replace('/(tabs)');
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setLoading(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (credential.identityToken) {
+        let fullNameStr = undefined;
+        if (credential.fullName) {
+          const { givenName, familyName } = credential.fullName;
+          fullNameStr = [givenName, familyName].filter(Boolean).join(' ').trim() || undefined;
+        }
+
+        const response = await apiService.appleSignIn(
+          credential.identityToken,
+          credential.email || undefined,
+          fullNameStr
+        );
+
+        if (response.error) {
+          Alert.alert('Error', response.error);
+          return;
+        }
+
+        if (response.data?.token) {
+          await processAuthToken(response.data.token);
+        } else {
+          Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
+        }
+      } else {
+        Alert.alert('Error', 'Apple Sign-In failed: No identity token returned.');
+      }
+    } catch (err: any) {
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
+        console.error('Apple Sign-In error:', err);
+        Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -498,6 +545,16 @@ export default function SignUpPage() {
                     <Ionicons name="logo-google" size={18} color="#fff" style={{ marginRight: 8 }} />
                     <Text style={styles.googleButtonText}>Sign In with Google</Text>
                   </TouchableOpacity>
+
+                  {/* Apple Sign In Button (iOS only) */}
+                  {Platform.OS === 'ios' && (
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                      style={styles.appleButton}
+                      onPress={handleAppleSignIn}
+                    />
+                  )}
                 </>
               )}
 
@@ -735,6 +792,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
+    marginBottom: 8,
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
+    borderRadius: 6,
     marginBottom: 8,
   },
   googleButtonText: {

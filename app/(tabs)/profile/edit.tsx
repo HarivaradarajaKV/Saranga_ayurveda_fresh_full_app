@@ -94,7 +94,12 @@ export default function EditProfileScreen() {
       setLoading(true);
       const response = await apiService.get('/users/profile');
       if (response.data) {
-        setProfile(response.data);
+        setProfile({
+          name: response.data.name || '',
+          email: response.data.email || '',
+          phone: response.data.phone || '',
+          photo_url: response.data.photo_url || '',
+        });
       }
     } catch (error) {
       console.error('Error loading profile:', error);
