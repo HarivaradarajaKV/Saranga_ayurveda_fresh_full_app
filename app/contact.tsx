@@ -152,31 +152,17 @@ export default function ContactScreen() {
           <View style={styles.tagUnderline} />
           
           <View style={styles.gridContainer}>
-            {/* Call Us (Full Width) */}
-            <TouchableOpacity
-              style={styles.gridCardFull}
-              onPress={() => Linking.openURL('tel:+919611200444')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.circleIconContainer}>
-                <Ionicons name="call-outline" size={18} color="#556C3A" />
-              </View>
-              <Text style={styles.cardTitle}>CALL US</Text>
-              <Text style={styles.cardValue}>+91 96112 00444</Text>
-              <Text style={styles.cardSubtext}>Mon - Sat | 10:00 AM - 6:00 PM (IST)</Text>
-            </TouchableOpacity>
-
             {/* Email Us (Half Width, Left) */}
             <TouchableOpacity
               style={styles.gridCard}
-              onPress={() => Linking.openURL('mailto:hello@sarangaayurveda.com')}
+              onPress={() => Linking.openURL('mailto:info@sarangaayurveda.com')}
               activeOpacity={0.8}
             >
               <View style={styles.circleIconContainer}>
                 <Ionicons name="mail-outline" size={18} color="#556C3A" />
               </View>
               <Text style={styles.cardTitle}>EMAIL US</Text>
-              <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>hello@sarangaayurveda.com</Text>
+              <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>info@sarangaayurveda.com</Text>
               <Text style={styles.cardSubtext}>We reply within{"\n"}24 business hours</Text>
             </TouchableOpacity>
 
@@ -191,7 +177,7 @@ export default function ContactScreen() {
               </View>
               <Text style={styles.cardTitle}>WHATSAPP</Text>
               <Text style={styles.cardValue}>Chat with us</Text>
-              <Text style={styles.cardSubtext}>WhatsApp Support{"\n"}+91 96112 00444</Text>
+              <Text style={styles.cardSubtext}>WhatsApp Support</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -235,88 +221,85 @@ export default function ContactScreen() {
             </View>
           </View>
 
-          {/* Row 2: Phone Number & Subject */}
-          <View style={[styles.formRow, { zIndex: 40 }]}>
-            {/* Phone Number */}
-            <View style={styles.formInputGroupHalf}>
-              <Text style={styles.inputLabel}>Phone Number</Text>
-              <View style={{ position: 'relative', zIndex: 1000 }}>
-                <View style={styles.phoneInputContainer}>
-                  <TouchableOpacity
-                    style={styles.prefixSelect}
-                    onPress={() => {
-                      setShowPrefixDropdown(!showPrefixDropdown);
-                      setShowSubjectDropdown(false);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.prefixText}>{phonePrefix}</Text>
-                    <Ionicons name={showPrefixDropdown ? "chevron-up" : "chevron-down"} size={12} color="#666" style={{ marginLeft: 2 }} />
-                  </TouchableOpacity>
-                  <View style={styles.phoneSeparator} />
-                  <TextInput
-                    style={styles.phoneTextInput}
-                    placeholder="Enter phone number"
-                    keyboardType="phone-pad"
-                    value={phoneNumber}
-                    onChangeText={setPhoneNumber}
-                    placeholderTextColor="#999"
-                  />
-                  <Ionicons name="call-outline" size={16} color="#999" style={styles.phoneInputIcon} />
-                </View>
-                {showPrefixDropdown && (
-                  <View style={styles.prefixDropdown}>
-                    {PREFIXES.map((prefix) => (
-                      <TouchableOpacity
-                        key={prefix}
-                        style={styles.dropdownOption}
-                        onPress={() => {
-                          setPhonePrefix(prefix);
-                          setShowPrefixDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownOptionText}>{prefix}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Subject */}
-            <View style={styles.formInputGroupHalf}>
-              <Text style={styles.inputLabel}>Subject <Text style={styles.required}>*</Text></Text>
-              <View style={{ position: 'relative', zIndex: 1000 }}>
+          {/* Phone Number */}
+          <View style={[styles.formInputGroup, { zIndex: 40 }]}>
+            <Text style={[styles.inputLabel, { minHeight: 0, marginBottom: 6 }]}>Phone Number</Text>
+            <View style={{ position: 'relative', zIndex: 1000 }}>
+              <View style={styles.phoneInputContainer}>
                 <TouchableOpacity
-                  style={styles.customSelect}
+                  style={styles.prefixSelect}
                   onPress={() => {
-                    setShowSubjectDropdown(!showSubjectDropdown);
-                    setShowPrefixDropdown(false);
+                    setShowPrefixDropdown(!showPrefixDropdown);
+                    setShowSubjectDropdown(false);
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.selectText, !subject && { color: '#999' }]} numberOfLines={1}>
-                    {subject ? subject : "Choose a subject"}
-                  </Text>
-                  <Ionicons name={showSubjectDropdown ? "chevron-up" : "chevron-down"} size={16} color="#666" />
+                  <Text style={styles.prefixText}>{phonePrefix}</Text>
+                  <Ionicons name={showPrefixDropdown ? "chevron-up" : "chevron-down"} size={12} color="#666" style={{ marginLeft: 2 }} />
                 </TouchableOpacity>
-                {showSubjectDropdown && (
-                  <View style={styles.dropdownOptionsContainer}>
-                    {SUBJECTS.map((sub) => (
-                      <TouchableOpacity
-                        key={sub}
-                        style={styles.dropdownOption}
-                        onPress={() => {
-                          setSubject(sub);
-                          setShowSubjectDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownOptionText}>{sub}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                <View style={styles.phoneSeparator} />
+                <TextInput
+                  style={styles.phoneTextInput}
+                  placeholder="Enter phone number"
+                  keyboardType="phone-pad"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  placeholderTextColor="#999"
+                />
+                <Ionicons name="call-outline" size={16} color="#999" style={styles.phoneInputIcon} />
               </View>
+              {showPrefixDropdown && (
+                <View style={styles.prefixDropdown}>
+                  {PREFIXES.map((prefix) => (
+                    <TouchableOpacity
+                      key={prefix}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setPhonePrefix(prefix);
+                        setShowPrefixDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownOptionText}>{prefix}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Subject */}
+          <View style={[styles.formInputGroup, { zIndex: 30 }]}>
+            <Text style={[styles.inputLabel, { minHeight: 0, marginBottom: 6 }]}>Subject <Text style={styles.required}>*</Text></Text>
+            <View style={{ position: 'relative', zIndex: 1000 }}>
+              <TouchableOpacity
+                style={styles.customSelect}
+                onPress={() => {
+                  setShowSubjectDropdown(!showSubjectDropdown);
+                  setShowPrefixDropdown(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.selectText, !subject && { color: '#999' }]} numberOfLines={1}>
+                  {subject ? subject : "Choose a subject"}
+                </Text>
+                <Ionicons name={showSubjectDropdown ? "chevron-up" : "chevron-down"} size={16} color="#666" />
+              </TouchableOpacity>
+              {showSubjectDropdown && (
+                <View style={styles.dropdownOptionsContainer}>
+                  {SUBJECTS.map((sub) => (
+                    <TouchableOpacity
+                      key={sub}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setSubject(sub);
+                        setShowSubjectDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownOptionText}>{sub}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
 

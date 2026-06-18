@@ -658,13 +658,15 @@ export default function ProfilePage() {
           </ScrollView>
 
           {/* User Profile Zoom View Modal */}
-          <Modal visible={isImageViewerVisible} transparent={true}>
-            <ImageViewer
-              imageUrls={images}
-              enableSwipeDown
-              onSwipeDown={() => setIsImageViewerVisible(false)}
-            />
-          </Modal>
+          {images.length > 0 && (
+            <Modal visible={isImageViewerVisible} transparent={true}>
+              <ImageViewer
+                imageUrls={images}
+                enableSwipeDown
+                onSwipeDown={() => setIsImageViewerVisible(false)}
+              />
+            </Modal>
+          )}
 
           {/* Support Modal */}
           <Modal

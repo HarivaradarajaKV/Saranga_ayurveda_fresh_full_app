@@ -14,6 +14,7 @@ import {
   SafeAreaView,
   Modal,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useOrders } from '../OrderContext';
 import { Picker } from '@react-native-picker/picker';
@@ -611,6 +612,84 @@ const AdminOrdersInner = () => {
     }
   };
 
+  const handleResetShipment = async (orderId: string) => {
+    if (!mountedRef.current || shiprocketLoading) return;
+
+    const performReset = async () => {
+      try {
+        setShiprocketLoading(true);
+        setShiprocketAction('reset');
+
+        const token = await AsyncStorage.getItem('auth_token');
+        const baseUrl = getBaseUrl();
+
+        const response = await fetch(`${baseUrl}/shiprocket/reset-shipment/${orderId}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert('✅ Shipment reset successfully!');
+
+          // Update state to clear all shiprocket data
+          const clearedData = {
+            shiprocket_order_id: null,
+            shiprocket_shipment_id: null,
+            shipment_status: null,
+            awb_number: null,
+            courier_id: null,
+            courier_name: null,
+            estimated_delivery_date: null,
+            tracking_url: null,
+            label_url: null,
+            manifest_url: null,
+            pickup_scheduled_date: null
+          };
+
+          if (selectedOrderForDetails) {
+            setSelectedOrderForDetails({
+              ...selectedOrderForDetails,
+              ...clearedData
+            } as any);
+          }
+
+          if (fetchOrders && typeof fetchOrders === 'function') {
+            fetchOrders();
+          }
+        } else {
+          alert('❌ Failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Reset shipment error:', error);
+        alert('❌ Error resetting shipment');
+      } finally {
+        if (mountedRef.current) {
+          setShiprocketLoading(false);
+          setShiprocketAction(null);
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to reset/cancel this shipment? This will clear all local Shiprocket data for this order so you can recreate it.')) {
+        performReset();
+      }
+    } else {
+      Alert.alert(
+        'Reset Shipment',
+        'Are you sure you want to reset/cancel this shipment? This will clear all local Shiprocket data for this order so you can recreate it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Reset', style: 'destructive', onPress: performReset }
+        ]
+      );
+    }
+  };
+
   // REMOVED: OrderStatusBadge component entirely to prevent crashes
 
   // Simplified status picker using buttons instead of heavy Picker component
@@ -952,58 +1031,37 @@ const AdminOrdersInner = () => {
                     </Text>
                   </TouchableOpacity>
 
-                  {/* Step 2: Assign Courier & Get AWB */}
+                  {/* Reset Shipment Option */}
                   {hasShiprocketData(selectedOrderForDetails) && (
                     <TouchableOpacity
                       style={{ 
-                        backgroundColor: hasAWB(selectedOrderForDetails) ? '#ccc' : '#694d21', 
+                        backgroundColor: '#fee2e2', 
                         padding: 12, 
                         borderRadius: 8, 
                         alignItems: 'center',
-                        marginTop: 8
+                        marginTop: 4,
+                        borderWidth: 1,
+                        borderColor: '#fca5a5'
                       }}
-                      onPress={() => handleAssignCourier(selectedOrderForDetails.id)}
-                      disabled={hasAWB(selectedOrderForDetails) || shiprocketLoading}
+                      onPress={() => handleResetShipment(selectedOrderForDetails.id)}
+                      disabled={shiprocketLoading}
                     >
-                      <Text style={{ color: hasAWB(selectedOrderForDetails) ? '#666' : '#fff', fontWeight: '600', fontSize: 14 }}>
-                        {hasAWB(selectedOrderForDetails) ? '✓ Courier Assigned & AWB Generated' : (shiprocketLoading && shiprocketAction === 'assign' ? '⏳ Assigning...' : '🚚 Assign Courier & Get AWB')}
+                      <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 14 }}>
+                        {shiprocketLoading && shiprocketAction === 'reset' ? '⏳ Resetting...' : '⚠️ Reset & Recreate Shipment'}
                       </Text>
                     </TouchableOpacity>
                   )}
-
-                  {/* Step 3: Courier details & Action buttons (Label, Pickup) */}
-                  {hasAWB(selectedOrderForDetails) && (
-                    <View style={{ marginTop: 12 }}>
-                      <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 6, marginVertical: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
-                        <Text style={{ color: '#666', fontSize: 12 }}>AWB Number:</Text>
-                        <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>
-                          {(selectedOrderForDetails as any).awb_number}
-                        </Text>
-                        <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
-                          Courier: {(selectedOrderForDetails as any).courier_name || 'Assigned'}
-                        </Text>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
-                        <TouchableOpacity
-                          style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
-                          onPress={() => handleDownloadLabel(selectedOrderForDetails.id)}
-                          disabled={shiprocketLoading}
-                        >
-                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                            {shiprocketLoading && shiprocketAction === 'label' ? '⏳' : '🏷️ Label'}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{ flex: 1, backgroundColor: '#694d21', padding: 12, borderRadius: 8, alignItems: 'center' }}
-                          onPress={() => handleSchedulePickup(selectedOrderForDetails.id)}
-                          disabled={shiprocketLoading}
-                        >
-                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                            {shiprocketLoading && shiprocketAction === 'pickup' ? '⏳' : '📍 Pickup'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                  {/* Display Shiprocket IDs if shipment is created */}
+                  {hasShiprocketData(selectedOrderForDetails) && (
+                    <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
+                      <Text style={{ color: '#666', fontSize: 12 }}>Shiprocket Order ID:</Text>
+                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 14, marginBottom: 4 }}>
+                        {(selectedOrderForDetails as any).shiprocket_order_id || '—'}
+                      </Text>
+                      <Text style={{ color: '#666', fontSize: 12 }}>Shipment ID:</Text>
+                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>
+                        {(selectedOrderForDetails as any).shiprocket_shipment_id || '—'}
+                      </Text>
                     </View>
                   )}
                 </View>

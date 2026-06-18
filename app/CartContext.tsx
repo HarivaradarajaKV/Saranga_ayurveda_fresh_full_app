@@ -259,7 +259,17 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       if (existingItem) {
         console.log('Item already in cart, incrementing quantity. Existing item:', existingItem);
         const originalQuantity = existingItem.quantity;
-        const newQuantity = existingItem.quantity + quantity;
+        const maxAvailable = typeof existingItem.stock_quantity === 'number' ? existingItem.stock_quantity : 999;
+        
+        if (originalQuantity >= maxAvailable) {
+          Alert.alert('Limit Reached', `You already have all available ${maxAvailable} items in your cart.`);
+          return;
+        }
+        
+        const newQuantity = Math.min(existingItem.quantity + quantity, maxAvailable);
+        if (originalQuantity + quantity > maxAvailable) {
+          Alert.alert('Stock Limit', `Only ${maxAvailable} units are available. Added ${maxAvailable - originalQuantity} more units to your cart.`);
+        }
         
         // 1. Optimistic Update (Immediate state change)
         setItems(prevItems => {
@@ -310,6 +320,18 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       }
 
       // Define newItem after checking for existing items
+      const productStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : 999;
+      if (productStock <= 0) {
+        Alert.alert('Out of Stock', 'This product is out of stock.');
+        return;
+      }
+
+      let initialQuantity = quantity;
+      if (quantity > productStock) {
+        initialQuantity = productStock;
+        Alert.alert('Stock Limit', `Only ${productStock} units are available. Added ${productStock} units to your cart.`);
+      }
+
       const itemPrice = typeof product.price === 'number' ? product.price : (parseFloat(String(product.price)) || 0);
       const itemOfferPercentage = typeof product.offer_percentage === 'number' ? product.offer_percentage : (parseFloat(String(product.offer_percentage)) || 0);
       
@@ -349,7 +371,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         stock_quantity: typeof product.stock_quantity === 'number' ? product.stock_quantity : (parseInt(String(product.stock_quantity)) || 0),
         created_at: product.created_at || new Date().toISOString(),
         offer_percentage: itemOfferPercentage,
-        quantity: quantity,
+        quantity: initialQuantity,
         variant: variant,
         cartId: tempCartId, // Temporary cart ID
         usage_instructions: product.usage_instructions,
@@ -384,7 +406,7 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       // 2. Perform API call in background
       apiService.post<{ id: number }>(apiService.ENDPOINTS.CART, {
         product_id: product.id,
-        quantity: quantity,
+        quantity: initialQuantity,
         variant: variant
       }).then(response => {
         if (response.error || !response.data || typeof response.data.id !== 'number') {
@@ -481,7 +503,14 @@ const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       }
 
       const originalQuantity = cartItem.quantity;
-      const newQuantity = increment ? cartItem.quantity + 1 : Math.max(1, cartItem.quantity - 1);
+      const maxAvailable = typeof cartItem.stock_quantity === 'number' ? cartItem.stock_quantity : 999;
+      
+      if (increment && originalQuantity >= maxAvailable) {
+        Alert.alert('Limit Reached', `Only ${maxAvailable} units available in stock.`);
+        return;
+      }
+
+      const newQuantity = increment ? Math.min(cartItem.quantity + 1, maxAvailable) : Math.max(1, cartItem.quantity - 1);
 
       if (newQuantity === originalQuantity) return;
 

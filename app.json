@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "SarangaAyurveda",
+    "name": "Saranga Ayurveda",
     "slug": "saranga-ayurveda-fresh",
-    "version": "4.0.1",
+    "version": "8.6.26",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": [
@@ -13,7 +13,10 @@
     "sdkVersion": "54.0.0",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.AyurvedaSaranga.myapp"
+      "bundleIdentifier": "com.AyurvedaSaranga.myapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +24,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.sarangaayurveda.fresh",
-      "versionCode": 4,
+      "versionCode": 6,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",

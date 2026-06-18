@@ -16,7 +16,6 @@ import {
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -232,7 +231,7 @@ export default function EditProfileScreen() {
         >
           <Animated.View style={[styles.photoContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: pulseAnim }] }]}>
             <View style={styles.photoWrapper}>
-              <BlurView intensity={20} style={styles.photoBlur}>
+              <View style={styles.photoBlur}>
                 <LinearGradient
                   colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
                   style={styles.photoGradient}
@@ -241,12 +240,12 @@ export default function EditProfileScreen() {
                     <Ionicons name="person" size={50} color="#2b3a1a" />
                   </View>
                 </LinearGradient>
-              </BlurView>
+              </View>
             </View>
           </Animated.View>
 
           <Animated.View style={[styles.form, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <BlurView intensity={15} style={styles.formBlur}>
+            <View style={styles.formBlur}>
               <Animated.View style={[styles.inputGroup, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                 <Text style={styles.label}>Name</Text>
                 <View style={styles.inputContainer}>
@@ -312,7 +311,7 @@ export default function EditProfileScreen() {
                   </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
-            </BlurView>
+            </View>
           </Animated.View>
         </ScrollView>
         </View>

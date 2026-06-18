@@ -296,11 +296,6 @@ export default function CartPage() {
               </View>
               <Text style={styles.brandSubtitle}>Review your items and proceed to checkout</Text>
             </View>
-            <Image
-              source={require('../assets/images/leaf_decoration.png')}
-              style={[styles.leafDecoration, { top: insets.top > 0 ? insets.top - 20 : (Platform.OS === 'ios' ? -10 : (StatusBar.currentHeight ?? 0) - 20) }]}
-              resizeMode="contain"
-            />
           </View>
 
           <Animated.View
@@ -446,18 +441,18 @@ export default function CartPage() {
                               <View style={styles.quantityAndTrashRow}>
                                 <View style={styles.qtyBox}>
                                   <TouchableOpacity
-                                    style={styles.qtyBoxBtn}
+                                    style={[styles.qtyBoxBtn, (item.stock_quantity === 0 || item.quantity <= 1) && { opacity: 0.5 }]}
                                     onPress={() => updateQuantity(item.id, false)}
-                                    disabled={item.stock_quantity === 0}
+                                    disabled={item.stock_quantity === 0 || item.quantity <= 1}
                                     delayPressIn={0}
                                   >
                                     <Text style={styles.qtyBoxBtnText}>−</Text>
                                   </TouchableOpacity>
                                   <Text style={styles.qtyBoxValue}>{item.quantity}</Text>
                                   <TouchableOpacity
-                                    style={styles.qtyBoxBtn}
+                                    style={[styles.qtyBoxBtn, (item.stock_quantity === 0 || item.quantity >= item.stock_quantity) && { opacity: 0.5 }]}
                                     onPress={() => updateQuantity(item.id, true)}
-                                    disabled={item.stock_quantity === 0}
+                                    disabled={item.stock_quantity === 0 || item.quantity >= item.stock_quantity}
                                     delayPressIn={0}
                                   >
                                     <Text style={styles.qtyBoxBtnText}>+</Text>
@@ -565,6 +560,8 @@ export default function CartPage() {
                       <Text style={styles.featureBadgeText}>Secure{"\n"}Payments</Text>
                     </View>
                   </View>
+
+                  <Text style={styles.customizedText}>This order has been specially customised for you</Text>
 
                   {/* Checkout Action Button */}
                   <TouchableOpacity
@@ -1005,5 +1002,12 @@ const styles = StyleSheet.create({
     color: '#3d5236',
     fontWeight: '600',
     textAlign: 'center',
+  },
+  customizedText: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
 }); 

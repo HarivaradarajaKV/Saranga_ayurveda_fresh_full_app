@@ -2314,6 +2314,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     rowGap: 4,
     columnGap: 10,
+    justifyContent: 'center',
   },
   footerSupportLink: {
     paddingVertical: 2,
@@ -2460,6 +2461,9 @@ const Page = () => {
   const screenWidth = Math.min(windowWidth, 800);
   const bannerWidth = screenWidth - 24;
   const bannerHeight = bannerWidth / 2.3;
+  const numHorizontalCards = screenWidth >= 768 ? 4 : screenWidth >= 480 ? 3 : 2;
+  const horizontalCardWidth = (screenWidth - 20) / numHorizontalCards;
+  const horizontalCardHeight = horizontalCardWidth + 95;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -3662,268 +3666,99 @@ const Page = () => {
         <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center', flex: 1 }}>
           <View style={[styles.fixedHeader, { paddingTop: insets.top }]}>
             <View style={styles.header}>
-            <TouchableOpacity
-              style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
-              onPress={handleDrawerOpen}
-              disabled={isMenuLoading}
-              activeOpacity={0.7}
-            >
-              {isMenuLoading ? (
-                <ActivityIndicator size="small" color="#2b3a1a" />
-              ) : (
-                <Ionicons name="menu" size={28} color="#2b3a1a" />
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.menuIcon, isMenuLoading && styles.menuIconLoading]}
+                onPress={handleDrawerOpen}
+                disabled={isMenuLoading}
+                activeOpacity={0.7}
+              >
+                {isMenuLoading ? (
+                  <ActivityIndicator size="small" color="#2b3a1a" />
+                ) : (
+                  <Ionicons name="menu" size={28} color="#2b3a1a" />
+                )}
+              </TouchableOpacity>
 
-            <View style={styles.titleContainer}>
-              <Image
-                source={typeof HEADER_LOGO_URI === 'string' ? { uri: HEADER_LOGO_URI } : HEADER_LOGO_URI}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-              <Image
-                source={typeof HEADER_NAME_LOGO_URI === 'string' ? { uri: HEADER_NAME_LOGO_URI } : HEADER_NAME_LOGO_URI}
-                style={styles.nameLogo}
-                resizeMode="contain"
-              />
+              <View style={styles.titleContainer}>
+                <Image
+                  source={typeof HEADER_LOGO_URI === 'string' ? { uri: HEADER_LOGO_URI } : HEADER_LOGO_URI}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+                <Image
+                  source={typeof HEADER_NAME_LOGO_URI === 'string' ? { uri: HEADER_NAME_LOGO_URI } : HEADER_NAME_LOGO_URI}
+                  style={styles.nameLogo}
+                  resizeMode="contain"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => {
+                  if (!isAuthenticated) {
+                    router.push('/auth/login');
+                  } else {
+                    router.push('/cart');
+                  }
+                }}
+              >
+                <Ionicons name="cart-outline" size={24} color="#2b3a1a" />
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => {
-                if (!isAuthenticated) {
-                  router.push('/auth/login');
-                } else {
-                  router.push('/cart');
-                }
-              }}
-            >
-              <Ionicons name="cart-outline" size={24} color="#2b3a1a" />
-            </TouchableOpacity>
           </View>
-        </View>
 
-        {loading ? (
-          <Animated.View style={[styles.loadingContainer, {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }]
-          }]}>
-            <Animated.View style={{
-              transform: [{ scale: pulseAnim }]
-            }}>
-              <ActivityIndicator size="large" color="#694d21" />
-            </Animated.View>
-            <Animated.Text style={[styles.loadingText, {
-              opacity: shimmerAnim
-            }]}>Loading amazing products...</Animated.Text>
+          {loading ? (
+            <Animated.View style={[styles.loadingContainer, {
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }]
+            }]}>
+              <Animated.View style={{
+                transform: [{ scale: pulseAnim }]
+              }}>
+                <ActivityIndicator size="large" color="#694d21" />
+              </Animated.View>
+              <Animated.Text style={[styles.loadingText, {
+                opacity: shimmerAnim
+              }]}>Loading amazing products...</Animated.Text>
 
-            {/* Modern skeleton loading */}
-            <View style={styles.skeletonContainer}>
-              {[1, 2, 3, 4].map((item) => (
-                <Animated.View
-                  key={item}
-                  style={[
-                    styles.skeletonCard,
-                    {
-                      opacity: shimmerAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.3, 0.7]
-                      })
-                    }
-                  ]}
-                >
-                  <View style={styles.skeletonImage} />
-                  <View style={styles.skeletonText} />
-                  <View style={styles.skeletonPrice} />
-                </Animated.View>
-              ))}
-            </View>
-          </Animated.View>
-        ) : searchQuery ? (
-          <View style={styles.searchResultsContainer}>
-            <Text style={[styles.sectionTitle, { marginLeft: 16 }]}>Search Results</Text>
-            <Text style={{ marginLeft: 16, color: '#666', marginTop: 4 }}>
-              {filteredProducts.length} result{filteredProducts.length === 1 ? '' : 's'} for "{searchQuery}"
-            </Text>
-            {filteredProducts.length > 0 ? (
-              <Animated.View style={[styles.searchResultsGrid, {
-                transform: [{ translateY: productSlideAnim }]
-              }]}>
-                {filteredProducts.map((product, index) => (
+              {/* Modern skeleton loading */}
+              <View style={styles.skeletonContainer}>
+                {[1, 2, 3, 4].map((item) => (
                   <Animated.View
-                    key={product.id}
+                    key={item}
                     style={[
-                      styles.searchProductWrapper,
+                      styles.skeletonCard,
                       {
-                        opacity: fadeAnim,
-                        transform: [
-                          { translateY: productSlideAnim },
-                          { scale: scaleAnim }
-                        ]
+                        opacity: shimmerAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.3, 0.7]
+                        })
                       }
                     ]}
                   >
-                    <ProductCard product={product} />
+                    <View style={styles.skeletonImage} />
+                    <View style={styles.skeletonText} />
+                    <View style={styles.skeletonPrice} />
                   </Animated.View>
                 ))}
-              </Animated.View>
-            ) : (
-              <View style={styles.noResultsContainer}>
-                <Ionicons name="search-outline" size={48} color="#694d21" />
-                <Text style={styles.noResultsText}>No products found</Text>
-                <Text style={[styles.noResultsText, { fontSize: 14, marginTop: 8, color: '#999' }]}>
-                  Try different search terms
-                </Text>
               </View>
-            )}
-          </View>
-        ) : (
-          <>
-            <View style={styles.categorySection}>
-              <View style={styles.categoryHeader}>
-                <View style={styles.categoryHeaderLeft}>
-
-                  <Text style={styles.categoryTitle}>Trusted Experts in</Text>
-                </View>
-              </View>
-              {categoriesLoading ? (
-                <View style={styles.categoryScrollContainer}>
-                  <Text style={styles.loadingText}>Loading categories...</Text>
-                </View>
-              ) : (
-                <CategoryNavigation
-                  categories={mainCategoriesWithImages}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={handleCategorySelect}
-                />
-              )}
-            </View>
-
-            {/* Banner Slideshow Section */}
-            <View style={[styles.bannerContainer, { height: bannerHeight }]}>
-              <ScrollView
-                ref={bannerScrollViewRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={screenWidth - 24}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                onScroll={(event) => {
-                  const xOffset = event.nativeEvent.contentOffset.x;
-                  const slideWidth = screenWidth - 24;
-                  if (slideWidth > 0) {
-                    const index = Math.round(xOffset / slideWidth);
-                    const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
-                    if (currentBannerIndex !== validIndex) {
-                      setCurrentBannerIndex(validIndex);
-                    }
-                  }
-                }}
-                scrollEventThrottle={16}
-                onMomentumScrollEnd={(event) => {
-                  const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
-                  const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
-                  if (currentBannerIndex !== validIndex) {
-                    setCurrentBannerIndex(validIndex);
-                  }
-                }}
-                onScrollBeginDrag={() => {
-                  isUserInteracting.current = true;
-                }}
-                onScrollEndDrag={resetUserInteraction}
-                onTouchStart={() => {
-                  isUserInteracting.current = true;
-                }}
-                onTouchEnd={resetUserInteraction}
-                style={{ width: screenWidth - 24 }}
-              >
-                {BANNER_DATA.map((banner) => (
-                  <TouchableOpacity
-                    key={banner.id}
-                    activeOpacity={0.95}
-                    onPress={() => handleBannerPress(banner.id)}
-                    style={{ width: screenWidth - 24, height: bannerHeight }}
-                  >
-                    <Image
-                      source={banner.image}
-                      style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <View style={styles.bannerDotsContainer}>
-                {BANNER_DATA.map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.bannerDot,
-                      currentBannerIndex === idx && styles.bannerDotActive
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {videos.length > 0 && (
-              <ScrollView
-                ref={videoScrollViewRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={true}
-                style={styles.videoCarousel}
-                onMomentumScrollEnd={(event) => {
-                  const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
-                  setCurrentVideoIndex(index);
-                }}
-              >
-                {videos.map((videoUri, index) => (
-                  <View key={index} style={[styles.videoContainer, { width: screenWidth }]}>
-                    <Video
-                      ref={(ref: any) => {
-                        if (ref) {
-                          videoRefs.current[index] = ref;
-                        }
-                      }}
-                      style={styles.video}
-                      source={{
-                        uri: videoUri,
-                      }}
-                      useNativeControls={false}
-                      resizeMode={ResizeMode.COVER}
-                      isLooping={true}
-                      shouldPlay={index === currentVideoIndex}
-                      onPlaybackStatusUpdate={(status) => {
-                        if (status.isLoaded && status.didJustFinish) {
-                          handleVideoEnd(index);
-                        }
-                      }}
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-
-            {/* New Arrival Section */}
-            <View style={styles.allProductsSection}>
-              <SectionHeader title="New Arrivals" />
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-                snapToInterval={(screenWidth - 44) / 2}
-                snapToAlignment="start"
-                decelerationRate="fast"
-              >
-                {newArrivalProducts.length > 0 ? (
-                  newArrivalProducts.map((product, index) => (
+            </Animated.View>
+          ) : searchQuery ? (
+            <View style={styles.searchResultsContainer}>
+              <Text style={[styles.sectionTitle, { marginLeft: 16 }]}>Search Results</Text>
+              <Text style={{ marginLeft: 16, color: '#666', marginTop: 4 }}>
+                {filteredProducts.length} result{filteredProducts.length === 1 ? '' : 's'} for "{searchQuery}"
+              </Text>
+              {filteredProducts.length > 0 ? (
+                <Animated.View style={[styles.searchResultsGrid, {
+                  transform: [{ translateY: productSlideAnim }]
+                }]}>
+                  {filteredProducts.map((product, index) => (
                     <Animated.View
-                      key={`newarrival-${product.id}-${index}`}
+                      key={product.id}
                       style={[
-                        styles.horizontalProductItem,
+                        styles.searchProductWrapper,
                         {
-                          width: (screenWidth - 44) / 2,
                           opacity: fadeAnim,
                           transform: [
                             { translateY: productSlideAnim },
@@ -3934,19 +3769,165 @@ const Page = () => {
                     >
                       <ProductCard product={product} />
                     </Animated.View>
-                  ))
+                  ))}
+                </Animated.View>
+              ) : (
+                <View style={styles.noResultsContainer}>
+                  <Ionicons name="search-outline" size={48} color="#694d21" />
+                  <Text style={styles.noResultsText}>No products found</Text>
+                  <Text style={[styles.noResultsText, { fontSize: 14, marginTop: 8, color: '#999' }]}>
+                    Try different search terms
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <>
+              <View style={styles.categorySection}>
+                <View style={styles.categoryHeader}>
+                  <View style={styles.categoryHeaderLeft}>
+
+                    <Text style={styles.categoryTitle}>Trusted Experts in</Text>
+                  </View>
+                </View>
+                {categoriesLoading ? (
+                  <View style={styles.categoryScrollContainer}>
+                    <Text style={styles.loadingText}>Loading categories...</Text>
+                  </View>
                 ) : (
-                  // Fallback: show most recent products if no new arrivals configured yet
-                  [...allProducts]
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .slice(0, 15)
-                    .map((product, index) => (
+                  <CategoryNavigation
+                    categories={mainCategoriesWithImages}
+                    selectedCategory={selectedCategory}
+                    onSelectCategory={handleCategorySelect}
+                  />
+                )}
+              </View>
+
+              {/* Banner Slideshow Section */}
+              <View style={[styles.bannerContainer, { height: bannerHeight }]}>
+                <ScrollView
+                  ref={bannerScrollViewRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={screenWidth - 24}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  onScroll={(event) => {
+                    const xOffset = event.nativeEvent.contentOffset.x;
+                    const slideWidth = screenWidth - 24;
+                    if (slideWidth > 0) {
+                      const index = Math.round(xOffset / slideWidth);
+                      const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
+                      if (currentBannerIndex !== validIndex) {
+                        setCurrentBannerIndex(validIndex);
+                      }
+                    }
+                  }}
+                  scrollEventThrottle={16}
+                  onMomentumScrollEnd={(event) => {
+                    const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
+                    const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
+                    if (currentBannerIndex !== validIndex) {
+                      setCurrentBannerIndex(validIndex);
+                    }
+                  }}
+                  onScrollBeginDrag={() => {
+                    isUserInteracting.current = true;
+                  }}
+                  onScrollEndDrag={resetUserInteraction}
+                  onTouchStart={() => {
+                    isUserInteracting.current = true;
+                  }}
+                  onTouchEnd={resetUserInteraction}
+                  style={{ width: screenWidth - 24 }}
+                >
+                  {BANNER_DATA.map((banner) => (
+                    <TouchableOpacity
+                      key={banner.id}
+                      activeOpacity={0.95}
+                      onPress={() => handleBannerPress(banner.id)}
+                      style={{ width: screenWidth - 24, height: bannerHeight }}
+                    >
+                      <Image
+                        source={banner.image}
+                        style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <View style={styles.bannerDotsContainer}>
+                  {BANNER_DATA.map((_, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.bannerDot,
+                        currentBannerIndex === idx && styles.bannerDotActive
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {videos.length > 0 && (
+                <ScrollView
+                  ref={videoScrollViewRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={true}
+                  style={styles.videoCarousel}
+                  onMomentumScrollEnd={(event) => {
+                    const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+                    setCurrentVideoIndex(index);
+                  }}
+                >
+                  {videos.map((videoUri, index) => (
+                    <View key={index} style={[styles.videoContainer, { width: screenWidth }]}>
+                      <Video
+                        ref={(ref: any) => {
+                          if (ref) {
+                            videoRefs.current[index] = ref;
+                          }
+                        }}
+                        style={styles.video}
+                        source={{
+                          uri: videoUri,
+                        }}
+                        useNativeControls={false}
+                        resizeMode={ResizeMode.COVER}
+                        isLooping={true}
+                        shouldPlay={index === currentVideoIndex}
+                        onPlaybackStatusUpdate={(status) => {
+                          if (status.isLoaded && status.didJustFinish) {
+                            handleVideoEnd(index);
+                          }
+                        }}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* New Arrival Section */}
+              <View style={styles.allProductsSection}>
+                <SectionHeader title="New Arrivals" />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScrollContent}
+                  snapToInterval={horizontalCardWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                >
+                  {newArrivalProducts.length > 0 ? (
+                    newArrivalProducts.map((product, index) => (
                       <Animated.View
-                        key={`newarrival-fallback-${product.id}-${index}`}
+                        key={`newarrival-${product.id}-${index}`}
                         style={[
                           styles.horizontalProductItem,
                           {
-                            width: (screenWidth - 44) / 2,
+                            width: horizontalCardWidth,
                             opacity: fadeAnim,
                             transform: [
                               { translateY: productSlideAnim },
@@ -3958,900 +3939,922 @@ const Page = () => {
                         <ProductCard product={product} />
                       </Animated.View>
                     ))
-                )}
-              </ScrollView>
-            </View>
-
-            {/* Best Seller Section */}
-            <View style={styles.allProductsSection}>
-              <SectionHeader title="Best Seller" />
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-                snapToInterval={(screenWidth - 44) / 2}
-                snapToAlignment="start"
-                decelerationRate="fast"
-              >
-                {(bestSellerProducts.length > 0 ? bestSellerProducts : allProducts).map((product, index) => (
-                  <Animated.View
-                    key={`bestseller-${product.id}-${index}`}
-                    style={[
-                      styles.horizontalProductItem,
-                      {
-                        width: (screenWidth - 44) / 2,
-                        opacity: fadeAnim,
-                        transform: [
-                          { translateY: productSlideAnim },
-                          { scale: scaleAnim }
-                        ]
-                      }
-                    ]}
-                  >
-                    <ProductCard product={product} />
-                  </Animated.View>
-                ))}
-              </ScrollView>
-            </View>
-
-            {/* New Combo Offers Section */}
-            <View style={styles.comboSection}>
-              <SectionHeader title="Combo Offers" />
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-                snapToInterval={(screenWidth - 44) / 2}
-                snapToAlignment="start"
-                decelerationRate="fast"
-              >
-                {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
-                {activeCombos.length > 0 ? (
-                  activeCombos.map((combo, index) => {
-                    // Calculate prices
-                    const calculateTotalPrice = () => {
-                      return (combo.items || []).reduce((sum: number, item: any) => {
-                        const price = Number(item.price || 0);
-                        const quantity = Number(item.quantity || 1);
-                        return sum + (price * quantity);
-                      }, 0);
-                    };
-
-                    const calculateDiscountedPrice = () => {
-                      const total = calculateTotalPrice();
-                      const discountValue = Number(combo.discount_value || 0);
-                      if (combo.discount_type === 'percentage') {
-                        return total - (total * (discountValue / 100));
-                      } else {
-                        return Math.max(0, total - discountValue);
-                      }
-                    };
-
-                    const totalPrice = calculateTotalPrice();
-                    const discountedPrice = calculateDiscountedPrice();
-                    const savings = totalPrice - discountedPrice;
-
-                    // Get combo images (up to 2 for display)
-                    const comboImages = [
-                      combo.image_url,
-                      combo.image_url2,
-                      combo.image_url3,
-                      combo.image_url4
-                    ].filter(img => img && typeof img === 'string').slice(0, 2);
-
-                    const handleComboPress = () => {
-                      router.push({
-                        pathname: '/deals/combo-detail/[id]',
-                        params: {
-                          id: combo.id.toString(),
-                          comboData: JSON.stringify(combo),
-                        },
-                      });
-                    };
-
-                    return (
-                      <Animated.View
-                        key={`combo-${combo.id}-${index}`}
-                        style={[
-                          styles.horizontalProductItem,
-                          {
-                            width: (screenWidth - 44) / 2,
-                            opacity: fadeAnim,
-                            transform: [
-                              { translateY: productSlideAnim },
-                              { scale: scaleAnim }
-                            ]
-                          }
-                        ]}
-                      >
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: '#fff',
-                            borderRadius: 12,
-                            elevation: 4,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 4,
-                            height: 255,
-                            overflow: 'hidden',
-                            marginHorizontal: 6,
-                            marginVertical: 10,
-                            borderWidth: 1,
-                            borderColor: '#f0f0f0',
-                          }}
-                          onPress={handleComboPress}
-                          activeOpacity={0.7}
+                  ) : (
+                    // Fallback: show most recent products if no new arrivals configured yet
+                    [...allProducts]
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .slice(0, 15)
+                      .map((product, index) => (
+                        <Animated.View
+                          key={`newarrival-fallback-${product.id}-${index}`}
+                          style={[
+                            styles.horizontalProductItem,
+                            {
+                              width: horizontalCardWidth,
+                              opacity: fadeAnim,
+                              transform: [
+                                { translateY: productSlideAnim },
+                                { scale: scaleAnim }
+                              ]
+                            }
+                          ]}
                         >
-                          <View style={{
-                            width: '100%',
-                            aspectRatio: 1,
-                            backgroundColor: '#f8f9fa',
-                            borderTopLeftRadius: 12,
-                            borderTopRightRadius: 12,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            overflow: 'hidden',
-                          }}>
-                            {comboImages.length > 0 ? (
-                              <Image
-                                source={{ uri: apiService.getFullImageUrl(comboImages[0]) }}
-                                style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
-                              />
-                            ) : (
-                              <Ionicons name="image-outline" size={32} color="#999" />
-                            )}
-                          </View>
-                          {Number(combo.discount_value) > 0 && (
-                            <View style={{
-                              position: 'absolute',
-                              top: 8,
-                              left: 8,
-                              backgroundColor: '#27ae60',
-                              borderRadius: 12,
-                              paddingVertical: 3,
-                              paddingHorizontal: 6,
-                              elevation: 2,
-                              shadowColor: '#27ae60',
-                              shadowOffset: { width: 0, height: 1 },
-                              shadowOpacity: 0.2,
-                              shadowRadius: 2,
-                            }}>
-                              <Text style={{
-                                color: '#fff',
-                                fontSize: 9,
-                                fontWeight: 'bold',
-                              }}>
-                                {combo.discount_type === 'percentage'
-                                  ? `${Number(combo.discount_value)}% OFF`
-                                  : `₹${Number(combo.discount_value)} OFF`}
-                              </Text>
-                            </View>
-                          )}
-
-                          <View style={{
-                            paddingVertical: 4,
-                            paddingHorizontal: 6,
-                            flex: 1,
-                            justifyContent: 'space-between',
-                          }}>
-                            <View>
-                              <Text style={styles.comboCardCategory}>COMBO OFFER</Text>
-                              <Text style={styles.comboCardName} numberOfLines={2}>{combo.title || 'Combo Offer'}</Text>
-                            </View>
-                            <View style={styles.comboCardPriceRow}>
-                              <Text style={styles.comboCardPrice}>₹{discountedPrice.toFixed(2)}</Text>
-                              <View style={styles.comboCardBtn}>
-                                <Ionicons name="chevron-forward" size={14} color="#2b3a1a" />
-                              </View>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    );
-                  })
-                ) : (
-                  // Fallback: Show placeholder when no active combos
-                  <View style={[styles.horizontalProductItem, { width: (screenWidth - 44) / 2 }]}>
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        elevation: 4,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 4,
-                        height: 255,
-                        overflow: 'hidden',
-                        marginHorizontal: 6,
-                        marginVertical: 10,
-                        borderWidth: 1,
-                        borderColor: '#f0f0f0',
-                      }}
-                      onPress={() => router.push('/deals/combo-offers')}
-                    >
-                      <View style={{
-                        width: '100%',
-                        aspectRatio: 1,
-                        backgroundColor: '#f8f9fa',
-                        borderTopLeftRadius: 12,
-                        borderTopRightRadius: 12,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        overflow: 'hidden',
-                      }}>
-                        <Ionicons name="gift-outline" size={32} color="#999" />
-                      </View>
-
-                      <View style={{
-                        paddingVertical: 4,
-                        paddingHorizontal: 6,
-                        flex: 1,
-                        justifyContent: 'space-between',
-                      }}>
-                        <View>
-
-                          <Text style={{
-                            fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-                            fontSize: 13,
-                            fontWeight: 'bold',
-                            color: '#333333',
-                            lineHeight: 18,
-                            marginBottom: 4,
-                          }} numberOfLines={2}>Check Out Our Combo Offers</Text>
-                        </View>
-                        <View style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          marginTop: 'auto',
-                        }}>
-                          <Text style={{
-                            fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-                            fontSize: 15,
-                            fontWeight: 'bold',
-                            color: '#333333',
-                          }}>View Offers</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-
-            {/* Bottom Banner Slideshow Section */}
-            <View style={[styles.bannerContainer, { height: bannerHeight }]}>
-              <ScrollView
-                ref={bottomBannerScrollViewRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={screenWidth - 24}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                onScroll={(event) => {
-                  const xOffset = event.nativeEvent.contentOffset.x;
-                  const slideWidth = screenWidth - 24;
-                  if (slideWidth > 0) {
-                    const index = Math.round(xOffset / slideWidth);
-                    const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
-                    if (currentBottomBannerIndex !== validIndex) {
-                      setCurrentBottomBannerIndex(validIndex);
-                    }
-                  }
-                }}
-                scrollEventThrottle={16}
-                onMomentumScrollEnd={(event) => {
-                  const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
-                  const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
-                  if (currentBottomBannerIndex !== validIndex) {
-                    setCurrentBottomBannerIndex(validIndex);
-                  }
-                }}
-                onScrollBeginDrag={() => {
-                  isBottomUserInteracting.current = true;
-                }}
-                onScrollEndDrag={resetBottomUserInteraction}
-                onTouchStart={() => {
-                  isBottomUserInteracting.current = true;
-                }}
-                onTouchEnd={resetBottomUserInteraction}
-                style={{ width: screenWidth - 24 }}
-              >
-                {BOTTOM_BANNER_DATA.map((banner) => (
-                  <TouchableOpacity
-                    key={banner.id}
-                    activeOpacity={0.95}
-                    onPress={() => handleBottomBannerPress(banner.id)}
-                    style={{ width: screenWidth - 24, height: bannerHeight }}
-                  >
-                    <Image
-                      source={banner.image}
-                      style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <View style={styles.bannerDotsContainer}>
-                {BOTTOM_BANNER_DATA.map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.bannerDot,
-                      currentBottomBannerIndex === idx && styles.bannerDotActive
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {/* Our Story Banner Section */}
-            <View style={styles.ourStoryBannerCard}>
-              <View style={styles.ourStoryBannerRow}>
-                <View style={styles.ourStoryBannerTextCol}>
-                  <Text style={styles.ourStoryBannerSub}>OUR STORY</Text>
-                  <Text style={styles.ourStoryBannerTitle}>
-                    Rooted in Ayurveda.{"\n"}Made for You.
-                  </Text>
-                  <View style={styles.ourStoryBannerDividerRow}>
-                    <View style={styles.ourStoryBannerDividerLine} />
-                    <Ionicons name="leaf" size={12} color="#694d21" style={{ marginHorizontal: 8 }} />
-                    <View style={styles.ourStoryBannerDividerLine} />
-                  </View>
-                  <Text style={styles.ourStoryBannerBody}>
-                    At Saranga Ayurveda, we blend ancient wisdom with modern living to create pure, natural and effective wellness solutions for every day.
-                  </Text>
-                </View>
-                <View style={styles.ourStoryBannerImageCol}>
-                  <Image
-                    source={OUR_STORY_BANNER_URI}
-                    style={styles.ourStoryBannerImage}
-                    resizeMode="cover"
-                  />
-                </View>
+                          <ProductCard product={product} />
+                        </Animated.View>
+                      ))
+                  )}
+                </ScrollView>
               </View>
 
-              <View style={styles.ourStoryBannerButtonContainer}>
-                <TouchableOpacity
-                  style={styles.ourStoryBannerReadMoreBtn}
-                  onPress={() => router.push('/our-story')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.ourStoryBannerReadMoreBtnText}>READ MORE</Text>
-                  <Ionicons name="arrow-forward-outline" size={14} color="#3d5236" style={{ marginLeft: 6 }} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Custom Saranga Anugraha Foundation Section */}
-            <View style={styles.customFoundationSection}>
-              <Image
-                source={HEADER_NAME_LOGO_URI}
-                style={styles.customFoundationLogo}
-                resizeMode="contain"
-              />
-              <Text style={styles.customFoundationSubText}>In association with</Text>
-              <Text style={styles.customFoundationName}>Saranga Anugraha Foundation</Text>
-              <Text style={styles.customFoundationBigText}>need your support</Text>
-
-              <View style={styles.customFoundationButtonsRow}>
-                <TouchableOpacity
-                  style={styles.customFoundationDonateButton}
-                  onPress={() => router.push('/donate')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.customFoundationDonateButtonText}>DONATE</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.customFoundationHelpButton}
-                  onPress={() => router.push('/donate')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.customFoundationHelpButtonText}>I NEED HELP</Text>
-                  <View style={styles.customFoundationArrowCircle}>
-                    <Ionicons
-                      name="arrow-up-outline"
-                      size={14}
-                      color="#333"
-                      style={{ transform: [{ rotate: '45deg' }] }}
-                    />
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Foundation Graphic Slideshow */}
-            <View style={styles.foundationSlideshowContainer}>
-              <ScrollView
-                ref={slideshowRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                style={[styles.slideshowScrollView, { height: screenWidth - 34 }]}
-              >
-                {SLIDE_DATA.map((slide, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    activeOpacity={0.9}
-                    onPress={() => router.push('/donate')}
-                    style={[styles.slideTouch, { width: screenWidth - 34, height: screenWidth - 34 }]}
-                  >
-                    <Image
-                      source={slide.image}
-                      style={styles.slideImage}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.slideTextContainer}>
-                      <Text style={styles.slideTitleText}>{slide.title}</Text>
-                      <Text style={styles.slideDescText}>{slide.description}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Slideshow Indicators / Dots */}
-              <View style={styles.slideshowDotsContainer}>
-                {SLIDE_DATA.map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.slideshowDot,
-                      activeSlide === idx && styles.slideshowDotActive
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {/* Pillars of Beauty Section */}
-            {false && (
-              <View style={styles.pillarsSection}>
-                <View style={styles.pillarsHeader}>
-                  <Text style={styles.pillarsTitle}>Pillars of Beauty in Ayurveda</Text>
-                  <Text style={styles.pillarsSubtitle}>
-                    Discover the ancient wisdom of Ayurvedic beauty rituals
-                  </Text>
-                </View>
-                <View style={[styles.pillarsGrid, {
-                  alignItems: 'center',
-                  paddingVertical: 40,
-                  backgroundColor: '#fff',
-                  borderRadius: 20,
-                  marginHorizontal: 16
-                }]}>
-                  {/* First row - 2 items */}
-                  <View style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-around',
-                    width: '90%',
-                    marginBottom: 60
-                  }}>
-                    <View style={{ width: '42%', alignItems: 'center' }}>
-                      <View style={{
-                        width: 110,
-                        height: 110,
-                        borderRadius: 55,
-                        marginBottom: 16,
-                        borderWidth: 2,
-                        borderColor: '#694d21',
-                        backgroundColor: '#fff',
-                        elevation: 4,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 4,
-                        overflow: 'hidden'
-                      }}>
-                        <Image
-                          source={{ uri: 'https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={{
-                        fontSize: 18,
-                        marginBottom: 8,
-                        color: '#694d21',
-                        fontWeight: '600',
-                        textAlign: 'center'
-                      }}>Roopam</Text>
-                      <Text style={{
-                        fontSize: 14,
-                        color: '#666',
-                        textAlign: 'center',
-                        paddingHorizontal: 4
-                      }}>Outer Beauty & Radiance</Text>
-                    </View>
-                    <View style={{ width: '42%', alignItems: 'center' }}>
-                      <View style={{
-                        width: 110,
-                        height: 110,
-                        borderRadius: 55,
-                        marginBottom: 16,
-                        borderWidth: 2,
-                        borderColor: '#694d21',
-                        backgroundColor: '#fff',
-                        elevation: 4,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 4,
-                        overflow: 'hidden'
-                      }}>
-                        <Image
-                          source={{ uri: 'https://images.pexels.com/photos/3762890/pexels-photo-3762890.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={{
-                        fontSize: 18,
-                        marginBottom: 8,
-                        color: '#694d21',
-                        fontWeight: '600',
-                        textAlign: 'center'
-                      }}>Gunam</Text>
-                      <Text style={{
-                        fontSize: 14,
-                        color: '#666',
-                        textAlign: 'center',
-                        paddingHorizontal: 4
-                      }}>Inner Beauty & Wellness</Text>
-                    </View>
-                  </View>
-                  {/* Second row - 1 item centered */}
-                  <View style={{
-                    width: '42%',
-                    alignItems: 'center',
-                    transform: [{ translateY: -20 }]
-                  }}>
-                    <View style={{
-                      width: 110,
-                      height: 110,
-                      borderRadius: 55,
-                      marginBottom: 16,
-                      borderWidth: 2,
-                      borderColor: '#694d21',
-                      backgroundColor: '#fff',
-                      elevation: 4,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 4,
-                      overflow: 'hidden'
-                    }}>
-                      <Image
-                        source={{ uri: 'https://images.pexels.com/photos/3762880/pexels-photo-3762880.jpeg?auto=compress&cs=tinysrgb&w=600' }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                      />
-                    </View>
-                    <Text style={{
-                      fontSize: 18,
-                      marginBottom: 8,
-                      color: '#694d21',
-                      fontWeight: '600',
-                      textAlign: 'center'
-                    }}>Vayastyag</Text>
-                    <Text style={{
-                      fontSize: 14,
-                      color: '#666',
-                      textAlign: 'center',
-                      paddingHorizontal: 4
-                    }}>Lasting Beauty & Grace</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Daily Skincare Tips Section */}
-            {false && (
-              <View style={styles.tipsContainer}>
-                <View style={styles.tipsHeader}>
-                  <Ionicons name="bulb" size={32} color="#694d21" />
-                  <Text style={styles.tipsTitle}>Daily Skincare Tips:</Text>
-                </View>
+              {/* Best Seller Section */}
+              <View style={styles.allProductsSection}>
+                <SectionHeader title="Best Seller" />
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  style={styles.tipsScrollView}
-                  contentContainerStyle={{ paddingHorizontal: 8 }}
+                  contentContainerStyle={styles.horizontalScrollContent}
+                  snapToInterval={horizontalCardWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
                 >
-                  {skincareTips.map((tip, index) => (
+                  {(bestSellerProducts.length > 0 ? bestSellerProducts : allProducts).map((product, index) => (
                     <Animated.View
-                      key={tip.id}
+                      key={`bestseller-${product.id}-${index}`}
                       style={[
-                        styles.tipCard,
+                        styles.horizontalProductItem,
                         {
-                          opacity: tipCardAnims[index],
+                          width: horizontalCardWidth,
+                          opacity: fadeAnim,
                           transform: [
-                            {
-                              scale: tipCardAnims[index].interpolate({
-                                inputRange: [0, 9],
-                                outputRange: [0.8, 2]
-                              })
-                            }
+                            { translateY: productSlideAnim },
+                            { scale: scaleAnim }
                           ]
                         }
                       ]}
                     >
-                      <LinearGradient
-                        colors={[tip.backgroundColor, '#ffffff']}
-                        style={styles.tipGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                      >
-                        <View style={[styles.tipIcon, { backgroundColor: tip.backgroundColor }]}>
-                          <Ionicons name={tip.icon as any} size={36} color="#694d21" />
-                        </View>
-                        <Text style={styles.tipTitle}>{tip.title}</Text>
-                        <Text style={styles.tipDescription}>{tip.description}</Text>
-                      </LinearGradient>
+                      <ProductCard product={product} />
                     </Animated.View>
                   ))}
                 </ScrollView>
               </View>
-            )}
 
-            {/* Your Concern, Our Collections Section */}
-            {/* Your Concern, Our Collections Section */}
-            {false && (
-              <View style={styles.concernSection}>
-                <View style={styles.concernHeader}>
-                  <Text style={styles.concernTitle}>Your Concern, Our Collections</Text>
-                  <Text style={styles.concernSubtitle}>Find solutions for your specific needs</Text>
-                </View>
-                <View style={styles.concernContainer}>
-                  {(() => {
-                    const pattern = [2, 3]; // Alternating 2 and 3 items per row
-                    let currentIndex = 0;
-                    const rows = [];
-                    let patternIndex = 0;
+              {/* New Combo Offers Section */}
+              <View style={styles.comboSection}>
+                <SectionHeader title="Combo Offers" />
 
-                    while (currentIndex < mainCategoriesWithImages.length) {
-                      const count = pattern[patternIndex % pattern.length];
-                      const chunk = mainCategoriesWithImages.slice(currentIndex, currentIndex + count);
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScrollContent}
+                  snapToInterval={horizontalCardWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                >
+                  {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
+                  {activeCombos.length > 0 ? (
+                    activeCombos.map((combo, index) => {
+                      // Calculate prices
+                      const calculateTotalPrice = () => {
+                        return (combo.items || []).reduce((sum: number, item: any) => {
+                          const price = Number(item.price || 0);
+                          const quantity = Number(item.quantity || 1);
+                          return sum + (price * quantity);
+                        }, 0);
+                      };
 
-                      if (chunk.length > 0) {
-                        rows.push(
-                          <View key={currentIndex} style={styles.concernRow}>
-                            {chunk.map((category) => (
-                              <TouchableOpacity
-                                key={category.id}
-                                style={[styles.concernCircle, { width: screenWidth * 0.28 }]}
-                                onPress={() => router.push({
-                                  pathname: '/category/[id]',
-                                  params: { id: category.id.toString(), name: category.name }
-                                })}
-                              >
-                                <View style={[styles.concernIconContainer, { width: screenWidth * 0.24, height: screenWidth * 0.24 }]}>
-                                  <Image
-                                    source={{ uri: category.image }}
-                                    style={styles.concernCircleImage}
-                                    resizeMode="cover"
-                                  />
-                                </View>
-                                <Text style={styles.concernText}>{category.name}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        );
-                      }
-
-                      currentIndex += count;
-                      patternIndex++;
-                    }
-                    return rows;
-                  })()}
-                </View>
-              </View>
-            )}
-
-            {/* Charity, Foundation, and Brand Reviews Sections */}
-            {false && (
-              <View style={styles.section}>
-                {/* Add Charity and Donations Section */}
-                <View style={styles.charitySection}>
-                  <View style={styles.charityHeader}>
-                    <Text style={styles.charityTitle}>With every tap, we give life.</Text>
-                    <Text style={styles.charitySubtitle}>Making a difference together</Text>
-                  </View>
-
-                  <View style={styles.donationStatsContainer}>
-                    <View style={styles.donationCard}>
-                      <Ionicons name="heart" size={32} color="#694d21" />
-                      <Text style={styles.donationAmount}>₹1,25,000</Text>
-                      <Text style={styles.donationLabel}>Total Donations</Text>
-                    </View>
-
-                    <View style={styles.donationCard}>
-                      <Ionicons name="people" size={32} color="#694d21" />
-                      <Text style={styles.donationAmount}>250+</Text>
-                      <Text style={styles.donationLabel}>Lives Impacted</Text>
-                    </View>
-
-                    <View style={styles.donationCard}>
-                      <Ionicons name="leaf" size={32} color="#694d21" />
-                      <Text style={styles.donationAmount}>15</Text>
-                      <Text style={styles.donationLabel}>Projects Funded</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.donationChartContainer}>
-                    <View style={styles.chartHeader}>
-                      <Text style={styles.chartTitle}>We don't just collect—we deliver hope.</Text>
-                      <Text style={styles.chartSubtitle}>Last 6 months</Text>
-                    </View>
-
-                    <View style={styles.barChart}>
-                      {[45, 60, 75, 55, 80, 65].map((height, index) => (
-                        <View key={index} style={styles.barContainer}>
-                          <View style={[styles.bar, { height: height }]} />
-                          <Text style={styles.barLabel}>
-                            {['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'][index]}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-
-                  <View style={styles.impactCategories}>
-                    <View style={styles.impactCategory}>
-                      <View style={[styles.impactIcon, { backgroundColor: '#FFE4E1' }]}>
-                        <Ionicons name="medkit" size={24} color="#694d21" />
-                      </View>
-                      <Text style={styles.impactTitle}>Healthcare</Text>
-                      <Text style={styles.impactAmount}>₹45,000</Text>
-                    </View>
-
-                    <View style={styles.impactCategory}>
-                      <View style={[styles.impactIcon, { backgroundColor: '#E0FFFF' }]}>
-                        <Ionicons name="book" size={24} color="#694d21" />
-                      </View>
-                      <Text style={styles.impactTitle}>Education</Text>
-                      <Text style={styles.impactAmount}>₹35,000</Text>
-                    </View>
-
-                    <View style={styles.impactCategory}>
-                      <View style={[styles.impactIcon, { backgroundColor: '#F0FFF0' }]}>
-                        <Ionicons name="nutrition" size={24} color="#694d21" />
-                      </View>
-                      <Text style={styles.impactTitle}>Food & Nutrition</Text>
-                      <Text style={styles.impactAmount}>₹45,000</Text>
-                    </View>
-                  </View>
-
-                  {/* Remove donation button */}
-                </View>
-
-                <FoundationSection />
-                <BrandReviews />
-              </View>
-            )}
-
-            <View style={styles.footerContainer}>
-              {/* Navigation Grid (2 Columns) */}
-              <View style={styles.footerGridRow}>
-                {/* Column 1: Get To Know Us */}
-                <View style={styles.footerGridColumn}>
-                  <Text style={styles.footerColumnHeader}>Get To Know Us</Text>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/our-story')}>
-                    <Text style={styles.footerGridLinkText}>Our Story</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/careers')}>
-                    <Text style={styles.footerGridLinkText}>Careers</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/internships')}>
-                    <Text style={styles.footerGridLinkText}>Internships</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Column 2: Quick Links (Swapped with Connect With Us) */}
-                <View style={styles.footerGridColumn}>
-                  <Text style={styles.footerColumnHeader}>Quick Links</Text>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/explore')}>
-                    <Text style={styles.footerGridLinkText}>Trending</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => {
-                    if (!isAuthenticated) {
-                      router.push('/auth/login');
-                    } else {
-                      router.push('/profile');
-                    }
-                  }}>
-                    <Text style={styles.footerGridLinkText}>My Account</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => {
-                    if (!isAuthenticated) {
-                      router.push('/auth/login');
-                    } else {
-                      router.push('/profile/orders');
-                    }
-                  }}>
-                    <Text style={styles.footerGridLinkText}>My Orders</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/contact')}>
-                    <Text style={styles.footerGridLinkText}>Contact Us</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Row 2: Connect With Us Centered (without Names, horizontal layout) */}
-              <View style={styles.footerConnectContainer}>
-                <Text style={styles.footerColumnHeaderCentred}>Connect With Us</Text>
-                <View style={styles.footerSocialIconsRow}>
-                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://whatsapp.com/channel/0029Vb76UKxL2ATwk9Z5Sd1z')}>
-                    <Ionicons name="logo-whatsapp" size={20} color="#2b3a1a" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.instagram.com/saranga_ayurveda')}>
-                    <Ionicons name="logo-instagram" size={20} color="#2b3a1a" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.facebook.com/people/Saranga-Ayurveda/61565898664471')}>
-                    <Ionicons name="logo-facebook" size={20} color="#2b3a1a" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.youtube.com/@saranga_ayurveda')}>
-                    <Ionicons name="logo-youtube" size={20} color="#2b3a1a" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.footerDivider} />
-
-              {/* Support Links Section (Stacked or inline flow) */}
-              <View style={styles.footerSupportSection}>
-                <Text style={styles.footerColumnHeader}>Support Links</Text>
-                <View style={styles.footerSupportRow}>
-                  {[
-                    { title: 'Terms & Conditions', route: '/legal/terms' },
-                    { title: 'Privacy Policy', route: '/legal/privacy-policy' },
-                    { title: 'Shipping and Delivery Policy', route: '/legal/shipping' },
-                    { title: 'Return/Cancellation Policy', route: '/legal/refund' },
-                    { title: 'Refund Policy', route: '/legal/refund' },
-                    { title: 'FAQs', route: '/faq' },
-                    { title: 'Help', route: '/help' }
-                  ].map((item) => (
-                    <TouchableOpacity
-                      key={item.title}
-                      style={styles.footerSupportLink}
-                      onPress={() => {
-                        if (item.route === '/legal/privacy-policy') {
-                          router.push('/legal/privacy-policy');
-                        } else if (item.route === '/legal/terms') {
-                          router.push('/legal/terms');
-                        } else if (item.route === '/legal/shipping') {
-                          router.push('/legal/shipping');
-                        } else if (item.route === '/legal/refund') {
-                          router.push('/legal/refund');
-                        } else if (item.route === '/faq') {
-                          router.push('/faq');
-                        } else if (item.route === '/help') {
-                          router.push('/help');
+                      const calculateDiscountedPrice = () => {
+                        const total = calculateTotalPrice();
+                        const discountValue = Number(combo.discount_value || 0);
+                        if (combo.discount_type === 'percentage') {
+                          return total - (total * (discountValue / 100));
+                        } else {
+                          return Math.max(0, total - discountValue);
                         }
-                      }}
+                      };
+
+                      const totalPrice = calculateTotalPrice();
+                      const discountedPrice = calculateDiscountedPrice();
+                      const savings = totalPrice - discountedPrice;
+
+                      // Get combo images (up to 2 for display)
+                      const comboImages = [
+                        combo.image_url,
+                        combo.image_url2,
+                        combo.image_url3,
+                        combo.image_url4
+                      ].filter(img => img && typeof img === 'string').slice(0, 2);
+
+                      const handleComboPress = () => {
+                        router.push({
+                          pathname: '/deals/combo-detail/[id]',
+                          params: {
+                            id: combo.id.toString(),
+                            comboData: JSON.stringify(combo),
+                          },
+                        });
+                      };
+
+                      return (
+                        <Animated.View
+                          key={`combo-${combo.id}-${index}`}
+                          style={[
+                            styles.horizontalProductItem,
+                            {
+                              width: horizontalCardWidth,
+                              opacity: fadeAnim,
+                              transform: [
+                                { translateY: productSlideAnim },
+                                { scale: scaleAnim }
+                              ]
+                            }
+                          ]}
+                        >
+                          <TouchableOpacity
+                            style={{
+                              backgroundColor: '#fff',
+                              borderRadius: 12,
+                              elevation: 4,
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.1,
+                              shadowRadius: 4,
+                              height: horizontalCardHeight,
+                              overflow: 'hidden',
+                              marginHorizontal: 6,
+                              marginVertical: 10,
+                              borderWidth: 1,
+                              borderColor: '#f0f0f0',
+                            }}
+                            onPress={handleComboPress}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{
+                              width: '100%',
+                              aspectRatio: 1,
+                              backgroundColor: '#f8f9fa',
+                              borderTopLeftRadius: 12,
+                              borderTopRightRadius: 12,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              overflow: 'hidden',
+                            }}>
+                              {comboImages.length > 0 ? (
+                                <Image
+                                  source={{ uri: apiService.getFullImageUrl(comboImages[0]) }}
+                                  style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                                />
+                              ) : (
+                                <Ionicons name="image-outline" size={32} color="#999" />
+                              )}
+                            </View>
+                            {Number(combo.discount_value) > 0 && (
+                              <View style={{
+                                position: 'absolute',
+                                top: 8,
+                                left: 8,
+                                backgroundColor: '#27ae60',
+                                borderRadius: 12,
+                                paddingVertical: 3,
+                                paddingHorizontal: 6,
+                                elevation: 2,
+                                shadowColor: '#27ae60',
+                                shadowOffset: { width: 0, height: 1 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 2,
+                              }}>
+                                <Text style={{
+                                  color: '#fff',
+                                  fontSize: 9,
+                                  fontWeight: 'bold',
+                                }}>
+                                  {combo.discount_type === 'percentage'
+                                    ? `${Number(combo.discount_value)}% OFF`
+                                    : `₹${Number(combo.discount_value)} OFF`}
+                                </Text>
+                              </View>
+                            )}
+
+                            <View style={{
+                              paddingVertical: 4,
+                              paddingHorizontal: 6,
+                              flex: 1,
+                              justifyContent: 'space-between',
+                            }}>
+                              <View>
+                                <Text style={styles.comboCardCategory}>COMBO OFFER</Text>
+                                <Text style={styles.comboCardName} numberOfLines={2}>{combo.title || 'Combo Offer'}</Text>
+                              </View>
+                              <View style={styles.comboCardPriceRow}>
+                                <Text style={styles.comboCardPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                                <View style={styles.comboCardBtn}>
+                                  <Ionicons name="chevron-forward" size={14} color="#2b3a1a" />
+                                </View>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    })
+                  ) : (
+                    // Fallback: Show placeholder when no active combos
+                    <View style={[styles.horizontalProductItem, { width: horizontalCardWidth }]}>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#fff',
+                          borderRadius: 12,
+                          elevation: 4,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 4,
+                          height: horizontalCardHeight,
+                          overflow: 'hidden',
+                          marginHorizontal: 6,
+                          marginVertical: 10,
+                          borderWidth: 1,
+                          borderColor: '#f0f0f0',
+                        }}
+                        onPress={() => router.push('/deals/combo-offers')}
+                      >
+                        <View style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          backgroundColor: '#f8f9fa',
+                          borderTopLeftRadius: 12,
+                          borderTopRightRadius: 12,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          overflow: 'hidden',
+                        }}>
+                          <Ionicons name="gift-outline" size={32} color="#999" />
+                        </View>
+
+                        <View style={{
+                          paddingVertical: 4,
+                          paddingHorizontal: 6,
+                          flex: 1,
+                          justifyContent: 'space-between',
+                        }}>
+                          <View>
+
+                            <Text style={{
+                              fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+                              fontSize: 13,
+                              fontWeight: 'bold',
+                              color: '#333333',
+                              lineHeight: 18,
+                              marginBottom: 4,
+                            }} numberOfLines={2}>Check Out Our Combo Offers</Text>
+                          </View>
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginTop: 'auto',
+                          }}>
+                            <Text style={{
+                              fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+                              fontSize: 15,
+                              fontWeight: 'bold',
+                              color: '#333333',
+                            }}>View Offers</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+
+              {/* Bottom Banner Slideshow Section */}
+              <View style={[styles.bannerContainer, { height: bannerHeight }]}>
+                <ScrollView
+                  ref={bottomBannerScrollViewRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={screenWidth - 24}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  onScroll={(event) => {
+                    const xOffset = event.nativeEvent.contentOffset.x;
+                    const slideWidth = screenWidth - 24;
+                    if (slideWidth > 0) {
+                      const index = Math.round(xOffset / slideWidth);
+                      const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
+                      if (currentBottomBannerIndex !== validIndex) {
+                        setCurrentBottomBannerIndex(validIndex);
+                      }
+                    }
+                  }}
+                  scrollEventThrottle={16}
+                  onMomentumScrollEnd={(event) => {
+                    const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
+                    const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
+                    if (currentBottomBannerIndex !== validIndex) {
+                      setCurrentBottomBannerIndex(validIndex);
+                    }
+                  }}
+                  onScrollBeginDrag={() => {
+                    isBottomUserInteracting.current = true;
+                  }}
+                  onScrollEndDrag={resetBottomUserInteraction}
+                  onTouchStart={() => {
+                    isBottomUserInteracting.current = true;
+                  }}
+                  onTouchEnd={resetBottomUserInteraction}
+                  style={{ width: screenWidth - 24 }}
+                >
+                  {BOTTOM_BANNER_DATA.map((banner) => (
+                    <TouchableOpacity
+                      key={banner.id}
+                      activeOpacity={0.95}
+                      onPress={() => handleBottomBannerPress(banner.id)}
+                      style={{ width: screenWidth - 24, height: bannerHeight }}
                     >
-                      <Text style={styles.footerSupportLinkText}>{item.title}</Text>
+                      <Image
+                        source={banner.image}
+                        style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                        resizeMode="cover"
+                      />
                     </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <View style={styles.bannerDotsContainer}>
+                  {BOTTOM_BANNER_DATA.map((_, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.bannerDot,
+                        currentBottomBannerIndex === idx && styles.bannerDotActive
+                      ]}
+                    />
                   ))}
                 </View>
               </View>
 
-              <View style={styles.footerDivider} />
+              {/* Our Story Banner Section */}
+              <View style={styles.ourStoryBannerCard}>
+                <View style={styles.ourStoryBannerRow}>
+                  <View style={styles.ourStoryBannerTextCol}>
+                    <Text style={styles.ourStoryBannerSub}>OUR STORY</Text>
+                    <Text style={styles.ourStoryBannerTitle}>
+                      Rooted in Ayurveda.{"\n"}Made for You.
+                    </Text>
+                    <View style={styles.ourStoryBannerDividerRow}>
+                      <View style={styles.ourStoryBannerDividerLine} />
+                      <Ionicons name="leaf" size={12} color="#694d21" style={{ marginHorizontal: 8 }} />
+                      <View style={styles.ourStoryBannerDividerLine} />
+                    </View>
+                    <Text style={styles.ourStoryBannerBody}>
+                      At Saranga Ayurveda, we blend ancient wisdom with modern living to create pure, natural and effective wellness solutions for every day.
+                    </Text>
+                  </View>
+                  <View style={styles.ourStoryBannerImageCol}>
+                    <Image
+                      source={OUR_STORY_BANNER_URI}
+                      style={styles.ourStoryBannerImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                </View>
 
-              {/* Footer Bottom Block */}
-              <View style={styles.footerBottomBlock}>
-                <Text style={styles.footerCopyrightText}>© 2026 Saranga Ayurveda. All Rights Reserved.</Text>
-                <Text style={styles.footerCopyrightSub}>Proudly Made In India</Text>
+                <View style={styles.ourStoryBannerButtonContainer}>
+                  <TouchableOpacity
+                    style={styles.ourStoryBannerReadMoreBtn}
+                    onPress={() => router.push('/our-story')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.ourStoryBannerReadMoreBtnText}>READ MORE</Text>
+                    <Ionicons name="arrow-forward-outline" size={14} color="#3d5236" style={{ marginLeft: 6 }} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </>
-        )}
+
+              {/* Custom Saranga Anugraha Foundation Section */}
+              <View style={styles.customFoundationSection}>
+                <Image
+                  source={HEADER_NAME_LOGO_URI}
+                  style={styles.customFoundationLogo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.customFoundationSubText}>In association with</Text>
+                <Text style={styles.customFoundationName}>Saranga Anugraha Foundation</Text>
+                <Text style={styles.customFoundationBigText}>needs your support</Text>
+
+                <View style={styles.customFoundationButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.customFoundationDonateButton}
+                    onPress={() => router.push('/donate')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.customFoundationDonateButtonText}>DONATE</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.customFoundationHelpButton}
+                    onPress={() => Linking.openURL('https://www.sarangaayurveda.com/foundation')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.customFoundationHelpButtonText}>I NEED HELP</Text>
+                    <View style={styles.customFoundationArrowCircle}>
+                      <Ionicons
+                        name="arrow-up-outline"
+                        size={14}
+                        color="#333"
+                        style={{ transform: [{ rotate: '45deg' }] }}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Foundation Graphic Slideshow */}
+              <View style={styles.foundationSlideshowContainer}>
+                <ScrollView
+                  ref={slideshowRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  style={[styles.slideshowScrollView, { height: screenWidth - 34 }]}
+                >
+                  {SLIDE_DATA.map((slide, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      activeOpacity={0.9}
+                      onPress={() => router.push('/donate')}
+                      style={[styles.slideTouch, { width: screenWidth - 34, height: screenWidth - 34 }]}
+                    >
+                      <Image
+                        source={slide.image}
+                        style={styles.slideImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.slideTextContainer}>
+                        <Text style={styles.slideTitleText}>{slide.title}</Text>
+                        <Text style={styles.slideDescText}>{slide.description}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Slideshow Indicators / Dots */}
+                <View style={styles.slideshowDotsContainer}>
+                  {SLIDE_DATA.map((_, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.slideshowDot,
+                        activeSlide === idx && styles.slideshowDotActive
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {/* Pillars of Beauty Section */}
+              {false && (
+                <View style={styles.pillarsSection}>
+                  <View style={styles.pillarsHeader}>
+                    <Text style={styles.pillarsTitle}>Pillars of Beauty in Ayurveda</Text>
+                    <Text style={styles.pillarsSubtitle}>
+                      Discover the ancient wisdom of Ayurvedic beauty rituals
+                    </Text>
+                  </View>
+                  <View style={[styles.pillarsGrid, {
+                    alignItems: 'center',
+                    paddingVertical: 40,
+                    backgroundColor: '#fff',
+                    borderRadius: 20,
+                    marginHorizontal: 16
+                  }]}>
+                    {/* First row - 2 items */}
+                    <View style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-around',
+                      width: '90%',
+                      marginBottom: 60
+                    }}>
+                      <View style={{ width: '42%', alignItems: 'center' }}>
+                        <View style={{
+                          width: 110,
+                          height: 110,
+                          borderRadius: 55,
+                          marginBottom: 16,
+                          borderWidth: 2,
+                          borderColor: '#694d21',
+                          backgroundColor: '#fff',
+                          elevation: 4,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                          overflow: 'hidden'
+                        }}>
+                          <Image
+                            source={{ uri: 'https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                        </View>
+                        <Text style={{
+                          fontSize: 18,
+                          marginBottom: 8,
+                          color: '#694d21',
+                          fontWeight: '600',
+                          textAlign: 'center'
+                        }}>Roopam</Text>
+                        <Text style={{
+                          fontSize: 14,
+                          color: '#666',
+                          textAlign: 'center',
+                          paddingHorizontal: 4
+                        }}>Outer Beauty & Radiance</Text>
+                      </View>
+                      <View style={{ width: '42%', alignItems: 'center' }}>
+                        <View style={{
+                          width: 110,
+                          height: 110,
+                          borderRadius: 55,
+                          marginBottom: 16,
+                          borderWidth: 2,
+                          borderColor: '#694d21',
+                          backgroundColor: '#fff',
+                          elevation: 4,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                          overflow: 'hidden'
+                        }}>
+                          <Image
+                            source={{ uri: 'https://images.pexels.com/photos/3762890/pexels-photo-3762890.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                        </View>
+                        <Text style={{
+                          fontSize: 18,
+                          marginBottom: 8,
+                          color: '#694d21',
+                          fontWeight: '600',
+                          textAlign: 'center'
+                        }}>Gunam</Text>
+                        <Text style={{
+                          fontSize: 14,
+                          color: '#666',
+                          textAlign: 'center',
+                          paddingHorizontal: 4
+                        }}>Inner Beauty & Wellness</Text>
+                      </View>
+                    </View>
+                    {/* Second row - 1 item centered */}
+                    <View style={{
+                      width: '42%',
+                      alignItems: 'center',
+                      transform: [{ translateY: -20 }]
+                    }}>
+                      <View style={{
+                        width: 110,
+                        height: 110,
+                        borderRadius: 55,
+                        marginBottom: 16,
+                        borderWidth: 2,
+                        borderColor: '#694d21',
+                        backgroundColor: '#fff',
+                        elevation: 4,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        overflow: 'hidden'
+                      }}>
+                        <Image
+                          source={{ uri: 'https://images.pexels.com/photos/3762880/pexels-photo-3762880.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text style={{
+                        fontSize: 18,
+                        marginBottom: 8,
+                        color: '#694d21',
+                        fontWeight: '600',
+                        textAlign: 'center'
+                      }}>Vayastyag</Text>
+                      <Text style={{
+                        fontSize: 14,
+                        color: '#666',
+                        textAlign: 'center',
+                        paddingHorizontal: 4
+                      }}>Lasting Beauty & Grace</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Daily Skincare Tips Section */}
+              {false && (
+                <View style={styles.tipsContainer}>
+                  <View style={styles.tipsHeader}>
+                    <Ionicons name="bulb" size={32} color="#694d21" />
+                    <Text style={styles.tipsTitle}>Daily Skincare Tips:</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.tipsScrollView}
+                    contentContainerStyle={{ paddingHorizontal: 8 }}
+                  >
+                    {skincareTips.map((tip, index) => (
+                      <Animated.View
+                        key={tip.id}
+                        style={[
+                          styles.tipCard,
+                          {
+                            opacity: tipCardAnims[index],
+                            transform: [
+                              {
+                                scale: tipCardAnims[index].interpolate({
+                                  inputRange: [0, 9],
+                                  outputRange: [0.8, 2]
+                                })
+                              }
+                            ]
+                          }
+                        ]}
+                      >
+                        <LinearGradient
+                          colors={[tip.backgroundColor, '#ffffff']}
+                          style={styles.tipGradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 0, y: 1 }}
+                        >
+                          <View style={[styles.tipIcon, { backgroundColor: tip.backgroundColor }]}>
+                            <Ionicons name={tip.icon as any} size={36} color="#694d21" />
+                          </View>
+                          <Text style={styles.tipTitle}>{tip.title}</Text>
+                          <Text style={styles.tipDescription}>{tip.description}</Text>
+                        </LinearGradient>
+                      </Animated.View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Your Concern, Our Collections Section */}
+              {/* Your Concern, Our Collections Section */}
+              {false && (
+                <View style={styles.concernSection}>
+                  <View style={styles.concernHeader}>
+                    <Text style={styles.concernTitle}>Your Concern, Our Collections</Text>
+                    <Text style={styles.concernSubtitle}>Find solutions for your specific needs</Text>
+                  </View>
+                  <View style={styles.concernContainer}>
+                    {(() => {
+                      const pattern = [2, 3]; // Alternating 2 and 3 items per row
+                      let currentIndex = 0;
+                      const rows = [];
+                      let patternIndex = 0;
+
+                      while (currentIndex < mainCategoriesWithImages.length) {
+                        const count = pattern[patternIndex % pattern.length];
+                        const chunk = mainCategoriesWithImages.slice(currentIndex, currentIndex + count);
+
+                        if (chunk.length > 0) {
+                          rows.push(
+                            <View key={currentIndex} style={styles.concernRow}>
+                              {chunk.map((category) => (
+                                <TouchableOpacity
+                                  key={category.id}
+                                  style={[styles.concernCircle, { width: screenWidth * 0.28 }]}
+                                  onPress={() => router.push({
+                                    pathname: '/category/[id]',
+                                    params: { id: category.id.toString(), name: category.name }
+                                  })}
+                                >
+                                  <View style={[styles.concernIconContainer, { width: screenWidth * 0.24, height: screenWidth * 0.24 }]}>
+                                    <Image
+                                      source={{ uri: category.image }}
+                                      style={styles.concernCircleImage}
+                                      resizeMode="cover"
+                                    />
+                                  </View>
+                                  <Text style={styles.concernText}>{category.name}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          );
+                        }
+
+                        currentIndex += count;
+                        patternIndex++;
+                      }
+                      return rows;
+                    })()}
+                  </View>
+                </View>
+              )}
+
+              {/* Charity, Foundation, and Brand Reviews Sections */}
+              {false && (
+                <View style={styles.section}>
+                  {/* Add Charity and Donations Section */}
+                  <View style={styles.charitySection}>
+                    <View style={styles.charityHeader}>
+                      <Text style={styles.charityTitle}>With every tap, we give life.</Text>
+                      <Text style={styles.charitySubtitle}>Making a difference together</Text>
+                    </View>
+
+                    <View style={styles.donationStatsContainer}>
+                      <View style={styles.donationCard}>
+                        <Ionicons name="heart" size={32} color="#694d21" />
+                        <Text style={styles.donationAmount}>₹1,25,000</Text>
+                        <Text style={styles.donationLabel}>Total Donations</Text>
+                      </View>
+
+                      <View style={styles.donationCard}>
+                        <Ionicons name="people" size={32} color="#694d21" />
+                        <Text style={styles.donationAmount}>250+</Text>
+                        <Text style={styles.donationLabel}>Lives Impacted</Text>
+                      </View>
+
+                      <View style={styles.donationCard}>
+                        <Ionicons name="leaf" size={32} color="#694d21" />
+                        <Text style={styles.donationAmount}>15</Text>
+                        <Text style={styles.donationLabel}>Projects Funded</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.donationChartContainer}>
+                      <View style={styles.chartHeader}>
+                        <Text style={styles.chartTitle}>We don't just collect—we deliver hope.</Text>
+                        <Text style={styles.chartSubtitle}>Last 6 months</Text>
+                      </View>
+
+                      <View style={styles.barChart}>
+                        {[45, 60, 75, 55, 80, 65].map((height, index) => (
+                          <View key={index} style={styles.barContainer}>
+                            <View style={[styles.bar, { height: height }]} />
+                            <Text style={styles.barLabel}>
+                              {['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'][index]}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.impactCategories}>
+                      <View style={styles.impactCategory}>
+                        <View style={[styles.impactIcon, { backgroundColor: '#FFE4E1' }]}>
+                          <Ionicons name="medkit" size={24} color="#694d21" />
+                        </View>
+                        <Text style={styles.impactTitle}>Healthcare</Text>
+                        <Text style={styles.impactAmount}>₹45,000</Text>
+                      </View>
+
+                      <View style={styles.impactCategory}>
+                        <View style={[styles.impactIcon, { backgroundColor: '#E0FFFF' }]}>
+                          <Ionicons name="book" size={24} color="#694d21" />
+                        </View>
+                        <Text style={styles.impactTitle}>Education</Text>
+                        <Text style={styles.impactAmount}>₹35,000</Text>
+                      </View>
+
+                      <View style={styles.impactCategory}>
+                        <View style={[styles.impactIcon, { backgroundColor: '#F0FFF0' }]}>
+                          <Ionicons name="nutrition" size={24} color="#694d21" />
+                        </View>
+                        <Text style={styles.impactTitle}>Food & Nutrition</Text>
+                        <Text style={styles.impactAmount}>₹45,000</Text>
+                      </View>
+                    </View>
+
+                    {/* Remove donation button */}
+                  </View>
+
+                  <FoundationSection />
+                  <BrandReviews />
+                </View>
+              )}
+
+              <View style={styles.footerContainer}>
+                {/* Navigation Grid (2 Columns) */}
+                <View style={styles.footerGridRow}>
+                  {/* Column 1: Get To Know Us */}
+                  <View style={styles.footerGridColumn}>
+                    <Text style={styles.footerColumnHeader}>Get To Know Us</Text>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/our-story')}>
+                      <Text style={styles.footerGridLinkText}>Our Story</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/careers')}>
+                      <Text style={styles.footerGridLinkText}>Careers</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/internships')}>
+                      <Text style={styles.footerGridLinkText}>Internships</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Column 2: Quick Links (Swapped with Connect With Us) */}
+                  <View style={styles.footerGridColumn}>
+                    <Text style={styles.footerColumnHeader}>Quick Links</Text>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/explore')}>
+                      <Text style={styles.footerGridLinkText}>Trending</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => {
+                      if (!isAuthenticated) {
+                        router.push('/auth/login');
+                      } else {
+                        router.push('/profile');
+                      }
+                    }}>
+                      <Text style={styles.footerGridLinkText}>My Account</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => {
+                      if (!isAuthenticated) {
+                        router.push('/auth/login');
+                      } else {
+                        router.push('/profile/orders');
+                      }
+                    }}>
+                      <Text style={styles.footerGridLinkText}>My Orders</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerGridLink} onPress={() => router.push('/contact')}>
+                      <Text style={styles.footerGridLinkText}>Contact Us</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Row 2: Connect With Us Centered (without Names, horizontal layout) */}
+                <View style={styles.footerConnectContainer}>
+                  <Text style={styles.footerColumnHeaderCentred}>Connect With Us</Text>
+                  <View style={styles.footerSocialIconsRow}>
+                    <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://whatsapp.com/channel/0029Vb76UKxL2ATwk9Z5Sd1z')}>
+                      <Ionicons name="logo-whatsapp" size={20} color="#2b3a1a" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.instagram.com/saranga_ayurveda')}>
+                      <Ionicons name="logo-instagram" size={20} color="#2b3a1a" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.facebook.com/people/Saranga-Ayurveda/61565898664471')}>
+                      <Ionicons name="logo-facebook" size={20} color="#2b3a1a" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerSocialIconBtn} onPress={() => Linking.openURL('https://www.youtube.com/@saranga_ayurveda')}>
+                      <Ionicons name="logo-youtube" size={20} color="#2b3a1a" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.footerDivider} />
+
+                {/* Support Links Section (Stacked or inline flow) */}
+                <View style={styles.footerSupportSection}>
+                  <View style={styles.footerSupportRow}>
+                    {[
+                      { title: 'Terms & Conditions', route: '/legal/terms' },
+                      { title: 'Privacy Policy', route: '/legal/privacy-policy' },
+                      { title: 'Shipping and Delivery Policy', route: '/legal/shipping' },
+                      { title: 'Return/Cancellation Policy', route: '/legal/refund' },
+                      { title: 'Refund Policy', route: '/legal/refund' },
+                      { title: 'FAQs', route: '/faq' },
+                      { title: 'Help', route: '/help' }
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item.title}
+                        style={styles.footerSupportLink}
+                        onPress={() => {
+                          if (item.route === '/legal/privacy-policy') {
+                            router.push('/legal/privacy-policy');
+                          } else if (item.route === '/legal/terms') {
+                            router.push('/legal/terms');
+                          } else if (item.route === '/legal/shipping') {
+                            router.push('/legal/shipping');
+                          } else if (item.route === '/legal/refund') {
+                            router.push('/legal/refund');
+                          } else if (item.route === '/faq') {
+                            router.push('/faq');
+                          } else if (item.route === '/help') {
+                            router.push('/help');
+                          }
+                        }}
+                      >
+                        <Text style={styles.footerSupportLinkText}>{item.title}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.footerDivider} />
+
+                {/* Footer Bottom Block */}
+                <View style={styles.footerBottomBlock}>
+                  <Text style={styles.footerCopyrightText}>© 2026 Saranga Ayurveda. All Rights Reserved.</Text>
+                  <Text style={styles.footerCopyrightSub}>Proudly Made In India</Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
 

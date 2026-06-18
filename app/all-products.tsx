@@ -114,9 +114,10 @@ export default function AllProductsPage() {
   
   // Calculate responsive card width
   const currentWidth = screenData.width;
+  const numColumns = currentWidth >= 768 ? 4 : currentWidth >= 480 ? 3 : 2;
   const responsiveGridPadding = currentWidth < 360 ? 8 : GRID_PADDING;
   const responsiveCardSpacing = currentWidth < 360 ? 4 : CARD_SPACING;
-  const responsiveItemWidth = (currentWidth - (responsiveGridPadding * 2) - responsiveCardSpacing) / 2;
+  const responsiveItemWidth = (currentWidth - (responsiveGridPadding * 2) - (responsiveCardSpacing * (numColumns - 1))) / numColumns;
 
   useEffect(() => {
     checkAuth();
@@ -331,10 +332,11 @@ export default function AllProductsPage() {
       ) : (
         <View style={{ flex: 1, maxWidth: 960, alignSelf: 'center', width: '100%' }}>
         <FlatList
+          key={numColumns}
           data={products}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
-          numColumns={2}
+          numColumns={numColumns}
           contentContainerStyle={[
             styles.productGrid,
             { 

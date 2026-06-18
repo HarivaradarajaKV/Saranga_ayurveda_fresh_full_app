@@ -60,6 +60,15 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
   const [isCartProcessing, setIsCartProcessing] = useState(false);
   const [lastTapTimestamp, setLastTapTimestamp] = useState(0);
 
+  const [cardWidth, setCardWidth] = useState<number | null>(null);
+
+  const handleLayout = (event: any) => {
+    const { width } = event.nativeEvent.layout;
+    if (width && width !== cardWidth) {
+      setCardWidth(width);
+    }
+  };
+
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const wishlistScaleAnim = useRef(new Animated.Value(1)).current;
@@ -273,10 +282,12 @@ export default function ProductCard({ product, hideActions = false, hideWishlist
 
   return (
     <Animated.View
+      onLayout={handleLayout}
       style={[
         styles.card,
         {
           opacity: fadeAnim,
+          height: cardWidth ? cardWidth + 95 : 255,
           transform: [
             { translateY: slideAnim },
             { scale: scaleAnim }
@@ -394,7 +405,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    height: 255,
     position: 'relative',
     overflow: 'hidden',
     marginHorizontal: 6,

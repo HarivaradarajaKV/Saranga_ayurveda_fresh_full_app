@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, StatusBar, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useCategories } from '../CategoryContext';
 import ProductCard from '../components/ProductCard';
@@ -48,6 +48,8 @@ export default function CategoryPage() {
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const insets = useSafeAreaInsets();
+    const { width: windowWidth } = useWindowDimensions();
+    const numColumns = windowWidth >= 768 ? 4 : windowWidth >= 480 ? 3 : 2;
 
     const category = getCategoryById(Number(id));
 
@@ -132,14 +134,15 @@ export default function CategoryPage() {
                     </View>
                 ) : (
                     <FlatList
+                        key={numColumns}
                         data={filteredProducts}
                         renderItem={({ item }) => (
-                            <View style={styles.productItem}>
+                            <View style={[styles.productItem, { maxWidth: `${100 / numColumns}%` }]}>
                                 <ProductCard product={item} />
                             </View>
                         )}
                         keyExtractor={item => item.id.toString()}
-                        numColumns={2}
+                        numColumns={numColumns}
                         contentContainerStyle={styles.productGrid}
                         columnWrapperStyle={styles.productRow}
                         showsVerticalScrollIndicator={false}

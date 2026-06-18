@@ -19,7 +19,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import { Video, ResizeMode } from 'expo-av';
@@ -71,7 +71,7 @@ interface Product {
   faqs?: FAQ[];
 }
 
-interface RelatedProduct extends Product {}
+interface RelatedProduct extends Product { }
 
 interface FAQ {
   question: string;
@@ -119,7 +119,7 @@ export default function ProductPage() {
   const [reviewCount, setReviewCount] = useState(0);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [imageErrors, setImageErrors] = useState<{[key: number]: boolean}>({});
+  const [imageErrors, setImageErrors] = useState<{ [key: number]: boolean }>({});
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const [isHowToUseExpanded, setIsHowToUseExpanded] = useState(false);
   const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(false);
@@ -160,18 +160,18 @@ export default function ProductPage() {
   // Function to get all media items for the main details carousel
   const getMediaList = () => {
     if (!productData) return [];
-    
+
     if (productData.media && Array.isArray(productData.media) && productData.media.length > 0) {
       return productData.media;
     }
-    
+
     // Fallback to legacy structure
     const legacyList = [
       { url: productData.image_url, type: 'image' }
     ];
     if (productData.image_url2) legacyList.push({ url: productData.image_url2, type: 'image' });
     if (productData.image_url3) legacyList.push({ url: productData.image_url3, type: 'image' });
-    
+
     return legacyList;
   };
 
@@ -181,7 +181,7 @@ export default function ProductPage() {
       const imageUrls = getMediaList()
         .filter(item => item.type !== 'video')
         .map(item => apiService.getFullImageUrl(item.url));
-      
+
       imagePreloader.preloadCarouselImages(imageUrls, currentImageIndex);
     }
   }, [currentImageIndex, productData]);
@@ -189,7 +189,7 @@ export default function ProductPage() {
   // Auto-scroll images every 8 seconds
   useEffect(() => {
     if (!productData || isImageViewerVisible || isAutoScrollDisabled) return;
-    
+
     const mediaList = getMediaList();
     const numItems = mediaList.length;
 
@@ -291,7 +291,7 @@ export default function ProductPage() {
     try {
       const response = await apiService.get(`/products/${id}/reviews`);
       console.log('Raw reviews response:', response.data);
-      
+
       if (response.data) {
         let reviewsData = [];
         // Handle both array and object response formats
@@ -302,11 +302,11 @@ export default function ProductPage() {
         }
 
         console.log('Processed reviews data:', reviewsData);
-        
-        const avgRating = reviewsData.length > 0 
-          ? reviewsData.reduce((acc: number, review: any) => acc + review.rating, 0) / reviewsData.length 
+
+        const avgRating = reviewsData.length > 0
+          ? reviewsData.reduce((acc: number, review: any) => acc + review.rating, 0) / reviewsData.length
           : 0;
-        
+
         setReviews(reviewsData);
         setAverageRating(avgRating);
         setReviewCount(reviewsData.length);
@@ -329,7 +329,7 @@ export default function ProductPage() {
     setIsCheckingDelivery(true);
     try {
       const isBangaloreArea = parseInt(pincode) >= 560001 && parseInt(pincode) <= 560100;
-      
+
       if (isBangaloreArea) {
         Alert.alert(
           'Delivery Status',
@@ -411,8 +411,8 @@ export default function ProductPage() {
       } else {
         const wishlistProduct = {
           ...productData,
-          usage_instructions: Array.isArray(productData.usage_instructions) 
-            ? productData.usage_instructions.join('\n') 
+          usage_instructions: Array.isArray(productData.usage_instructions)
+            ? productData.usage_instructions.join('\n')
             : productData.usage_instructions,
           benefits: Array.isArray(productData.benefits)
             ? productData.benefits.join('\n')
@@ -452,20 +452,20 @@ export default function ProductPage() {
       };
 
       console.log('Sending review data:', reviewData);
-      
+
       const response = await apiService.post(`/products/${id}/reviews`, reviewData);
       console.log('Review submission response:', response.data);
-      
+
       if (response.data) {
         // Add the new review to the existing reviews
         const newReview = response.data.review || response.data;
         setReviews(prevReviews => [...prevReviews, newReview]);
-        
+
         // Recalculate average rating
         const newAvgRating = (averageRating * reviewCount + review.rating) / (reviewCount + 1);
         setAverageRating(newAvgRating);
         setReviewCount(prev => prev + 1);
-        
+
         Alert.alert('Success', 'Review added successfully');
       }
     } catch (error) {
@@ -548,16 +548,16 @@ export default function ProductPage() {
   // Function to get image URLs for the viewer (images and gifs, excluding videos)
   const getImageUrls = () => {
     if (!productData) return [];
-    
+
     const mediaList = getMediaList();
     const imagesOnly = mediaList.filter(m => m.type !== 'video');
-    
+
     if (imagesOnly.length > 0) {
       return imagesOnly.map((m, idx) => ({
         url: imageErrors[idx] ? 'https://via.placeholder.com/400x400/f8f9fa/666666?text=No+Image' : apiService.getFullImageUrl(m.url)
       }));
     }
-    
+
     return [];
   };
 
@@ -576,418 +576,423 @@ export default function ProductPage() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={{ width: '100%', maxWidth: 750, alignSelf: 'center', flex: 1 }}>
-        <ScrollView 
-          style={styles.container} 
+        <ScrollView
+          style={styles.container}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
 
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} delayPressIn={0}>
-            <Ionicons name="arrow-back" size={22} color="#333" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Product Images with Discount Badge */}
-        <View style={styles.imageSection}>
-          <ScrollView 
-            ref={scrollViewRef}
-            horizontal 
-            pagingEnabled 
-            showsHorizontalScrollIndicator={false}
-            style={[styles.imageContainer, { width: screenWidth }]}
-            onScroll={(event) => {
-              const contentOffset = event.nativeEvent.contentOffset;
-              const viewSize = event.nativeEvent.layoutMeasurement;
-              const selectedIndex = Math.floor(contentOffset.x / viewSize.width);
-              setCurrentImageIndex(selectedIndex);
-            }}
-            scrollEventThrottle={16}
-          >
-            {getMediaList().map((item, index) => (
-              <View key={index} style={[styles.imageWrapper, { width: screenWidth }]}>
-                {item.type === 'video' ? (
-                  <Video
-                    source={{ uri: apiService.getFullImageUrl(item.url) }}
-                    rate={1.0}
-                    volume={1.0}
-                    isMuted={true}
-                    resizeMode={ResizeMode.CONTAIN}
-                    shouldPlay={currentImageIndex === index}
-                    isLooping
-                    useNativeControls
-                    style={[styles.productVideo, { width: screenWidth }]}
-                  />
-                ) : (
-                  <TouchableOpacity 
-                    onPress={() => handleImagePress(index)}
-                    activeOpacity={0.9}
-                    style={{ width: '100%', height: '100%' }}
-                  >
-                    <OptimizedImage
-                      source={{ uri: apiService.getFullImageUrl(item.url) }}
-                      style={[styles.productImage, { width: screenWidth }]}
-                      resizeMode="contain"
-                      placeholderColor="#f8f9fa"
-                      showLoader={true}
-                      priority={index === 0 ? "high" : "normal"}
-                      onError={() => handleImageError(index)}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </ScrollView>
-
-          {/* Discount Badge overlaid on image */}
-          {productData.offer_percentage > 0 && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountBadgeText}>-{productData.offer_percentage}%</Text>
-            </View>
-          )}
-
-          {/* Pagination Dots */}
-          {getMediaList().length > 1 && !isImageViewerVisible && (
-            <View style={styles.paginationDots}>
-              {getMediaList().map((_, idx) => (
-                <View key={idx} style={[styles.dot, currentImageIndex === idx && styles.activeDot]} />
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Image Viewer Modal */}
-        <Modal
-          visible={isImageViewerVisible}
-          transparent={true}
-          onRequestClose={() => setIsImageViewerVisible(false)}
-          animationType="fade"
-        >
-          <View style={styles.imageViewerContainer}>
-            <ImageViewer
-              imageUrls={getImageUrls()}
-              index={currentImageIndex}
-              onChange={(index) => {
-                if (index !== undefined) {
-                  setCurrentImageIndex(index);
-                }
-              }}
-              enableSwipeDown={true}
-              onSwipeDown={() => setIsImageViewerVisible(false)}
-              renderHeader={() => <></>}
-              renderIndicator={() => <></>}
-            />
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsImageViewerVisible(false)}
-              activeOpacity={0.7}
-              delayPressIn={0}
-            >
-              <Ionicons name="close" size={28} color="white" />
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} delayPressIn={0}>
+              <Ionicons name="arrow-back" size={22} color="#333" />
             </TouchableOpacity>
           </View>
-        </Modal>
 
-        {/* Product Info */}
-        <View style={styles.productInfo}>
+          {/* Product Images with Discount Badge */}
+          <View style={styles.imageSection}>
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={[styles.imageContainer, { width: screenWidth, height: screenWidth }]}
+              onScroll={(event) => {
+                const contentOffset = event.nativeEvent.contentOffset;
+                const viewSize = event.nativeEvent.layoutMeasurement;
+                const selectedIndex = Math.floor(contentOffset.x / viewSize.width);
+                setCurrentImageIndex(selectedIndex);
+              }}
+              scrollEventThrottle={16}
+            >
+              {getMediaList().map((item, index) => (
+                <View key={index} style={[styles.imageWrapper, { width: screenWidth, height: screenWidth }]}>
+                  {item.type === 'video' ? (
+                    <Video
+                      source={{ uri: apiService.getFullImageUrl(item.url) }}
+                      rate={1.0}
+                      volume={1.0}
+                      isMuted={true}
+                      resizeMode={ResizeMode.CONTAIN}
+                      shouldPlay={currentImageIndex === index}
+                      isLooping
+                      useNativeControls
+                      style={[styles.productVideo, { width: screenWidth, height: screenWidth }]}
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleImagePress(index)}
+                      activeOpacity={0.9}
+                      style={{ width: '100%', height: '100%' }}
+                    >
+                      <OptimizedImage
+                        source={{ uri: apiService.getFullImageUrl(item.url) }}
+                        style={[styles.productImage, { width: screenWidth, height: screenWidth }]}
+                        resizeMode="contain"
+                        placeholderColor="#f8f9fa"
+                        showLoader={true}
+                        priority={index === 0 ? "high" : "normal"}
+                        onError={() => handleImageError(index)}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
 
-          {/* Price Row with Share & Wishlist */}
-          <View style={styles.priceHeaderRow}>
-            <View style={styles.priceContainer}>
-              {productData.offer_percentage > 0 ? (
-                <>
-                  <Text style={styles.price}>
-                    ₹{(productData.price * (1 - productData.offer_percentage / 100)).toFixed(2)}
-                  </Text>
-                  <Text style={styles.originalPrice}>
-                    ₹{parseFloat(String(productData.price)).toFixed(2)}
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.price}>₹{parseFloat(String(productData.price)).toFixed(2)}</Text>
-              )}
-            </View>
-            <View style={styles.priceHeaderIcons}>
-              <TouchableOpacity onPress={handleShare} style={styles.iconCircleBtn} activeOpacity={0.7} delayPressIn={0}>
-                <Ionicons name="share-outline" size={20} color="#444" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleWishlistPress} style={styles.iconCircleBtn} activeOpacity={0.7} delayPressIn={0}>
-                <Ionicons 
-                  name={isInWishlist(productData.id) ? "heart" : "heart-outline"} 
-                  size={20} 
-                  color={isInWishlist(productData.id) ? "#e74c3c" : "#444"} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+            {/* Discount Badge overlaid on image */}
+            {productData.offer_percentage > 0 && (
+              <View style={styles.discountBadge}>
+                <Text style={styles.discountBadgeText}>-{productData.offer_percentage}%</Text>
+              </View>
+            )}
 
-          {/* Product Name */}
-          <Text style={styles.productName}>{productData.name}</Text>
-
-          {/* Short Description */}
-          {productData.description ? (
-            <Text style={styles.shortDescription} numberOfLines={2}>{productData.description}</Text>
-          ) : null}
-
-          <View style={styles.dividerLine} />
-
-          {/* Size selector */}
-          {(productData.sizes && productData.sizes.length > 0) || productData.size ? (
-            <View style={styles.sizeSection}>
-              <Text style={styles.sizeLabel}>Size</Text>
-              <View style={styles.sizeChipsRow}>
-                {(productData.sizes && productData.sizes.length > 0
-                  ? productData.sizes
-                  : [productData.size as string]
-                ).map((s, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[
-                      styles.sizeChip,
-                      selectedSize === s && styles.sizeChipSelected,
-                    ]}
-                    onPress={() => setSelectedSize(s)}
-                    activeOpacity={0.8}
-                    delayPressIn={0}
-                  >
-                    <Text style={[styles.sizeChipText, selectedSize === s && styles.sizeChipTextSelected]}>{s}</Text>
-                  </TouchableOpacity>
+            {/* Pagination Dots */}
+            {getMediaList().length > 1 && !isImageViewerVisible && (
+              <View style={styles.paginationDots}>
+                {getMediaList().map((_, idx) => (
+                  <View key={idx} style={[styles.dot, currentImageIndex === idx && styles.activeDot]} />
                 ))}
               </View>
-            </View>
-          ) : null}
+            )}
+          </View>
 
-          {/* Stock Indicator */}
-          {productData.stock_quantity === 0 ? (
-            <View style={styles.stockContainer}>
-              <Text style={[styles.stockText, styles.outOfStock]}>Out of Stock</Text>
-            </View>
-          ) : productData.stock_quantity < 10 ? (
-            <View style={styles.stockContainer}>
-              <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="flame" size={14} color="#e74c3c" style={{ marginRight: 4 }} />
-                <Text style={[styles.stockText, styles.lowStock]}>Only few left!</Text>
-              </Animated.View>
-            </View>
-          ) : null}
-
-          {/* Quantity Selector + Add to Cart */}
-          {productData.stock_quantity > 0 && (
-            <View style={styles.cartRow}>
-              <View style={styles.quantitySelector}>
-                <TouchableOpacity
-                  style={styles.qtyBtn}
-                  onPress={() => setQuantity(q => Math.max(1, q - 1))}
-                  activeOpacity={0.7}
-                  delayPressIn={0}
-                >
-                  <Text style={styles.qtyBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{quantity}</Text>
-                <TouchableOpacity
-                  style={styles.qtyBtn}
-                  onPress={() => setQuantity(q => q + 1)}
-                  activeOpacity={0.7}
-                  delayPressIn={0}
-                >
-                  <Text style={styles.qtyBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
+          {/* Image Viewer Modal */}
+          <Modal
+            visible={isImageViewerVisible}
+            transparent={true}
+            onRequestClose={() => setIsImageViewerVisible(false)}
+            animationType="fade"
+          >
+            <View style={styles.imageViewerContainer}>
+              <ImageViewer
+                imageUrls={getImageUrls()}
+                index={currentImageIndex}
+                onChange={(index) => {
+                  if (index !== undefined) {
+                    setCurrentImageIndex(index);
+                  }
+                }}
+                enableSwipeDown={true}
+                onSwipeDown={() => setIsImageViewerVisible(false)}
+                renderHeader={() => <></>}
+                renderIndicator={() => <></>}
+              />
               <TouchableOpacity
-                style={styles.addToCartBtn}
-                onPress={() => handleAddToCart()}
-                disabled={isAddingToCart}
-                activeOpacity={0.85}
+                style={styles.closeButton}
+                onPress={() => setIsImageViewerVisible(false)}
+                activeOpacity={0.7}
                 delayPressIn={0}
               >
-                <Ionicons name="cart-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.addToCartBtnText}>{isAddingToCart ? 'Adding...' : 'Add to Cart'}</Text>
+                <Ionicons name="close" size={28} color="white" />
               </TouchableOpacity>
             </View>
-          )}
+          </Modal>
 
-          {/* Buy Now */}
-          {productData.stock_quantity > 0 ? (
-            <TouchableOpacity
-              style={styles.buyNowBtn}
-              onPress={() => handleBuyNow()}
-              activeOpacity={0.8}
-              delayPressIn={0}
-            >
-              <Text style={styles.buyNowBtnText}>Buy Now</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.outOfStockContainer}>
-              <Text style={styles.outOfStockMessage}>Stay tuned for this item to be back in stock.</Text>
-              <TouchableOpacity style={styles.notifyButton} onPress={handleNotifyMe}>
-                <Text style={styles.notifyButtonText}>Notify Me When Available</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Product Info */}
+          <View style={styles.productInfo}>
 
-          {/* Feature Badges */}
-          <View style={styles.featureBadgesCard}>
-            <View style={styles.featureBadge}>
-              <Text style={styles.featureBadgeIcon}>🌿</Text>
-              <Text style={styles.featureBadgeText}>100% Natural</Text>
-            </View>
-            <View style={styles.featureBadgeDivider} />
-            <View style={styles.featureBadge}>
-              <Text style={styles.featureBadgeIcon}>🐇</Text>
-              <Text style={styles.featureBadgeText}>Cruelty Free</Text>
-            </View>
-            <View style={styles.featureBadgeDivider} />
-            <View style={styles.featureBadge}>
-              <Text style={styles.featureBadgeIcon}>♻️</Text>
-              <Text style={styles.featureBadgeText}>Eco Friendly</Text>
-            </View>
-            <View style={styles.featureBadgeDivider} />
-            <View style={styles.featureBadge}>
-              <Text style={styles.featureBadgeIcon}>🛡️</Text>
-              <Text style={styles.featureBadgeText}>Expert Approved</Text>
-            </View>
-          </View>
-
-          {/* Accordion Sections */}
-          <View style={styles.accordionContainer}>
-
-            {/* Details (Description) */}
-            {productData.description && (
-              <View style={styles.accordionSection}>
-                <TouchableOpacity
-                  style={styles.accordionHeader}
-                  onPress={() => setIsDescExpanded(!isDescExpanded)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.accordionTitle}>Details</Text>
-                  <Ionicons name={isDescExpanded ? 'remove' : 'add'} size={20} color="#333" />
-                </TouchableOpacity>
-                {isDescExpanded && (
-                  <View style={styles.accordionContent}>
-                    <Text style={styles.descriptionText}>{productData.description}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* How to Use */}
-            {productData.usage_instructions && (
-              <View style={styles.accordionSection}>
-                <TouchableOpacity
-                  style={styles.accordionHeader}
-                  onPress={() => setIsHowToUseExpanded(!isHowToUseExpanded)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.accordionTitle}>How to Use</Text>
-                  <Ionicons name={isHowToUseExpanded ? 'remove' : 'add'} size={20} color="#333" />
-                </TouchableOpacity>
-                {isHowToUseExpanded && (
-                  <View style={styles.accordionContent}>
-                    <Text style={styles.descriptionText}>
-                      {(Array.isArray(productData.usage_instructions)
-                        ? productData.usage_instructions
-                        : productData.usage_instructions.split('\n')
-                      )
-                        .map(inst => inst.replace(/^\s*(?:step\s*\d+\s*[:.-]?\s*|\d+\s*[:.-]\s*)/i, '').trim())
-                        .filter(Boolean)
-                        .join(' ')}
+            {/* Price Row with Share & Wishlist */}
+            <View style={styles.priceHeaderRow}>
+              <View style={styles.priceContainer}>
+                {productData.offer_percentage > 0 ? (
+                  <>
+                    <Text style={styles.price}>
+                      ₹{(productData.price * (1 - productData.offer_percentage / 100)).toFixed(2)}
                     </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Ingredients */}
-            {productData.ingredients && (
-              <View style={styles.accordionSection}>
-                <TouchableOpacity
-                  style={styles.accordionHeader}
-                  onPress={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.accordionTitle}>Ingredients</Text>
-                  <Ionicons name={isIngredientsExpanded ? 'remove' : 'add'} size={20} color="#333" />
-                </TouchableOpacity>
-                {isIngredientsExpanded && (
-                  <View style={styles.accordionContent}>
-                    <Text style={styles.descriptionText}>
-                      {Array.isArray(productData.ingredients)
-                        ? productData.ingredients.join(', ')
-                        : productData.ingredients}
+                    <Text style={styles.originalPrice}>
+                      ₹{parseFloat(String(productData.price)).toFixed(2)}
                     </Text>
-                  </View>
+                  </>
+                ) : (
+                  <Text style={styles.price}>₹{parseFloat(String(productData.price)).toFixed(2)}</Text>
                 )}
+              </View>
+              <View style={styles.priceHeaderIcons}>
+                <TouchableOpacity onPress={handleShare} style={styles.iconCircleBtn} activeOpacity={0.7} delayPressIn={0}>
+                  <Ionicons name="share-outline" size={20} color="#444" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleWishlistPress} style={styles.iconCircleBtn} activeOpacity={0.7} delayPressIn={0}>
+                  <Ionicons
+                    name={isInWishlist(productData.id) ? "heart" : "heart-outline"}
+                    size={20}
+                    color={isInWishlist(productData.id) ? "#e74c3c" : "#444"}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Product Name */}
+            <Text style={styles.productName}>{productData.name}</Text>
+
+            {/* Short Description */}
+            {productData.description ? (
+              <Text style={styles.shortDescription} numberOfLines={2}>{productData.description}</Text>
+            ) : null}
+
+            <View style={styles.dividerLine} />
+
+            {/* Size selector */}
+            {(productData.sizes && productData.sizes.length > 0) || productData.size ? (
+              <View style={styles.sizeSection}>
+                <Text style={styles.sizeLabel}>Size</Text>
+                <View style={styles.sizeChipsRow}>
+                  {(productData.sizes && productData.sizes.length > 0
+                    ? productData.sizes
+                    : [productData.size as string]
+                  ).map((s, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[
+                        styles.sizeChip,
+                        selectedSize === s && styles.sizeChipSelected,
+                      ]}
+                      onPress={() => setSelectedSize(s)}
+                      activeOpacity={0.8}
+                      delayPressIn={0}
+                    >
+                      <Text style={[styles.sizeChipText, selectedSize === s && styles.sizeChipTextSelected]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {/* Stock Indicator */}
+            {productData.stock_quantity === 0 ? (
+              <View style={styles.stockContainer}>
+                <Text style={[styles.stockText, styles.outOfStock]}>Out of Stock</Text>
+              </View>
+            ) : productData.stock_quantity < 10 ? (
+              <View style={styles.stockContainer}>
+                <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="flame" size={14} color="#e74c3c" style={{ marginRight: 4 }} />
+                  <Text style={[styles.stockText, styles.lowStock]}>Only few left!</Text>
+                </Animated.View>
+              </View>
+            ) : null}
+
+            {/* Quantity Selector + Add to Cart */}
+            {productData.stock_quantity > 0 && (
+              <View style={styles.cartRow}>
+                <View style={styles.quantitySelector}>
+                  <TouchableOpacity
+                    style={styles.qtyBtn}
+                    onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                    activeOpacity={0.7}
+                    delayPressIn={0}
+                  >
+                    <Text style={styles.qtyBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyValue}>{quantity}</Text>
+                  <TouchableOpacity
+                    style={styles.qtyBtn}
+                    onPress={() => {
+                      if (quantity >= productData.stock_quantity) {
+                        Alert.alert('Limit Reached', `Only ${productData.stock_quantity} units available in stock.`);
+                        return;
+                      }
+                      setQuantity(q => q + 1);
+                    }}
+                    activeOpacity={0.7}
+                    delayPressIn={0}
+                  >
+                    <Text style={styles.qtyBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.addToCartBtn}
+                  onPress={() => handleAddToCart()}
+                  disabled={isAddingToCart}
+                  activeOpacity={0.85}
+                  delayPressIn={0}
+                >
+                  <Ionicons name="cart-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.addToCartBtnText}>{isAddingToCart ? 'Adding...' : 'Add to Cart'}</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            {/* Delivery & Returns */}
-            <View style={styles.accordionSection}>
+            {/* Buy Now */}
+            {productData.stock_quantity > 0 ? (
               <TouchableOpacity
-                style={styles.accordionHeader}
-                onPress={() => setIsDeliveryExpanded(!isDeliveryExpanded)}
-                activeOpacity={0.7}
+                style={styles.buyNowBtn}
+                onPress={() => handleBuyNow()}
+                activeOpacity={0.8}
+                delayPressIn={0}
               >
-                <Text style={styles.accordionTitle}>Delivery & Returns</Text>
-                <Ionicons name={isDeliveryExpanded ? 'remove' : 'add'} size={20} color="#333" />
+                <Text style={styles.buyNowBtnText}>Buy Now</Text>
               </TouchableOpacity>
-              {isDeliveryExpanded && (
-                <View style={styles.accordionContent}>
-                  <View style={styles.deliveryCheckInner}>
-                    <Text style={styles.deliverySubtitle}>Check Delivery</Text>
-                    <View style={styles.pincodeContainer}>
-                      <TextInput
-                        style={styles.pincodeInput}
-                        placeholder="Enter Pincode"
-                        value={pincode}
-                        onChangeText={setPincode}
-                        keyboardType="numeric"
-                        maxLength={6}
-                        placeholderTextColor="#aaa"
-                      />
-                      <TouchableOpacity
-                        style={styles.checkButton}
-                        onPress={checkDelivery}
-                        disabled={isCheckingDelivery}
-                      >
-                        <Text style={styles.checkButtonText}>{isCheckingDelivery ? 'Checking...' : 'Check'}</Text>
-                      </TouchableOpacity>
+            ) : (
+              <View style={styles.outOfStockContainer}>
+                <Text style={styles.outOfStockMessage}>Stay tuned for this item to be back in stock.</Text>
+                <TouchableOpacity style={styles.notifyButton} onPress={handleNotifyMe}>
+                  <Text style={styles.notifyButtonText}>Notify Me When Available</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature Badges */}
+            <View style={styles.featureBadgesCard}>
+              <View style={styles.featureBadge}>
+                <Ionicons name="leaf" size={22} color="#556C3A" />
+                <Text style={styles.featureBadgeText}>100% Natural</Text>
+              </View>
+              <View style={styles.featureBadgeDivider} />
+              <View style={styles.featureBadge}>
+                <MaterialCommunityIcons name="rabbit" size={22} color="#556C3A" />
+                <Text style={styles.featureBadgeText}>Cruelty Free</Text>
+              </View>
+              <View style={styles.featureBadgeDivider} />
+              <View style={styles.featureBadge}>
+                <MaterialCommunityIcons name="recycle" size={22} color="#556C3A" />
+                <Text style={styles.featureBadgeText}>Eco Friendly</Text>
+              </View>
+              <View style={styles.featureBadgeDivider} />
+              <View style={styles.featureBadge}>
+                <Ionicons name="shield-checkmark" size={22} color="#556C3A" />
+                <Text style={styles.featureBadgeText}>Expert Approved</Text>
+              </View>
+            </View>
+
+            {/* Accordion Sections */}
+            <View style={styles.accordionContainer}>
+
+              {/* Details (Description) */}
+              {productData.description && (
+                <View style={styles.accordionSection}>
+                  <TouchableOpacity
+                    style={styles.accordionHeader}
+                    onPress={() => setIsDescExpanded(!isDescExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.accordionTitle}>Details</Text>
+                    <Ionicons name={isDescExpanded ? 'remove' : 'add'} size={20} color="#333" />
+                  </TouchableOpacity>
+                  {isDescExpanded && (
+                    <View style={styles.accordionContent}>
+                      <Text style={styles.descriptionText}>{productData.description}</Text>
                     </View>
-                    <Text style={styles.deliveryNote}>Free delivery on orders above ₹499. Easy 7-day returns.</Text>
-                  </View>
+                  )}
                 </View>
               )}
+
+              {/* How to Use */}
+              {productData.usage_instructions && (
+                <View style={styles.accordionSection}>
+                  <TouchableOpacity
+                    style={styles.accordionHeader}
+                    onPress={() => setIsHowToUseExpanded(!isHowToUseExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.accordionTitle}>How to Use</Text>
+                    <Ionicons name={isHowToUseExpanded ? 'remove' : 'add'} size={20} color="#333" />
+                  </TouchableOpacity>
+                  {isHowToUseExpanded && (
+                    <View style={styles.accordionContent}>
+                      <Text style={styles.descriptionText}>
+                        {(Array.isArray(productData.usage_instructions)
+                          ? productData.usage_instructions
+                          : productData.usage_instructions.split('\n')
+                        )
+                          .map(inst => inst.replace(/^\s*(?:step\s*\d+\s*[:.-]?\s*|\d+\s*[:.-]\s*)/i, '').trim())
+                          .filter(Boolean)
+                          .join(' ')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Ingredients */}
+              {productData.ingredients && (
+                <View style={styles.accordionSection}>
+                  <TouchableOpacity
+                    style={styles.accordionHeader}
+                    onPress={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.accordionTitle}>Ingredients</Text>
+                    <Ionicons name={isIngredientsExpanded ? 'remove' : 'add'} size={20} color="#333" />
+                  </TouchableOpacity>
+                  {isIngredientsExpanded && (
+                    <View style={styles.accordionContent}>
+                      <Text style={styles.descriptionText}>
+                        {Array.isArray(productData.ingredients)
+                          ? productData.ingredients.join(', ')
+                          : productData.ingredients}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Check Delivery */}
+              <View style={styles.accordionSection}>
+                <TouchableOpacity
+                  style={styles.accordionHeader}
+                  onPress={() => setIsDeliveryExpanded(!isDeliveryExpanded)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.accordionTitle}>Check Delivery</Text>
+                  <Ionicons name={isDeliveryExpanded ? 'remove' : 'add'} size={20} color="#333" />
+                </TouchableOpacity>
+                {isDeliveryExpanded && (
+                  <View style={styles.accordionContent}>
+                    <View style={styles.deliveryCheckInner}>
+                      <View style={styles.pincodeContainer}>
+                        <TextInput
+                          style={styles.pincodeInput}
+                          placeholder="Enter Pincode"
+                          value={pincode}
+                          onChangeText={setPincode}
+                          keyboardType="numeric"
+                          maxLength={6}
+                          placeholderTextColor="#aaa"
+                        />
+                        <TouchableOpacity
+                          style={styles.checkButton}
+                          onPress={checkDelivery}
+                          disabled={isCheckingDelivery}
+                        >
+                          <Text style={styles.checkButtonText}>{isCheckingDelivery ? 'Checking...' : 'Check'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.deliveryNote}>Free delivery on orders above ₹599.</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
 
-          {/* FAQ */}
-          {productData.faqs && productData.faqs.length > 0 && (
-            <FrequentlyAskedQuestions />
-          )}
+            {/* FAQ */}
+            {productData.faqs && productData.faqs.length > 0 && (
+              <FrequentlyAskedQuestions />
+            )}
 
-          {/* Frequently Bought Together */}
-          {productData && (
-            <FrequentlyBoughtTogether 
-              currentProductId={productData.id}
-              category={productData.category}
-              categoryName={productData.category_name}
+            {/* Frequently Bought Together */}
+            {productData && (
+              <FrequentlyBoughtTogether
+                currentProductId={productData.id}
+                category={productData.category}
+                categoryName={productData.category_name}
+              />
+            )}
+
+            {/* Customer Reviews */}
+            <CustomerReviews
+              rating={averageRating}
+              reviews={reviews}
+              productId={Number(id)}
+              isAuthenticated={isAuthenticated}
+              currentUserId={currentUserId}
+              onAddReview={handleAddReview}
+              onEditReview={handleEditReview}
+              onDeleteReview={handleDeleteReview}
+              onLogin={handleAuthRequired}
             />
-          )}
-
-          {/* Customer Reviews */}
-          <CustomerReviews 
-            rating={averageRating}
-            reviews={reviews}
-            productId={Number(id)}
-            isAuthenticated={isAuthenticated}
-            currentUserId={currentUserId}
-            onAddReview={handleAddReview}
-            onEditReview={handleEditReview}
-            onDeleteReview={handleDeleteReview}
-            onLogin={handleAuthRequired}
-          />
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
 
       </View>
     </SafeAreaView>

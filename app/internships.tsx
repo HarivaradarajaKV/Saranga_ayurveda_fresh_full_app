@@ -372,94 +372,91 @@ export default function InternshipsScreen() {
             </View>
           </View>
 
-          {/* Row 2: Phone Number & Position Applying For */}
-          <View style={[styles.formRow, { zIndex: 40 }]}>
-            {/* Phone Number */}
-            <View style={styles.formInputGroupHalf}>
-              <Text style={styles.inputLabel}>Phone Number <Text style={styles.required}>*</Text></Text>
-              <View style={{ position: 'relative', zIndex: 1000 }}>
-                <View style={styles.phoneInputContainer}>
-                  <TouchableOpacity
-                    style={styles.prefixSelect}
-                    onPress={() => {
-                      setShowPrefixDropdown(!showPrefixDropdown);
-                      setShowPositionDropdown(false);
-                      setShowDegreeDropdown(false);
-                      setShowInterestDropdown(false);
-                      setShowSemesterDropdown(false);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.prefixText}>{phonePrefix}</Text>
-                    <Ionicons name={showPrefixDropdown ? "chevron-up" : "chevron-down"} size={12} color="#666" style={{ marginLeft: 2 }} />
-                  </TouchableOpacity>
-                  <View style={styles.phoneSeparator} />
-                  <TextInput
-                    style={styles.phoneTextInput}
-                    placeholder="Enter phone number"
-                    keyboardType="phone-pad"
-                    value={phoneNumber}
-                    onChangeText={setPhoneNumber}
-                    placeholderTextColor="#999"
-                  />
-                  <Ionicons name="call-outline" size={16} color="#999" style={styles.phoneInputIcon} />
-                </View>
-                {showPrefixDropdown && (
-                  <View style={styles.prefixDropdown}>
-                    {PREFIXES.map((prefix) => (
-                      <TouchableOpacity
-                        key={prefix}
-                        style={styles.dropdownOption}
-                        onPress={() => {
-                          setPhonePrefix(prefix);
-                          setShowPrefixDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownOptionText}>{prefix}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Position Applying For */}
-            <View style={styles.formInputGroupHalf}>
-              <Text style={styles.inputLabel}>Position Applying For <Text style={styles.required}>*</Text></Text>
-              <View style={{ position: 'relative', zIndex: 1000 }}>
+          {/* Phone Number */}
+          <View style={[styles.formInputGroup, { zIndex: 45 }]}>
+            <Text style={[styles.inputLabel, { minHeight: 0, marginBottom: 6 }]}>Phone Number <Text style={styles.required}>*</Text></Text>
+            <View style={{ position: 'relative', zIndex: 1000 }}>
+              <View style={styles.phoneInputContainer}>
                 <TouchableOpacity
-                  style={styles.customSelect}
+                  style={styles.prefixSelect}
                   onPress={() => {
-                    setShowPositionDropdown(!showPositionDropdown);
-                    setShowPrefixDropdown(false);
+                    setShowPrefixDropdown(!showPrefixDropdown);
+                    setShowPositionDropdown(false);
                     setShowDegreeDropdown(false);
                     setShowInterestDropdown(false);
                     setShowSemesterDropdown(false);
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.selectText, !position && { color: '#999' }]} numberOfLines={1}>
-                    {position ? position : "Select position"}
-                  </Text>
-                  <Ionicons name={showPositionDropdown ? "chevron-up" : "chevron-down"} size={16} color="#666" />
+                  <Text style={styles.prefixText}>{phonePrefix}</Text>
+                  <Ionicons name={showPrefixDropdown ? "chevron-up" : "chevron-down"} size={12} color="#666" style={{ marginLeft: 2 }} />
                 </TouchableOpacity>
-                {showPositionDropdown && (
-                  <View style={styles.dropdownOptionsContainer}>
-                    {POSITIONS.map((pos) => (
-                      <TouchableOpacity
-                        key={pos}
-                        style={styles.dropdownOption}
-                        onPress={() => {
-                          setPosition(pos);
-                          setShowPositionDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownOptionText}>{pos}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                <View style={styles.phoneSeparator} />
+                <TextInput
+                  style={styles.phoneTextInput}
+                  placeholder="Enter phone number"
+                  keyboardType="phone-pad"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  placeholderTextColor="#999"
+                />
+                <Ionicons name="call-outline" size={16} color="#999" style={styles.phoneInputIcon} />
               </View>
+              {showPrefixDropdown && (
+                <View style={styles.prefixDropdown}>
+                  {PREFIXES.map((prefix) => (
+                    <TouchableOpacity
+                      key={prefix}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setPhonePrefix(prefix);
+                        setShowPrefixDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownOptionText}>{prefix}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Position Applying For */}
+          <View style={[styles.formInputGroup, { zIndex: 40 }]}>
+            <Text style={[styles.inputLabel, { minHeight: 0, marginBottom: 6 }]}>Position Applying For <Text style={styles.required}>*</Text></Text>
+            <View style={{ position: 'relative', zIndex: 1000 }}>
+              <TouchableOpacity
+                style={styles.customSelect}
+                onPress={() => {
+                  setShowPositionDropdown(!showPositionDropdown);
+                  setShowPrefixDropdown(false);
+                  setShowDegreeDropdown(false);
+                  setShowInterestDropdown(false);
+                  setShowSemesterDropdown(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.selectText, !position && { color: '#999' }]} numberOfLines={1}>
+                  {position ? position : "Select position"}
+                </Text>
+                <Ionicons name={showPositionDropdown ? "chevron-up" : "chevron-down"} size={16} color="#666" />
+              </TouchableOpacity>
+              {showPositionDropdown && (
+                <View style={styles.dropdownOptionsContainer}>
+                  {POSITIONS.map((pos) => (
+                    <TouchableOpacity
+                      key={pos}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setPosition(pos);
+                        setShowPositionDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownOptionText}>{pos}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
 

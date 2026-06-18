@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +9,9 @@ import { Product } from './types/product';
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const { width: windowWidth } = useWindowDimensions();
+  const numColumns = windowWidth >= 768 ? 4 : windowWidth >= 480 ? 3 : 2;
+  const productItemWidth = `${(100 / numColumns) - 2}%` as any;
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -238,7 +241,7 @@ const SearchScreen = () => {
                 <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Results ({filteredProducts.length})</Text>
                 <View style={styles.productsGrid}>
                   {filteredProducts.map((product) => (
-                    <View key={product.id} style={styles.productItem}>
+                    <View key={product.id} style={[styles.productItem, { width: productItemWidth }]}>
                       <ProductCard product={product} />
                     </View>
                   ))}

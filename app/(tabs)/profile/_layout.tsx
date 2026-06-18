@@ -47,13 +47,8 @@ export default function ProfileLayout() {
       <Stack.Screen 
         name="edit" 
         options={{
-          presentation: 'modal',
-          headerShown: true,
-          title: 'Edit Profile',
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerShadowVisible: false,
+          presentation: 'card',
+          headerShown: false,
         }}
       />
     </Stack>

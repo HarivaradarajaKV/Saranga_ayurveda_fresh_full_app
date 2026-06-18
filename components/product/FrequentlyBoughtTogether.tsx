@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiService } from '../../app/services/api';
@@ -30,6 +30,10 @@ export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> =
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth, 750);
+  const numHorizontalCards = windowWidth >= 768 ? 4 : windowWidth >= 480 ? 3 : 2;
+  const cardWidth = (screenWidth - 20) / numHorizontalCards;
 
   useEffect(() => {
     fetchRelatedProducts();
@@ -124,7 +128,7 @@ export const FrequentlyBoughtTogether: React.FC<FrequentlyBoughtTogetherProps> =
         contentContainerStyle={styles.scrollContainer}
       >
         {relatedProducts.map((product) => (
-          <View key={product.id} style={styles.productCardWrapper}>
+          <View key={product.id} style={[styles.productCardWrapper, { width: cardWidth }]}>
             <ProductCard product={product as any} />
           </View>
         ))}

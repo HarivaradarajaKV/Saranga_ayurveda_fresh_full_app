@@ -221,7 +221,7 @@ export const generateInvoice = async (order: Order) => {
             <p>We hope you enjoy your Ayurvedic products.</p>
             <div class="contact-info">
               <p>For any queries, please contact us:</p>
-              <p>📧 sarangaconsumershelp@gmail.com | 📱 +91-9008145980</p>
+              <p>📧 info@sarangaayurveda.com | 📱 +91-9008145980</p>
               <p>www.sarangaayurveda.com</p>
             </div>
           </div>
