@@ -117,22 +117,83 @@ export default function SignUpPage() {
   const processAuthToken = async (token: string) => {
     try {
       const tokenData = JSON.parse(atob(token.split('.')[1]));
-      console.log('Google signup role:', tokenData.role);
+      console.log('Login role:', tokenData.role);
 
       await AsyncStorage.setItem('auth_token', token);
       await AsyncStorage.setItem('user_role', tokenData.role);
       if (tokenData.id) await AsyncStorage.setItem('user_id', String(tokenData.id));
-      if (tokenData.name) {
-        await AsyncStorage.setItem('name', tokenData.name);
-        await AsyncStorage.setItem('user_name', tokenData.name);
-      }
 
-      authEvents.notify();
+      const nameVal = tokenData.name || '';
+      const emailVal = tokenData.email || '';
 
-      if (tokenData.role === 'admin') {
-        router.replace('/admin/dashboard');
+      const isPlaceholder = (n: string, e: string) => {
+        if (!n || n.trim() === '' || n === 'Apple User' || n === 'Google User') return true;
+        if (n.includes('@')) return true;
+        const prefix = e.split('@')[0].toLowerCase();
+        const normalizedName = n.toLowerCase().replace(/[\s\._\-]/g, '');
+        const normalizedPrefix = prefix.replace(/[\s\._\-]/g, '');
+        if (normalizedName === normalizedPrefix) return true;
+        if (normalizedName.startsWith(normalizedPrefix) && /^\d*$/.test(normalizedName.slice(normalizedPrefix.length))) {
+          return true;
+        }
+        if (/^\d+$/.test(normalizedName)) return true;
+        return false;
+      };
+
+      const navigateNext = () => {
+        authEvents.notify();
+        if (tokenData.role === 'admin') {
+          router.replace('/admin/dashboard');
+        } else {
+          router.replace('/(tabs)');
+        }
+      };
+
+      if (isPlaceholder(nameVal, emailVal) && Platform.OS === 'ios') {
+        Alert.prompt(
+          'Enter Your Name',
+          'Please enter your full name to complete your profile.',
+          [
+            {
+              text: 'Skip',
+              onPress: async () => {
+                await AsyncStorage.setItem('name', nameVal || 'Apple User');
+                await AsyncStorage.setItem('user_name', nameVal || 'Apple User');
+                navigateNext();
+              },
+              style: 'cancel',
+            },
+            {
+              text: 'Save',
+              onPress: async (enteredName) => {
+                const finalName = enteredName?.trim();
+                if (finalName) {
+                  try {
+                    await apiService.updateUserProfile({ name: finalName });
+                    await AsyncStorage.setItem('name', finalName);
+                    await AsyncStorage.setItem('user_name', finalName);
+                  } catch (e) {
+                    console.error('Failed to update name:', e);
+                    await AsyncStorage.setItem('name', finalName);
+                    await AsyncStorage.setItem('user_name', finalName);
+                  }
+                } else {
+                  await AsyncStorage.setItem('name', nameVal || 'Apple User');
+                  await AsyncStorage.setItem('user_name', nameVal || 'Apple User');
+                }
+                navigateNext();
+              },
+            },
+          ],
+          'plain-text',
+          ''
+        );
       } else {
-        router.replace('/(tabs)');
+        if (nameVal) {
+          await AsyncStorage.setItem('name', nameVal);
+          await AsyncStorage.setItem('user_name', nameVal);
+        }
+        navigateNext();
       }
     } catch (err) {
       console.error('Token processing error:', err);
