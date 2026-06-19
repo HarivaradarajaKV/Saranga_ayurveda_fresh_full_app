@@ -2514,7 +2514,7 @@ const Page = () => {
     }))
     : [];
 
-  console.log('Category images:', mainCategoriesWithImages.length > 0 ? mainCategoriesWithImages.map(c => ({ name: c.name, image: c.image })) : 'No categories loaded');
+
 
   const [dropdownWidth] = useState(new Animated.Value(0));
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
