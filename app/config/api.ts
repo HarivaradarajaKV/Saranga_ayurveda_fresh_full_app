@@ -880,12 +880,8 @@ export class Api implements ApiService {
         if (!imageUrl) return 'https://via.placeholder.com/144x144/f8f9fa/666666?text=No+Image';
 
         try {
-            // If it's already a full URL, return it (with on-the-fly Supabase optimization if applicable)
+            // If it's already a full URL, return it
             if (imageUrl.startsWith('http')) {
-                if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
-                    return imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-                        + '?width=600&height=600&resize=contain&quality=80&format=webp';
-                }
                 return imageUrl;
             }
 
