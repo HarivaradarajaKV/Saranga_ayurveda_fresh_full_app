@@ -3537,7 +3537,7 @@ const Page = () => {
     }
   }, [textWidth]);
 
-  // Auto-scroll the new banner slideshow every 4 seconds
+  // Auto-scroll the new banner slideshow every 5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       if (!isUserInteracting.current) {
@@ -3548,7 +3548,7 @@ const Page = () => {
           animated: true
         });
       }
-    }, 4000);
+    }, 5000);
 
     return () => clearInterval(timer);
   }, [currentBannerIndex]);
