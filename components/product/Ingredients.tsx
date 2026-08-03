@@ -6,6 +6,9 @@ interface IngredientsProps {
 }
 
 export const Ingredients: React.FC<IngredientsProps> = ({ ingredients }) => {
+  if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
+    return null;
+  }
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Ingredients</Text>

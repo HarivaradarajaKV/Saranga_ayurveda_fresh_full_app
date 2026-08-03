@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,1380 +7,1596 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
-  ViewStyle,
-  TextStyle,
-  Platform,
-  SafeAreaView,
+  TextInput,
   Modal,
-  ScrollView,
+  SafeAreaView,
   Alert,
+  Platform,
+  StatusBar,
+  ScrollView,
+  Dimensions,
+  Linking,
 } from 'react-native';
-import { useOrders } from '../OrderContext';
-import { Picker } from '@react-native-picker/picker';
-import { MaterialIcons } from '@expo/vector-icons';
-// Removed date-fns format import to reduce bundle size and computation
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystemLegacy from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as Linking from 'expo-linking';
-import { API_CONFIG, getBaseUrl, ENDPOINTS } from '../config/api';
-import { Order, OrderStatus, OrderSummary } from '../OrderContext';
-import { ErrorBoundary } from '../ErrorBoundary';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { getBaseUrl, ENDPOINTS } from '../config/api';
+import { apiService } from '../services/api';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { AdminMoreModal } from './components/AdminMoreModal';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PAGE_LIMIT = 10;
 
-interface Styles {
-  safeArea: ViewStyle;
-  container: ViewStyle;
-  filterSection: ViewStyle;
-  filterLabel: TextStyle;
-  pickerContainer: ViewStyle;
-  picker: TextStyle;
-  ordersList: ViewStyle;
-  scrollContent: ViewStyle;
-  loadingContainer: ViewStyle;
-  noOrders: TextStyle;
-  orderCard: ViewStyle;
-  orderHeader: ViewStyle;
-  orderHeaderLeft: ViewStyle;
-  orderTopRow: ViewStyle;
-  orderId: TextStyle;
-  orderDate: TextStyle;
-  statusBadge: ViewStyle;
-  statusText: TextStyle;
-  orderDetails: ViewStyle;
-  section: ViewStyle;
-  sectionTitle: TextStyle;
-  customerInfo: ViewStyle;
-  infoRow: ViewStyle;
-  infoLabel: TextStyle;
-  infoValue: TextStyle;
-  itemsContainer: ViewStyle;
-  orderItem: ViewStyle;
-  itemDetails: ViewStyle;
-  itemName: TextStyle;
-  itemQuantity: TextStyle;
-  itemPrice: TextStyle;
-  summaryContainer: ViewStyle;
-  summaryRow: ViewStyle;
-  summaryLabel: TextStyle;
-  summaryValue: TextStyle;
-  discountText: TextStyle;
-  totalRow: ViewStyle;
-  totalLabel: TextStyle;
-  totalValue: TextStyle;
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface OrderStats {
+  total: number; total_trend: number;
+  pending: number; pending_trend: number;
+  processing: number; processing_trend: number;
+  shipped: number; shipped_trend: number;
+  delivered: number; delivered_trend: number;
+  cancelled: number; cancelled_trend: number;
 }
 
+interface AdminOrderItem {
+  product_id?: number;
+  product_name?: string;
+  name?: string;
+  title?: string;
+  quantity?: number;
+  price_at_time?: number | string;
+  price?: number | string;
+  unit_price?: number | string;
+  image_url?: string;
+}
 
+interface AdminOrder {
+  id: number;
+  status: string;
+  total_amount: string;
+  created_at: string;
+  payment_method: string;
+  payment_method_display: string;
+  payment_status: string;
+  customer_name: string;
+  customer_email: string;
+  user_name?: string;
+  user_email?: string;
+  shipping_full_name?: string;
+  shipping_phone_number?: string;
+  shipping_address_line1?: string;
+  shipping_address_line2?: string;
+  shipping_city?: string;
+  shipping_state?: string;
+  shipping_postal_code?: string;
+  item_count: number;
+  items?: AdminOrderItem[] | string;
+  shipment_status?: string;
+  shiprocket_order_id?: string;
+  shiprocket_shipment_id?: string;
+  awb_number?: string;
+  courier_name?: string;
+  tracking_url?: string;
+}
 
-const AdminOrdersInner = () => {
-  let ordersContext;
-  try {
-    ordersContext = useOrders();
-  } catch (error) {
-    console.error('Error accessing OrderContext:', error);
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <Text style={{ color: '#ff4444', fontSize: 16, textAlign: 'center', marginBottom: 10 }}>
-            Error loading orders. Please try again.
-          </Text>
-          <TouchableOpacity
-            style={{ backgroundColor: '#0066cc', padding: 12, borderRadius: 8 }}
-            onPress={() => {
-              // Force reload by navigating away and back
-              if (typeof window !== 'undefined' && window.location) {
-                window.location.reload();
-              }
-            }}
-          >
-            <Text style={{ color: '#fff', textAlign: 'center' }}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-  const {
-    orders: orderSummaries = [],
-    loading = false,
-    fetchOrders,
-    updateOrderStatus,
-    getOrderById,
-  } = ordersContext || {};
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+const fmtDate = (iso: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const fmtYMD = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const fmtCurrency = (v: string | number) => `₹${parseFloat(String(v || 0)).toFixed(2)}`;
+
+type StatusKey = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'confirmed';
+
+const STATUS_STYLES: Record<StatusKey, { bg: string; text: string; icon: string; iconColor: string }> = {
+  pending:    { bg: '#FFF8E1', text: '#F59E0B', icon: 'time-outline',           iconColor: '#F59E0B' },
+  processing: { bg: '#FFF3E0', text: '#EA580C', icon: 'settings-outline',        iconColor: '#EA580C' },
+  shipped:    { bg: '#E8F5E9', text: '#16A34A', icon: 'car-outline',             iconColor: '#16A34A' },
+  delivered:  { bg: '#EAF6ED', text: '#15803D', icon: 'checkmark-circle-outline', iconColor: '#15803D' },
+  cancelled:  { bg: '#FEE2E2', text: '#DC2626', icon: 'close-circle-outline',    iconColor: '#DC2626' },
+  confirmed:  { bg: '#E8F4FD', text: '#2563EB', icon: 'checkmark-done-outline',  iconColor: '#2563EB' },
+};
+
+const getStatusStyle = (status: string) =>
+  STATUS_STYLES[(status?.toLowerCase() as StatusKey)] || STATUS_STYLES.pending;
+
+const trendLabel = (val: number) => {
+  if (val === 0) return '0% vs last week';
+  const sign = val > 0 ? '↑' : '↓';
+  return `${sign} ${Math.abs(val)}% vs last week`;
+};
+
+const trendColor = (val: number) => (val >= 0 ? '#16A34A' : '#DC2626');
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export default function AdminOrdersScreen() {
+  const router = useRouter();
+  const isMounted = useRef(true);
+
+  // Stats
+  const [stats, setStats] = useState<OrderStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Orders list
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
-  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  // Order detail / status update modal
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showMoreModal, setShowMoreModal] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState<Date | null>(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
+  const [exportEndDate, setExportEndDate] = useState<Date | null>(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [visibleCount, setVisibleCount] = useState<number>(20); // Show 20 orders initially
-  const [canRender, setCanRender] = useState(false); // Defer rendering to prevent crashes
-  const [loadingMore, setLoadingMore] = useState(false); // Track if we're loading more orders
-  const [shiprocketLoading, setShiprocketLoading] = useState(false);
-  const [shiprocketAction, setShiprocketAction] = useState<string | null>(null);
-  const mountedRef = React.useRef(true);
-  const fetchInProgressRef = React.useRef(false);
-  const lastFetchTimeRef = React.useRef(0);
-  const fetchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadMoreTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadMoreInProgressRef = React.useRef(false); // Prevent multiple simultaneous loadMore calls
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      // Clear any pending fetches
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-        fetchTimeoutRef.current = null;
-      }
-      if (loadMoreTimeoutRef.current) {
-        clearTimeout(loadMoreTimeoutRef.current);
-        loadMoreTimeoutRef.current = null;
-      }
-      fetchInProgressRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mountedRef.current) return;
-    setCanRender(true);
-
-    if ((!orderSummaries || orderSummaries.length === 0) && typeof fetchOrders === 'function') {
-      fetchOrders().catch((error: any) => {
-        console.error('Error fetching orders on mount:', error);
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const buildOrderDetails = React.useCallback((summary: OrderSummary): Order | null => {
-    if (!summary || !summary.id) return null;
-    try {
-      const detail = typeof getOrderById === 'function' ? getOrderById(String(summary.id)) : undefined;
-      if (detail) return detail;
-
-      const shipping = summary.shipping_address || {
-        full_name: '',
-        address_line1: '',
-        address_line2: '',
-        city: '',
-        state: '',
-        pincode: '',
-        phone: '',
-      };
-
-      return {
-        ...summary,
-        id: String(summary.id),
-        items: Array.isArray((summary as any).items) ? [...(summary as any).items] : [],
-        shipping_address: shipping,
-        payment_method: summary.payment_method || 'online',
-        payment_method_display: summary.payment_method_display || (summary.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment'),
-        discount_amount: Number(summary.discount_amount || 0),
-        delivery_charge: Number(summary.delivery_charge || 0),
-        total_amount: Number(summary.total_amount || 0),
-      } as Order;
-    } catch (error) {
-      console.error('Error hydrating order summary:', error);
-      return null;
-    }
-  }, [getOrderById]);
-
-  const onRefresh = React.useCallback(async () => {
-    if (!mountedRef.current || !fetchOrders || typeof fetchOrders !== 'function') return;
-    if (fetchInProgressRef.current) {
-      // If a fetch is already in progress, just update the refreshing state
-      setRefreshing(false);
-      return;
-    }
-
-    fetchInProgressRef.current = true;
-    lastFetchTimeRef.current = Date.now();
-    if (mountedRef.current) setRefreshing(true);
-
-    try {
-      await fetchOrders();
-      // Reset visible count on refresh to show initial batch
-      if (mountedRef.current) {
-        setVisibleCount(20);
-        loadMoreInProgressRef.current = false;
-        setLoadingMore(false);
-      }
-    } catch (error) {
-      console.error('Error refreshing orders:', error);
-    } finally {
-      fetchInProgressRef.current = false;
-      if (mountedRef.current) setRefreshing(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Remove fetchOrders dependency to prevent recreation
-
-  const filteredOrders = React.useMemo(() => {
-    try {
-      if (!Array.isArray(orderSummaries)) return [];
-      const filtered = selectedStatus === 'all'
-        ? orderSummaries
-        : orderSummaries.filter(order => order && order.status === selectedStatus);
-      return filtered || [];
-    } catch (error) {
-      console.error('Error filtering orders:', error);
-      return [];
-    }
-  }, [orderSummaries, selectedStatus]);
-
-  const visibleOrders = React.useMemo(() => {
-    try {
-      if (!Array.isArray(filteredOrders) || filteredOrders.length === 0) return [];
-      if (visibleCount <= 0) return [];
-      return filteredOrders.slice(0, Math.min(visibleCount, filteredOrders.length));
-    } catch (error) {
-      console.error('Error creating visible orders:', error);
-      return [];
-    }
-  }, [filteredOrders, visibleCount]);
-
-  // Update visible count when filtered orders change
-  useEffect(() => {
-    if (!mountedRef.current) return;
-
-    try {
-      if (!mountedRef.current) return;
-      setVisibleCount((prevCount) => {
-        const safeLength = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
-
-        if (safeLength > 0) {
-          // If we have more orders available, ensure we show at least 20
-          if (prevCount < 20) {
-            return Math.min(20, safeLength);
-          }
-          // If visibleCount exceeds available orders, adjust it
-          if (prevCount > safeLength) {
-            return safeLength;
-          }
-          return prevCount;
-        } else {
-          // Reset if no filtered orders
-          return 20;
-        }
-      });
-    } catch (error) {
-      console.error('Error updating visible count:', error);
-    }
-  }, [filteredOrders.length]);
-
-  const loadMore = React.useCallback(() => {
-    if (!mountedRef.current || loadMoreInProgressRef.current) return;
-
-    try {
-      const totalAvailable = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
-      if (totalAvailable === 0) return;
-
-      // Check if there are more orders to load using current visibleCount
-      setVisibleCount((prevCount) => {
-        // Check if there are more orders to load
-        if (prevCount >= totalAvailable) {
-          return prevCount; // Already showing all orders
-        }
-
-        // Load 20 more orders at a time for better performance
-        const increment = 20;
-        const next = Math.min(prevCount + increment, totalAvailable);
-
-        // If we're close to the end (within 20 orders), just show all remaining
-        if (totalAvailable - prevCount <= increment) {
-          return totalAvailable;
-        }
-        return next;
-      });
-
-      // Set loading state outside of setState callback
-      loadMoreInProgressRef.current = true;
-      if (mountedRef.current) setLoadingMore(true);
-
-      if (loadMoreTimeoutRef.current) {
-        clearTimeout(loadMoreTimeoutRef.current);
-      }
-      loadMoreTimeoutRef.current = setTimeout(() => {
-        loadMoreInProgressRef.current = false;
-        if (mountedRef.current) setLoadingMore(false);
-        loadMoreTimeoutRef.current = null;
-      }, 200);
-    } catch (error) {
-      console.error('Error in loadMore:', error);
-      loadMoreInProgressRef.current = false;
-      if (mountedRef.current) setLoadingMore(false);
-    }
-  }, [filteredOrders]);
-
-  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
-    if (!mountedRef.current || !updateOrderStatus || typeof updateOrderStatus !== 'function') return;
-    if (!orderId || !newStatus) return;
-
-    try {
-      await updateOrderStatus(orderId, newStatus);
-      // Refresh orders after status update
-      if (mountedRef.current && fetchOrders && typeof fetchOrders === 'function') {
-        setTimeout(() => {
-          if (mountedRef.current) {
-            fetchOrders().catch((error: any) => {
-              console.error('Error refreshing after status update:', error);
-            });
-          }
-        }, 500);
-      }
-    } catch (error) {
-      console.error('Error updating order status:', error);
+  // Preset Date Ranges
+  const setPresetRange = (preset: 'today' | '7days' | 'month' | 'all') => {
+    const now = new Date();
+    if (preset === 'today') {
+      setExportStartDate(new Date());
+      setExportEndDate(new Date());
+    } else if (preset === '7days') {
+      setExportStartDate(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
+      setExportEndDate(new Date());
+    } else if (preset === 'month') {
+      setExportStartDate(new Date(now.getFullYear(), now.getMonth(), 1));
+      setExportEndDate(new Date());
+    } else if (preset === 'all') {
+      setExportStartDate(null);
+      setExportEndDate(null);
     }
   };
 
-  const toYMD = (d: Date) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const buildExportUrl = () => {
-    const base = getBaseUrl();
-    const params: string[] = [];
-    if (startDate) params.push(`start=${encodeURIComponent(toYMD(startDate))}`);
-    if (endDate) params.push(`end=${encodeURIComponent(toYMD(endDate))}`);
-    const qs = params.length ? `?${params.join('&')}` : '';
-    return `${base}${ENDPOINTS.ADMIN_ORDERS_EXPORT}${qs}`;
-  };
-
-  const downloadPdf = async () => {
+  // PDF Export Download Handler
+  const downloadPdf = async (startD: Date | null, endD: Date | null) => {
+    setDownloading(true);
     try {
-      if (mountedRef.current) setDownloading(true);
-      const url = buildExportUrl();
+      const base = getBaseUrl();
       const token = await AsyncStorage.getItem('auth_token');
+      const params: string[] = [];
+      if (startD) params.push(`start=${fmtYMD(startD)}`);
+      if (endD) params.push(`end=${fmtYMD(endD)}`);
+      const qs = params.length ? `?${params.join('&')}` : '';
+      const url = `${base}/admin/orders/export${qs}`;
 
       if (Platform.OS === 'web') {
         const res = await fetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/pdf' } : { Accept: 'application/pdf' }
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        if (!res.ok) throw new Error('Failed to download');
+        if (!res.ok) throw new Error('Failed to download PDF');
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = `orders_${startDate ? toYMD(startDate) : 'all'}_${endDate ? toYMD(endDate) : 'all'}.pdf`;
+        a.download = `Saranga_Orders_${startD ? fmtYMD(startD) : 'all'}_to_${endD ? fmtYMD(endD) : 'all'}.pdf`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(blobUrl);
+        Alert.alert('Success', 'PDF report downloaded successfully');
       } else {
+        const FileSystemLegacy = require('expo-file-system/legacy');
+        const Sharing = require('expo-sharing');
+
         const baseDir = FileSystemLegacy.documentDirectory || FileSystemLegacy.cacheDirectory;
-        if (!baseDir) throw new Error('No writable directory available');
+        if (!baseDir) throw new Error('No storage directory available');
         const downloadsDir = `${baseDir}downloads/`;
         const dirInfo = await FileSystemLegacy.getInfoAsync(downloadsDir);
         if (!dirInfo.exists) {
           await FileSystemLegacy.makeDirectoryAsync(downloadsDir, { intermediates: true });
         }
-        const fileUri = `${downloadsDir}orders_${startDate ? toYMD(startDate) : 'all'}_${endDate ? toYMD(endDate) : 'all'}.pdf`;
-        const headers: Record<string, string> = { Accept: 'application/pdf' };
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
+        const fileName = `Saranga_Orders_${startD ? fmtYMD(startD) : 'all'}_to_${endD ? fmtYMD(endD) : 'all'}.pdf`;
+        const fileUri = `${downloadsDir}${fileName}`;
+
         const downloadResumable = FileSystemLegacy.createDownloadResumable(
           url,
           fileUri,
-          { headers }
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
         );
         const result = await downloadResumable.downloadAsync();
         const savedUri = result?.uri || fileUri;
+
         if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(savedUri);
+          await Sharing.shareAsync(savedUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Save / Share PDF Report',
+            UTI: 'com.adobe.pdf',
+          });
         } else {
           await Linking.openURL(savedUri);
         }
       }
-    } catch (e) {
-      console.error('Download PDF error:', e);
+      setShowExportModal(false);
+    } catch (e: any) {
+      console.error('downloadPdf error:', e);
+      Alert.alert('Error', 'Failed to download PDF report: ' + (e.message || 'Unknown error'));
     } finally {
-      if (mountedRef.current) setDownloading(false);
+      setDownloading(false);
     }
   };
 
-  // Shiprocket Helper Functions
-  const hasShiprocketData = (order: Order) => {
+  // Package dimensions & Shiprocket state
+  const [packageWeight, setPackageWeight] = useState('0.5');
+  const [packageLength, setPackageLength] = useState('10');
+  const [packageBreadth, setPackageBreadth] = useState('10');
+  const [packageHeight, setPackageHeight] = useState('10');
+  const [shiprocketLoading, setShiprocketLoading] = useState(false);
+
+  // ── Shiprocket Helpers ──────────────────────────────────────────────────
+
+  const hasShiprocketData = (order: AdminOrder | null) => {
     if (!order) return false;
     return !!(
-      (order as any).shiprocket_order_id ||
-      (order as any).shiprocket_shipment_id ||
-      (order as any).awb_number ||
-      (order as any).shipment_status === 'created' ||
-      (order as any).shipment_status === 'awb_generated' ||
-      (order as any).shipment_status === 'pickup_scheduled'
+      order.shiprocket_order_id ||
+      order.shiprocket_shipment_id ||
+      order.awb_number ||
+      order.shipment_status === 'created' ||
+      order.shipment_status === 'awb_generated' ||
+      order.shipment_status === 'pickup_scheduled'
     );
   };
 
-  const hasAWB = (order: Order) => {
+  const hasAWB = (order: AdminOrder | null) => {
     if (!order) return false;
     return !!(
-      (order as any).awb_number ||
-      (order as any).shipment_status === 'awb_generated' ||
-      (order as any).shipment_status === 'pickup_scheduled'
+      order.awb_number ||
+      order.shipment_status === 'awb_generated' ||
+      order.shipment_status === 'pickup_scheduled'
     );
   };
 
-  const handleCreateShipment = async (orderId: string) => {
-    if (!mountedRef.current || shiprocketLoading) return;
+  // ── Shiprocket Handlers ─────────────────────────────────────────────────
 
+  const handleCreateShipment = async (orderId: number) => {
+    setShiprocketLoading(true);
     try {
-      setShiprocketLoading(true);
-      setShiprocketAction('create');
+      const res = await apiService.post(`/shiprocket/create-shipment/${orderId}`, {
+        weight: parseFloat(packageWeight) || 0.5,
+        length: parseInt(packageLength) || 10,
+        breadth: parseInt(packageBreadth) || 10,
+        height: parseInt(packageHeight) || 10,
+      });
+      if (res.data?.success) {
+        Alert.alert('Success', 'Shipment created successfully!');
+        fetchOrders(page, false);
+        if (selectedOrder) {
+          setSelectedOrder({
+            ...selectedOrder,
+            shiprocket_order_id: res.data.data?.order_id,
+            shiprocket_shipment_id: res.data.data?.shipment_id,
+            shipment_status: 'created',
+          });
+        }
+      } else {
+        Alert.alert('Error', res.data?.error || res.error || 'Failed to create shipment');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to create shipment');
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
 
-      const token = await AsyncStorage.getItem('auth_token');
-      const baseUrl = getBaseUrl();
+  const handleAssignCourier = async (orderId: number) => {
+    setShiprocketLoading(true);
+    try {
+      const res = await apiService.post(`/shiprocket/assign-courier/${orderId}`, {});
+      if (res.data?.success) {
+        Alert.alert('Success', 'Courier assigned & AWB generated successfully!');
+        fetchOrders(page, false);
+        if (selectedOrder) {
+          setSelectedOrder({
+            ...selectedOrder,
+            awb_number: res.data.data?.awb_code,
+            courier_name: res.data.data?.courier_name,
+            shipment_status: 'awb_generated',
+          });
+        }
+      } else {
+        Alert.alert('Error', res.data?.error || res.error || 'Failed to assign courier');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to assign courier');
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
 
-      const response = await fetch(`${baseUrl}/shiprocket/create-shipment/${orderId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+  const handleDownloadLabel = async (orderId: number) => {
+    setShiprocketLoading(true);
+    try {
+      const res = await apiService.post(`/shiprocket/generate-label/${orderId}`, {});
+      if (res.data?.success && res.data.data?.label_url) {
+        await Linking.openURL(res.data.data.label_url);
+        Alert.alert('Success', 'Shipping label opened!');
+      } else {
+        Alert.alert('Error', res.data?.error || res.error || 'Failed to generate label');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to generate label');
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
+
+  const handleSchedulePickup = async (orderId: number) => {
+    setShiprocketLoading(true);
+    try {
+      const res = await apiService.post(`/shiprocket/request-pickup/${orderId}`, {});
+      if (res.data?.success) {
+        Alert.alert('Success', 'Pickup scheduled successfully!');
+        fetchOrders(page, false);
+        if (selectedOrder) {
+          setSelectedOrder({
+            ...selectedOrder,
+            shipment_status: 'pickup_scheduled',
+          });
+        }
+      } else {
+        Alert.alert('Error', res.data?.error || res.error || 'Failed to schedule pickup');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to schedule pickup');
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
+
+  const handleResetShipment = async (orderId: number) => {
+    Alert.alert(
+      'Reset Shipment',
+      'Are you sure you want to reset/cancel this shipment? This will clear all local Shiprocket data for this order so you can recreate it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setShiprocketLoading(true);
+            try {
+              const res = await apiService.post(`/shiprocket/reset-shipment/${orderId}`, {});
+              if (res.data?.success) {
+                Alert.alert('Success', res.data.message || 'Shipment reset successfully!');
+                fetchOrders(page, false);
+                if (selectedOrder) {
+                  setSelectedOrder({
+                    ...selectedOrder,
+                    shiprocket_order_id: undefined,
+                    shiprocket_shipment_id: undefined,
+                    shipment_status: undefined,
+                    awb_number: undefined,
+                    courier_name: undefined,
+                    tracking_url: undefined,
+                  });
+                }
+              } else {
+                Alert.alert('Error', res.data?.error || res.error || 'Failed to reset shipment');
+              }
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to reset shipment');
+            } finally {
+              setShiprocketLoading(false);
+            }
+          },
         },
-        body: JSON.stringify({
-          pickupLocation: 'warehouse',
-          weight: 0.5,
-          length: 10,
-          breadth: 10,
-          height: 10
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('✅ Shipment created successfully!');
-
-        // Update the order in state with Shiprocket data
-        if (selectedOrderForDetails && data.data) {
-          setSelectedOrderForDetails({
-            ...selectedOrderForDetails,
-            shiprocket_order_id: data.data.order_id,
-            shiprocket_shipment_id: data.data.shipment_id,
-            shipment_status: 'created'
-          } as any);
-        }
-
-        // Also refresh the orders list in background
-        if (fetchOrders && typeof fetchOrders === 'function') {
-          fetchOrders();
-        }
-      } else {
-        alert('❌ Failed: ' + (data.error || 'Unknown error') + '\n\nPlease add a pickup location named "Primary" in Shiprocket dashboard.');
-      }
-    } catch (error) {
-      console.error('Create shipment error:', error);
-      alert('❌ Error: Add pickup location in Shiprocket\n\n1. Go to shiprocket.in\n2. Settings → Pickup Addresses\n3. Add location named "Primary"');
-    } finally {
-      if (mountedRef.current) {
-        setShiprocketLoading(false);
-        setShiprocketAction(null);
-      }
-    }
-  };
-
-  const handleAssignCourier = async (orderId: string) => {
-    if (!mountedRef.current || shiprocketLoading) return;
-
-    try {
-      setShiprocketLoading(true);
-      setShiprocketAction('assign');
-
-      const token = await AsyncStorage.getItem('auth_token');
-      const baseUrl = getBaseUrl();
-
-      const response = await fetch(`${baseUrl}/shiprocket/assign-courier/${orderId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('✅ Courier assigned & AWB generated!');
-
-        // Update order with AWB data immediately
-        if (selectedOrderForDetails && data.data) {
-          setSelectedOrderForDetails({
-            ...selectedOrderForDetails,
-            awb_number: data.data.awb_code,
-            courier_id: data.data.courier_company_id,
-            courier_name: data.data.courier_name,
-            shipment_status: 'ready_to_ship'
-          } as any);
-        }
-
-        // Refresh list in background
-        if (fetchOrders && typeof fetchOrders === 'function') {
-          fetchOrders();
-        }
-      } else {
-        alert('❌ Failed: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Assign courier error:', error);
-      alert('❌ Error assigning courier');
-    } finally {
-      if (mountedRef.current) {
-        setShiprocketLoading(false);
-        setShiprocketAction(null);
-      }
-    }
-  };
-
-  const handleDownloadLabel = async (orderId: string) => {
-    if (!mountedRef.current || shiprocketLoading) return;
-
-    try {
-      setShiprocketLoading(true);
-      setShiprocketAction('label');
-
-      const token = await AsyncStorage.getItem('auth_token');
-      const baseUrl = getBaseUrl();
-
-      const response = await fetch(`${baseUrl}/shiprocket/generate-label/${orderId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data.label_url) {
-        Linking.openURL(data.data.label_url);
-        alert('✅ Label opened!');
-      } else {
-        alert('❌ Failed to generate label');
-      }
-    } catch (error) {
-      console.error('Download label error:', error);
-      alert('❌ Error downloading label');
-    } finally {
-      if (mountedRef.current) {
-        setShiprocketLoading(false);
-        setShiprocketAction(null);
-      }
-    }
-  };
-
-  const handleSchedulePickup = async (orderId: string) => {
-    if (!mountedRef.current || shiprocketLoading) return;
-
-    try {
-      setShiprocketLoading(true);
-      setShiprocketAction('pickup');
-
-      const token = await AsyncStorage.getItem('auth_token');
-      const baseUrl = getBaseUrl();
-
-      const response = await fetch(`${baseUrl}/shiprocket/request-pickup/${orderId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('✅ Pickup scheduled!');
-      } else {
-        alert('❌ Failed: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Schedule pickup error:', error);
-      alert('❌ Error scheduling pickup');
-    } finally {
-      if (mountedRef.current) {
-        setShiprocketLoading(false);
-        setShiprocketAction(null);
-      }
-    }
-  };
-
-  const handleResetShipment = async (orderId: string) => {
-    if (!mountedRef.current || shiprocketLoading) return;
-
-    const performReset = async () => {
-      try {
-        setShiprocketLoading(true);
-        setShiprocketAction('reset');
-
-        const token = await AsyncStorage.getItem('auth_token');
-        const baseUrl = getBaseUrl();
-
-        const response = await fetch(`${baseUrl}/shiprocket/reset-shipment/${orderId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          alert('✅ Shipment reset successfully!');
-
-          // Update state to clear all shiprocket data
-          const clearedData = {
-            shiprocket_order_id: null,
-            shiprocket_shipment_id: null,
-            shipment_status: null,
-            awb_number: null,
-            courier_id: null,
-            courier_name: null,
-            estimated_delivery_date: null,
-            tracking_url: null,
-            label_url: null,
-            manifest_url: null,
-            pickup_scheduled_date: null
-          };
-
-          if (selectedOrderForDetails) {
-            setSelectedOrderForDetails({
-              ...selectedOrderForDetails,
-              ...clearedData
-            } as any);
-          }
-
-          if (fetchOrders && typeof fetchOrders === 'function') {
-            fetchOrders();
-          }
-        } else {
-          alert('❌ Failed: ' + (data.error || 'Unknown error'));
-        }
-      } catch (error) {
-        console.error('Reset shipment error:', error);
-        alert('❌ Error resetting shipment');
-      } finally {
-        if (mountedRef.current) {
-          setShiprocketLoading(false);
-          setShiprocketAction(null);
-        }
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to reset/cancel this shipment? This will clear all local Shiprocket data for this order so you can recreate it.')) {
-        performReset();
-      }
-    } else {
-      Alert.alert(
-        'Reset Shipment',
-        'Are you sure you want to reset/cancel this shipment? This will clear all local Shiprocket data for this order so you can recreate it.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Reset', style: 'destructive', onPress: performReset }
-        ]
-      );
-    }
-  };
-
-  // REMOVED: OrderStatusBadge component entirely to prevent crashes
-
-  // Simplified status picker using buttons instead of heavy Picker component
-  const OrderStatusPicker = React.memo(({ currentStatus, orderId }: { currentStatus: OrderStatus, orderId: string }) => {
-    const statusOptions: { label: string; value: OrderStatus; color: string }[] = [
-      { label: 'Pending', value: 'pending', color: '#FFA500' },
-      { label: 'Confirmed', value: 'confirmed', color: '#4169E1' },
-      { label: 'Shipped', value: 'shipped', color: '#8A2BE2' },
-      { label: 'Delivered', value: 'delivered', color: '#228B22' },
-      { label: 'Cancelled', value: 'cancelled', color: '#DC143C' },
-    ];
-
-    return (
-      <View style={{ marginTop: 8 }}>
-        <Text style={[styles.filterLabel, { marginBottom: 8 }]}>Update Status</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-          {statusOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              onPress={() => handleStatusUpdate(orderId, option.value)}
-              style={{
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 6,
-                backgroundColor: currentStatus === option.value ? option.color : '#f0f0f0',
-                borderWidth: 1,
-                borderColor: currentStatus === option.value ? option.color : '#ddd',
-                minWidth: 90,
-                marginRight: 8,
-                marginBottom: 8,
-              }}
-            >
-              <Text style={{
-                color: currentStatus === option.value ? '#fff' : '#333',
-                fontSize: 12,
-                fontWeight: currentStatus === option.value ? '600' : '400',
-                textAlign: 'center',
-              }}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      ]
     );
-  });
+  };
 
-  // Ultra-minimal OrderCard - absolute bare minimum to prevent crashes
-  const OrderCard = React.memo(({ order, isExpanded, onToggle }: { order: OrderSummary | Order; isExpanded: boolean; onToggle: () => void }) => {
-    // Add null checks to prevent crashes
-    if (!order || !order.id) {
-      return null;
+  // ── Auth helper ───────────────────────────────────────────────────────────
+
+  const getAuthHeader = async (): Promise<Record<string, string>> => {
+    const token = await AsyncStorage.getItem('auth_token');
+    return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+  };
+
+  // ── Fetch stats ───────────────────────────────────────────────────────────
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await apiService.get('/admin/orders/stats');
+      if (res.data && isMounted.current) {
+        setStats(res.data);
+      }
+    } catch (e) {
+      console.error('fetchStats error:', e);
+    } finally {
+      if (isMounted.current) setStatsLoading(false);
     }
+  }, []);
 
-    // Extract only what we need - no processing
-    const orderId = String(order.id || 'N/A');
-    const orderStatus = String(order.status || 'pending');
-    const orderDate = order.created_at ? String(order.created_at).slice(0, 10) : 'N/A';
+  // ── Fetch orders list ─────────────────────────────────────────────────────
+
+  const fetchOrders = useCallback(async (p = page, reset = false) => {
+    if (!isMounted.current) return;
+    if (reset) setLoading(true);
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', String(p));
+      queryParams.append('limit', String(PAGE_LIMIT));
+      if (statusFilter !== 'all') queryParams.append('status', statusFilter);
+      if (paymentFilter !== 'all') queryParams.append('payment', paymentFilter);
+      if (search && search.trim()) queryParams.append('search', search.trim());
+
+      const res = await apiService.get(`/admin/orders?${queryParams.toString()}`);
+      if (res.data && isMounted.current) {
+        const list = Array.isArray(res.data) ? res.data : (res.data.orders || []);
+        const totalCount = Array.isArray(res.data) ? res.data.length : (res.data.total ?? list.length);
+        setOrders(list);
+        setTotal(totalCount);
+        setPage(p);
+      }
+    } catch (e) {
+      console.error('fetchOrders error:', e);
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [statusFilter, paymentFilter, search, page]);
+
+  // ── Update order status ───────────────────────────────────────────────────
+
+  const handleStatusUpdate = async (orderId: number, newStatus: string) => {
+    setUpdatingStatus(true);
+    try {
+      const res = await apiService.put(`/admin/orders/${orderId}/status`, { status: newStatus });
+      if (res.error) throw new Error(res.error);
+      Alert.alert('Success', `Order #SA${orderId} status updated to ${newStatus}`);
+      setShowDetailModal(false);
+      setSelectedOrder(null);
+      fetchOrders(page, false);
+      fetchStats();
+    } catch (e) {
+      Alert.alert('Error', 'Could not update order status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // ── Effects ───────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    isMounted.current = true;
+    fetchStats();
+    fetchOrders(1, true);
+    return () => { isMounted.current = false; };
+  }, []);
+
+  // Re-fetch when filters/search change
+  useEffect(() => {
+    fetchOrders(1, true);
+  }, [statusFilter, paymentFilter, search]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchStats();
+    fetchOrders(1, true);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
+
+  // ── Render stat card ──────────────────────────────────────────────────────
+
+  const StatCard = ({ label, value, trend, iconName, iconBg, onPress }: {
+    label: string; value: number; trend: number;
+    iconName: string; iconBg: string; onPress?: () => void;
+  }) => (
+    <TouchableOpacity
+      style={styles.statCard}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.statIconBg, { backgroundColor: iconBg }]}>
+        <Ionicons name={iconName as any} size={18} color="#2D4B34" />
+      </View>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value.toLocaleString()}</Text>
+      <Text style={[styles.statTrend, { color: trendColor(trend) }]}>{trendLabel(trend)}</Text>
+    </TouchableOpacity>
+  );
+
+  // ── Render order row ──────────────────────────────────────────────────────
+
+  const OrderRow = ({ item }: { item: AdminOrder }) => {
+    const st = getStatusStyle(item.status);
+    const isPaid = item.payment_status?.toLowerCase() === 'paid' || item.payment_method?.toLowerCase() !== 'cod';
+    const fulfillment = item.shipment_status
+      ? item.shipment_status.charAt(0).toUpperCase() + item.shipment_status.slice(1)
+      : item.status?.charAt(0).toUpperCase() + item.status?.slice(1);
 
     return (
-      <View style={styles.orderCard}>
-        <TouchableOpacity
-          style={styles.orderHeader}
-          onPress={onToggle}
-          activeOpacity={0.7}
-        >
-          <View style={styles.orderHeaderLeft}>
-            <View style={styles.orderTopRow}>
-              <Text style={styles.orderId}>Order #{orderId}</Text>
-              <Text style={{ fontSize: 11, color: '#666', marginLeft: 8 }}>
-                {orderStatus}
-              </Text>
-            </View>
-            <Text style={styles.orderDate}>{orderDate}</Text>
+      <TouchableOpacity
+        style={styles.orderRow}
+        onPress={() => { setSelectedOrder(item); setShowDetailModal(true); }}
+        activeOpacity={0.75}
+      >
+        {/* Status icon */}
+        <View style={[styles.orderStatusIcon, { backgroundColor: st.bg }]}>
+          <Ionicons name={st.icon as any} size={16} color={st.iconColor} />
+        </View>
+
+        {/* Order info */}
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderIdText}>#SA{item.id}</Text>
+          <Text style={styles.orderCustomer} numberOfLines={1}>{item.customer_name}</Text>
+          <Text style={styles.orderEmail} numberOfLines={1}>{item.customer_email}</Text>
+        </View>
+
+        {/* Amount + payment */}
+        <View style={styles.orderMiddle}>
+          <Text style={styles.orderAmount}>{fmtCurrency(item.total_amount)}</Text>
+          <Text style={styles.orderPayPaid}>• {isPaid ? 'Paid' : 'Unpaid'}</Text>
+          <Text style={styles.orderPayMethod}>{item.payment_method_display}</Text>
+        </View>
+
+        {/* Status badge + fulfillment + date */}
+        <View style={styles.orderRight}>
+          <View style={[styles.statusBadge, { backgroundColor: st.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: st.text }]}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+            </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={24} color="#666" />
-        </TouchableOpacity>
-
-        {/* REMOVED: Inline expansion to prevent memory crashes - details now shown in modal */}
-      </View>
-    );
-  }, (prevProps, nextProps) => {
-    // Ultra-simple comparison - only check ID to minimize computation
-    return prevProps.order.id === nextProps.order.id;
-  });
-
-  if (loading && !refreshing) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066cc" />
+          <Text style={styles.fulfillmentText}>{fulfillment}</Text>
+          <Text style={styles.orderDate}>{fmtDate(item.created_at)}</Text>
         </View>
-      </SafeAreaView>
+
+        {/* Actions */}
+        <View style={styles.orderActions}>
+          <TouchableOpacity onPress={() => { setSelectedOrder(item); setShowDetailModal(true); }}>
+            <Ionicons name="eye-outline" size={18} color="#6B7280" />
+          </TouchableOpacity>
+          <View style={{ height: 8 }} />
+          <TouchableOpacity>
+            <Ionicons name="ellipsis-vertical" size={16} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
     );
-  }
+  };
+
+  // ── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.filterSection}>
-          <Text style={styles.filterLabel}>Filter by status:</Text>
-          <View style={styles.pickerContainer}>
-            {Platform.OS !== 'web' ? (
-              <Picker
-                selectedValue={selectedStatus}
-                style={[styles.picker, Platform.select({
-                  android: { color: '#333' },
-                  ios: { color: '#333' }
-                })]}
-                dropdownIconColor="#333"
-                mode={Platform.select({ ios: 'dialog', android: 'dropdown' })}
-                itemStyle={Platform.select({
-                  ios: { fontSize: 16, color: '#333' }
-                })}
-                onValueChange={itemValue => {
-                  if (mountedRef.current) {
-                    setSelectedStatus(itemValue);
-                  }
-                }}
-              >
-                <Picker.Item label="All Orders" value="all" />
-                <Picker.Item label="Pending" value="pending" />
-                <Picker.Item label="Confirmed" value="confirmed" />
-                <Picker.Item label="Shipped" value="shipped" />
-                <Picker.Item label="Delivered" value="delivered" />
-                <Picker.Item label="Cancelled" value="cancelled" />
-              </Picker>
-            ) : (
-              <select
-                value={selectedStatus}
-                onChange={(e) => {
-                  if (mountedRef.current) {
-                    setSelectedStatus(e.target.value);
-                  }
-                }}
-                style={{ width: '100%', padding: 12, fontSize: 16, borderRadius: 8 }}
-              >
-                <option value="all">All Orders</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            )}
-          </View>
-          <View style={{ marginTop: 12 }}>
-            <Text style={styles.filterLabel}>Export orders by date:</Text>
-            <View style={{ flexDirection: 'row', marginTop: 8, alignItems: 'stretch' }}>
-              <TouchableOpacity
-                onPress={() => setShowStartPicker(true)}
-                style={{ flex: 1, marginRight: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Text style={{ color: '#333', textAlign: 'center' }}>{startDate ? `Start: ${startDate.toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })}` : 'Select start date'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowEndPicker(true)}
-                style={{ flex: 1, marginLeft: 8, backgroundColor: '#eef2ff', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Text style={{ color: '#333', textAlign: 'center' }}>{endDate ? `End: ${endDate.toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })}` : 'Select end date'}</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              disabled={downloading}
-              onPress={downloadPdf}
-              style={{ marginTop: 8, backgroundColor: '#0066cc', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600' }}>{downloading ? 'Downloading...' : 'Download PDF'}</Text>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+
+          {/* Top Header */}
+          <View style={styles.topHeader}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+              <Ionicons name="arrow-back" size={22} color="#111827" />
             </TouchableOpacity>
-            {showStartPicker && (
-              <DateTimePicker
-                value={startDate || new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  setShowStartPicker(false);
-                  if (date) setStartDate(date);
-                }}
-              />
-            )}
-            {showEndPicker && (
-              <DateTimePicker
-                value={endDate || new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  setShowEndPicker(false);
-                  if (date) setEndDate(date);
-                }}
-              />
-            )}
+            <Text style={styles.headerTitle}>Orders</Text>
+            <TouchableOpacity style={styles.iconBtn} onPress={onRefresh}>
+              <Ionicons name="refresh-outline" size={22} color="#111827" />
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {!canRender ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0066cc" />
-            <Text style={{ marginTop: 12, color: '#666' }}>Loading orders...</Text>
-          </View>
-        ) : (
-          <FlatList
-            style={styles.ordersList}
-            contentContainerStyle={styles.scrollContent}
-            data={Array.isArray(visibleOrders) ? visibleOrders : []}
-            keyExtractor={(order) => {
-              if (!order || !order.id) return `order-${Math.random()}`;
-              return String(order.id);
-            }}
-            renderItem={({ item }: { item: OrderSummary }) => {
-              if (!item) return null;
-              try {
-                const hydrated = buildOrderDetails(item);
-                if (!hydrated) return null;
-                return (
-                  <OrderCard
-                    order={hydrated}
-                    isExpanded={false}
-                    onToggle={() => {
-                      if (!mountedRef.current) return;
-                      try {
-                        const detail = typeof getOrderById === 'function' ? getOrderById(String(item.id)) : undefined;
-                        setSelectedOrderForDetails(detail || hydrated);
-                        setShowOrderDetailsModal(true);
-                        if (!detail && typeof fetchOrders === 'function') {
-                          fetchOrders().catch(err => console.error('Error refetching orders for detail:', err));
-                        }
-                      } catch (error) {
-                        console.error('Error opening order details:', error);
-                      }
-                    }}
-                  />
-                );
-              } catch (error) {
-                console.error('Error rendering OrderCard:', error);
-                return null;
-              }
-            }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            showsVerticalScrollIndicator={true}
-            removeClippedSubviews={Platform.OS !== 'web'} // Disable on web for better scroll detection
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
-            windowSize={10}
-            updateCellsBatchingPeriod={50}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.3}
-            ListEmptyComponent={<Text style={styles.noOrders}>No orders found</Text>}
-            ListFooterComponent={
-              (() => {
-                try {
-                  const visibleLength = Array.isArray(visibleOrders) ? visibleOrders.length : 0;
-                  const filteredLength = Array.isArray(filteredOrders) ? filteredOrders.length : 0;
+          <ScrollView
+            style={styles.body}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 90 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2D4B34']} tintColor="#2D4B34" />}
+          >
+            {/* ── Stat Cards ── */}
+            {statsLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                <ActivityIndicator color="#2D4B34" />
+              </View>
+            ) : stats ? (
+              <>
+                <View style={styles.statRow}>
+                  <StatCard label="Total Orders" value={stats.total} trend={stats.total_trend} iconName="bag-handle-outline" iconBg="#EAF6ED" onPress={() => setStatusFilter('all')} />
+                  <StatCard label="Pending" value={stats.pending} trend={stats.pending_trend} iconName="time-outline" iconBg="#FFF8E1" onPress={() => setStatusFilter('pending')} />
+                  <StatCard label="Processing" value={stats.processing} trend={stats.processing_trend} iconName="settings-outline" iconBg="#FFF3E0" onPress={() => setStatusFilter('processing')} />
+                </View>
+                <View style={[styles.statRow, { marginTop: 0 }]}>
+                  <StatCard label="Delivered" value={stats.delivered} trend={stats.delivered_trend} iconName="checkmark-circle-outline" iconBg="#EAF6ED" onPress={() => setStatusFilter('delivered')} />
+                  <StatCard label="Cancelled" value={stats.cancelled} trend={stats.cancelled_trend} iconName="close-circle-outline" iconBg="#FEE2E2" onPress={() => setStatusFilter('cancelled')} />
+                </View>
+              </>
+            ) : null}
 
-                  if (visibleLength < filteredLength) {
-                    return (
-                      <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                        {loadingMore && <ActivityIndicator size="small" color="#0066cc" style={{ marginBottom: 8 }} />}
-                        <TouchableOpacity
-                          onPress={loadMore}
-                          disabled={loadingMore}
-                          style={{
-                            paddingVertical: 8,
-                            paddingHorizontal: 16,
-                            backgroundColor: loadingMore ? '#ccc' : '#0066cc',
-                            borderRadius: 8
-                          }}
-                        >
-                          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                            {loadingMore ? 'Loading...' : `Load More (${filteredLength - visibleLength} remaining)`}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  } else if (visibleLength > 0) {
-                    return (
-                      <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                        <Text style={{ color: '#666', fontSize: 12 }}>
-                          All orders loaded ({filteredLength} total)
-                        </Text>
-                      </View>
-                    );
-                  }
-                  return null;
-                } catch (error) {
-                  console.error('Error rendering ListFooterComponent:', error);
-                  return null;
-                }
-              })()
-            }
-          />
-        )}
-      </View>
+            {/* ── Search Bar ── */}
+            <View style={styles.searchRow}>
+              <View style={styles.searchBox}>
+                <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search by Order ID, Customer or Email..."
+                  placeholderTextColor="#9CA3AF"
+                  value={searchInput}
+                  onChangeText={setSearchInput}
+                  onSubmitEditing={() => setSearch(searchInput)}
+                  returnKeyType="search"
+                />
+                {searchInput.length > 0 && (
+                  <TouchableOpacity onPress={() => { setSearchInput(''); setSearch(''); }}>
+                    <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
-      {/* Order Details Modal - Moved from inline expansion to prevent memory crashes */}
-      {showOrderDetailsModal && selectedOrderForDetails && (
-        <Modal
-          visible={showOrderDetailsModal}
-          animationType="slide"
-          onRequestClose={() => {
-            setShowOrderDetailsModal(false);
-            setSelectedOrderForDetails(null);
-          }}
-        >
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
-              <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Order Details</Text>
-              <TouchableOpacity onPress={() => {
-                setShowOrderDetailsModal(false);
-                setSelectedOrderForDetails(null);
-              }}>
-                <MaterialIcons name="close" size={28} color="#000" />
+            {/* ── Filter Pills Row ── */}
+            <View style={styles.filterPillRow}>
+              {/* Status filter */}
+              <TouchableOpacity style={styles.filterPill} onPress={() => setShowStatusModal(true)}>
+                <Text style={styles.filterPillText}>
+                  {statusFilter === 'all' ? 'All Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                </Text>
+                <Ionicons name="chevron-down" size={12} color="#374151" />
+              </TouchableOpacity>
+
+              {/* Payment filter */}
+              <TouchableOpacity style={styles.filterPill} onPress={() => setShowPaymentModal(true)}>
+                <Text style={styles.filterPillText}>
+                  {paymentFilter === 'all' ? 'All Payment' : paymentFilter.charAt(0).toUpperCase() + paymentFilter.slice(1)}
+                </Text>
+                <Ionicons name="chevron-down" size={12} color="#374151" />
+              </TouchableOpacity>
+
+              <View style={{ flex: 1 }} />
+
+              {/* Export */}
+              <TouchableOpacity
+                style={styles.exportBtn}
+                onPress={() => setShowExportModal(true)}
+              >
+                <Ionicons name="download-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.exportBtnText}>Export PDF</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Order Status</Text>
-                <OrderStatusPicker currentStatus={selectedOrderForDetails.status || 'pending'} orderId={selectedOrderForDetails.id} />
-              </View>
 
-              {/* Shiprocket Management Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>📦 Shipment Management</Text>
-                <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', gap: 12 }}>
-                  {/* Step 1: Create Shipment */}
+            {/* ── Orders List ── */}
+            {loading && !refreshing ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color="#2D4B34" />
+                <Text style={{ color: '#6B7280', marginTop: 12, fontSize: 13 }}>Loading orders...</Text>
+              </View>
+            ) : orders.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <Ionicons name="bag-handle-outline" size={48} color="#D1D5DB" />
+                <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 14 }}>No orders found</Text>
+              </View>
+            ) : (
+              <>
+                {orders.map(item => <OrderRow key={String(item.id)} item={item} />)}
+
+                {/* ── Pagination ── */}
+                <View style={styles.paginationContainer}>
+                  <Text style={styles.paginationInfo}>
+                    Showing {(page - 1) * PAGE_LIMIT + 1} to {Math.min(page * PAGE_LIMIT, total)} of {total.toLocaleString()} orders
+                  </Text>
+                  <View style={styles.paginationControls}>
+                    <TouchableOpacity
+                      style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
+                      onPress={() => page > 1 && fetchOrders(page - 1, true)}
+                      disabled={page === 1}
+                    >
+                      <Ionicons name="chevron-back" size={14} color={page === 1 ? '#D1D5DB' : '#374151'} />
+                    </TouchableOpacity>
+
+                    {/* Page number pills */}
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      let p = i + 1;
+                      if (totalPages > 5 && page > 3) {
+                        p = page - 2 + i;
+                      }
+                      if (p > totalPages) return null;
+                      return (
+                        <TouchableOpacity
+                          key={p}
+                          style={[styles.pageBtn, p === page && styles.pageBtnActive]}
+                          onPress={() => p !== page && fetchOrders(p, true)}
+                        >
+                          <Text style={[styles.pageBtnText, p === page && styles.pageBtnActiveText]}>{p}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {totalPages > 5 && (
+                      <Text style={styles.pageBtnText}>... {totalPages}</Text>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.pageBtn, page === totalPages && styles.pageBtnDisabled]}
+                      onPress={() => page < totalPages && fetchOrders(page + 1, true)}
+                      disabled={page === totalPages}
+                    >
+                      <Ionicons name="chevron-forward" size={14} color={page === totalPages ? '#D1D5DB' : '#374151'} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
+          </ScrollView>
+
+          {/* ── Bottom Nav Bar ── */}
+          <View style={styles.bottomTabBar}>
+            <TouchableOpacity style={styles.tabItem} onPress={() => router.replace('/admin/dashboard' as any)}>
+              <Ionicons name="grid-outline" size={22} color="#6B7280" />
+              <Text style={styles.tabLabel}>Dashboard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={() => {}}>
+              <Ionicons name="bag-handle" size={22} color="#2D4B34" />
+              <Text style={[styles.tabLabel, styles.tabLabelActive]}>Orders</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={() => router.push('/admin/products' as any)}>
+              <Ionicons name="cube-outline" size={22} color="#6B7280" />
+              <Text style={styles.tabLabel}>Products</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={() => router.push('/admin/users' as any)}>
+              <Ionicons name="people-outline" size={22} color="#6B7280" />
+              <Text style={styles.tabLabel}>Customers</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={() => setShowMoreModal(true)}>
+              <Ionicons name="ellipsis-horizontal-outline" size={22} color="#6B7280" />
+              <Text style={styles.tabLabel}>More</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Admin More Options Modal ── */}
+          <AdminMoreModal
+            visible={showMoreModal}
+            onClose={() => setShowMoreModal(false)}
+          />
+
+          {/* ── Export PDF Date Range Modal ── */}
+          <Modal visible={showExportModal} transparent animationType="slide" onRequestClose={() => setShowExportModal(false)}>
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowExportModal(false)}>
+              <View style={styles.modalSheet}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={styles.modalTitle}>Export Orders PDF</Text>
+                  <TouchableOpacity onPress={() => setShowExportModal(false)}>
+                    <Ionicons name="close" size={22} color="#374151" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Preset Ranges */}
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8 }}>
+                  Quick Date Presets
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                  <TouchableOpacity style={styles.presetPill} onPress={() => setPresetRange('today')}>
+                    <Text style={styles.presetPillText}>Today</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.presetPill} onPress={() => setPresetRange('7days')}>
+                    <Text style={styles.presetPillText}>Last 7 Days</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.presetPill} onPress={() => setPresetRange('month')}>
+                    <Text style={styles.presetPillText}>This Month</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.presetPill} onPress={() => setPresetRange('all')}>
+                    <Text style={styles.presetPillText}>All Time</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Custom Date Inputs */}
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8 }}>
+                  Custom Range
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
                   <TouchableOpacity
-                    style={{ 
-                      backgroundColor: hasShiprocketData(selectedOrderForDetails) ? '#ccc' : '#694d21', 
-                      padding: 12, 
-                      borderRadius: 8, 
-                      alignItems: 'center' 
-                    }}
-                    onPress={() => handleCreateShipment(selectedOrderForDetails.id)}
-                    disabled={hasShiprocketData(selectedOrderForDetails) || shiprocketLoading}
+                    style={styles.datePickerBtn}
+                    onPress={() => setShowStartPicker(true)}
                   >
-                    <Text style={{ color: hasShiprocketData(selectedOrderForDetails) ? '#666' : '#fff', fontWeight: '600', fontSize: 14 }}>
-                      {hasShiprocketData(selectedOrderForDetails) ? '✓ Shipment Created' : (shiprocketLoading && shiprocketAction === 'create' ? '⏳ Creating...' : '📦 Create Shiprocket Shipment')}
+                    <Ionicons name="calendar-outline" size={16} color="#2D4B34" />
+                    <Text style={styles.datePickerBtnText}>
+                      {exportStartDate ? `Start: ${fmtYMD(exportStartDate)}` : 'Select Start Date'}
                     </Text>
                   </TouchableOpacity>
 
-                  {/* Reset Shipment Option */}
-                  {hasShiprocketData(selectedOrderForDetails) && (
-                    <TouchableOpacity
-                      style={{ 
-                        backgroundColor: '#fee2e2', 
-                        padding: 12, 
-                        borderRadius: 8, 
-                        alignItems: 'center',
-                        marginTop: 4,
-                        borderWidth: 1,
-                        borderColor: '#fca5a5'
-                      }}
-                      onPress={() => handleResetShipment(selectedOrderForDetails.id)}
-                      disabled={shiprocketLoading}
-                    >
-                      <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 14 }}>
-                        {shiprocketLoading && shiprocketAction === 'reset' ? '⏳ Resetting...' : '⚠️ Reset & Recreate Shipment'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {/* Display Shiprocket IDs if shipment is created */}
-                  {hasShiprocketData(selectedOrderForDetails) && (
-                    <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#e0e0e0' }}>
-                      <Text style={{ color: '#666', fontSize: 12 }}>Shiprocket Order ID:</Text>
-                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 14, marginBottom: 4 }}>
-                        {(selectedOrderForDetails as any).shiprocket_order_id || '—'}
-                      </Text>
-                      <Text style={{ color: '#666', fontSize: 12 }}>Shipment ID:</Text>
-                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>
-                        {(selectedOrderForDetails as any).shiprocket_shipment_id || '—'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Customer Details</Text>
-                <View style={styles.customerInfo}>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Name:</Text>
-                    <Text style={styles.infoValue}>{selectedOrderForDetails.shipping_address?.full_name || 'N/A'}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Phone:</Text>
-                    <Text style={styles.infoValue}>{selectedOrderForDetails.shipping_address?.phone || 'N/A'}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Payment:</Text>
-                    <Text style={styles.infoValue}>{selectedOrderForDetails.payment_method_display || (selectedOrderForDetails.payment_method?.toLowerCase() === 'cod' ? 'Cash on Delivery' : 'Online Payment')}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Address:</Text>
-                    <Text style={styles.infoValue}>
-                      {selectedOrderForDetails.shipping_address?.address_line1 || 'N/A'}
-                      {'\n'}
-                      {selectedOrderForDetails.shipping_address?.city || ''}, {selectedOrderForDetails.shipping_address?.state || ''} - {selectedOrderForDetails.shipping_address?.pincode || ''}
+                  <TouchableOpacity
+                    style={styles.datePickerBtn}
+                    onPress={() => setShowEndPicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color="#2D4B34" />
+                    <Text style={styles.datePickerBtnText}>
+                      {exportEndDate ? `End: ${fmtYMD(exportEndDate)}` : 'Select End Date'}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
-              </View>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Order Items ({(selectedOrderForDetails.items?.length || 0)})</Text>
-                <View style={styles.itemsContainer}>
-                  {selectedOrderForDetails.items && selectedOrderForDetails.items.length > 0 ? (
-                    selectedOrderForDetails.items.slice(0, 10).map((item, index) => {
-                      if (!item) return null;
-                      const price = Number(item.price_at_time || 0);
-                      const qty = Number(item.quantity || 0);
-                      return (
-                        <View key={`${selectedOrderForDetails.id}-item-${index}`} style={styles.orderItem}>
-                          <View style={styles.itemDetails}>
-                            <Text style={styles.itemName} numberOfLines={1}>{item.product_name || 'Unknown Product'}</Text>
-                            <Text style={styles.itemQuantity}>Qty: {qty}</Text>
-                          </View>
-                          <Text style={styles.itemPrice}>₹{(price * qty).toFixed(2)}</Text>
-                        </View>
-                      );
-                    })
+                {/* Mobile Date Pickers */}
+                {showStartPicker && (
+                  <DateTimePicker
+                    value={exportStartDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, date) => {
+                      setShowStartPicker(false);
+                      if (date) setExportStartDate(date);
+                    }}
+                  />
+                )}
+                {showEndPicker && (
+                  <DateTimePicker
+                    value={exportEndDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, date) => {
+                      setShowEndPicker(false);
+                      if (date) setExportEndDate(date);
+                    }}
+                  />
+                )}
+
+                {/* Download Action Button */}
+                <TouchableOpacity
+                  style={[styles.exportSubmitBtn, downloading && { opacity: 0.6 }]}
+                  onPress={() => downloadPdf(exportStartDate, exportEndDate)}
+                  disabled={downloading}
+                >
+                  {downloading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.noOrders}>No items found</Text>
+                    <>
+                      <Ionicons name="document-text-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.exportSubmitBtnText}>Download PDF Report</Text>
+                    </>
                   )}
-                  {(selectedOrderForDetails.items?.length || 0) > 10 && (
-                    <Text style={{ padding: 8, color: '#666', fontSize: 12, textAlign: 'center' }}>
-                      +{(selectedOrderForDetails.items?.length || 0) - 10} more items
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* ── Status Filter Modal ── */}
+          <Modal visible={showStatusModal} transparent animationType="slide" onRequestClose={() => setShowStatusModal(false)}>
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowStatusModal(false)}>
+              <View style={styles.modalSheet}>
+                <Text style={styles.modalTitle}>Filter by Status</Text>
+                {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled', 'confirmed'].map(s => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.modalOption, statusFilter === s && styles.modalOptionActive]}
+                    onPress={() => { setStatusFilter(s); setShowStatusModal(false); }}
+                  >
+                    <Text style={[styles.modalOptionText, statusFilter === s && styles.modalOptionTextActive]}>
+                      {s === 'all' ? 'All Status' : s.charAt(0).toUpperCase() + s.slice(1)}
                     </Text>
-                  )}
-                </View>
+                    {statusFilter === s && <Ionicons name="checkmark" size={16} color="#2D4B34" />}
+                  </TouchableOpacity>
+                ))}
               </View>
+            </TouchableOpacity>
+          </Modal>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Order Summary</Text>
-                <View style={styles.summaryContainer}>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Subtotal:</Text>
-                    <Text style={styles.summaryValue}>₹{(selectedOrderForDetails.items?.reduce((sum, item) => sum + (Number(item.price_at_time || 0) * Number(item.quantity || 0)), 0) || 0).toFixed(2)}</Text>
-                  </View>
-                  {Number(selectedOrderForDetails.discount_amount || 0) > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Discount:</Text>
-                      <Text style={[styles.summaryValue, styles.discountText]}>-₹{Number(selectedOrderForDetails.discount_amount || 0).toFixed(2)}</Text>
-                    </View>
-                  )}
-                  {Number(selectedOrderForDetails.gst_amount || 0) > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>GST (included in prices):</Text>
-                      <Text style={styles.summaryValue}>₹{Number(selectedOrderForDetails.gst_amount || 0).toFixed(2)}</Text>
-                    </View>
-                  )}
-                  {Number(selectedOrderForDetails.delivery_charge || 0) > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Delivery:</Text>
-                      <Text style={styles.summaryValue}>₹{Number(selectedOrderForDetails.delivery_charge || 0).toFixed(2)}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.summaryRow, styles.totalRow]}>
-                    <Text style={styles.totalLabel}>Total:</Text>
-                    <Text style={styles.totalValue}>₹{Number(selectedOrderForDetails.total_amount || 0).toFixed(2)}</Text>
-                  </View>
-                </View>
+          {/* ── Payment Filter Modal ── */}
+          <Modal visible={showPaymentModal} transparent animationType="slide" onRequestClose={() => setShowPaymentModal(false)}>
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowPaymentModal(false)}>
+              <View style={styles.modalSheet}>
+                <Text style={styles.modalTitle}>Filter by Payment</Text>
+                {['all', 'cod', 'online', 'upi', 'netbanking', 'creditcard'].map(p => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[styles.modalOption, paymentFilter === p && styles.modalOptionActive]}
+                    onPress={() => { setPaymentFilter(p); setShowPaymentModal(false); }}
+                  >
+                    <Text style={[styles.modalOptionText, paymentFilter === p && styles.modalOptionTextActive]}>
+                      {p === 'all' ? 'All Payment' : p === 'cod' ? 'Cash on Delivery' : p === 'upi' ? 'UPI' : p === 'netbanking' ? 'Net Banking' : p === 'creditcard' ? 'Credit Card' : 'Online Payment'}
+                    </Text>
+                    {paymentFilter === p && <Ionicons name="checkmark" size={16} color="#2D4B34" />}
+                  </TouchableOpacity>
+                ))}
               </View>
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
-      )}
-    </SafeAreaView>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* ── Order Detail Modal ── */}
+          <Modal visible={showDetailModal} transparent animationType="slide" onRequestClose={() => setShowDetailModal(false)}>
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowDetailModal(false)}>
+              <View style={[styles.modalSheet, { maxHeight: '80%' }]}>
+                {selectedOrder && (
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <Text style={styles.modalTitle}>Order #SA{selectedOrder.id}</Text>
+                      <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+                        <Ionicons name="close" size={22} color="#374151" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Customer</Text>
+                      <Text style={styles.detailValue}>{selectedOrder.shipping_full_name || selectedOrder.customer_name || selectedOrder.user_name || 'Customer'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Email</Text>
+                      <Text style={styles.detailValue}>{selectedOrder.customer_email || selectedOrder.user_email || '—'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Phone</Text>
+                      <Text style={styles.detailValue}>{selectedOrder.shipping_phone_number || '—'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Address</Text>
+                      <Text style={styles.detailValue}>
+                        {[
+                          selectedOrder.shipping_address_line1,
+                          selectedOrder.shipping_address_line2,
+                          selectedOrder.shipping_city,
+                          selectedOrder.shipping_state,
+                          selectedOrder.shipping_postal_code
+                        ].filter(Boolean).join(', ') || '—'}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Amount</Text>
+                      <Text style={styles.detailValue}>{fmtCurrency(selectedOrder.total_amount)}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Payment</Text>
+                      <Text style={styles.detailValue}>{selectedOrder.payment_method_display}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Date</Text>
+                      <Text style={styles.detailValue}>{fmtDate(selectedOrder.created_at)}</Text>
+                    </View>
+
+                    {/* Order Items Section */}
+                    <Text style={[styles.modalTitle, { fontSize: 14, marginTop: 16, marginBottom: 8 }]}>
+                      Order Items ({(() => {
+                        let itms = selectedOrder.items;
+                        if (typeof itms === 'string') {
+                          try { itms = JSON.parse(itms); } catch { itms = []; }
+                        }
+                        return Array.isArray(itms) ? itms.filter(Boolean).length : 0;
+                      })()})
+                    </Text>
+                    <View style={{ backgroundColor: '#F9FAFB', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 12 }}>
+                      {(() => {
+                        let itms = selectedOrder.items;
+                        if (typeof itms === 'string') {
+                          try { itms = JSON.parse(itms); } catch { itms = []; }
+                        }
+                        const list = Array.isArray(itms) ? itms.filter(Boolean) : [];
+                        if (list.length === 0) {
+                          return <Text style={{ color: '#9CA3AF', fontSize: 12, textAlign: 'center', py: 4 }}>No items details recorded</Text>;
+                        }
+                        return list.map((item, idx) => {
+                          const pName = item?.product_name || item?.name || item?.title || 'Item';
+                          const pQty = parseInt(String(item?.quantity || 1));
+                          const pPrice = parseFloat(String(item?.price_at_time || item?.price || item?.unit_price || 0));
+                          return (
+                            <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: idx === list.length - 1 ? 0 : 1, borderBottomColor: '#F3F4F6' }}>
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '600', color: '#1F2937' }}>{pName}</Text>
+                                <Text style={{ fontSize: 11, color: '#6B7280' }}>Qty: {pQty} × ₹{pPrice.toFixed(0)}</Text>
+                              </View>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#2D4B34' }}>₹{(pPrice * pQty).toFixed(0)}</Text>
+                            </View>
+                          );
+                        });
+                      })()}
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Current Status</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusStyle(selectedOrder.status).bg }]}>
+                        <Text style={[styles.statusBadgeText, { color: getStatusStyle(selectedOrder.status).text }]}>
+                          {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.modalTitle, { fontSize: 14, marginTop: 16, marginBottom: 8 }]}>Update Status</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {(['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as StatusKey[]).map(s => {
+                        const st = getStatusStyle(s);
+                        const isActive = selectedOrder.status === s;
+                        return (
+                          <TouchableOpacity
+                            key={s}
+                            style={[styles.updateStatusBtn, { backgroundColor: isActive ? st.bg : '#F9FAFB', borderColor: isActive ? st.text : '#E5E7EB' }]}
+                            onPress={() => {
+                              if (!isActive) {
+                                Alert.alert('Update Status', `Change to ${s}?`, [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Update', onPress: () => handleStatusUpdate(selectedOrder.id, s) },
+                                ]);
+                              }
+                            }}
+                          >
+                            {updatingStatus ? <ActivityIndicator size="small" color={st.text} /> : (
+                              <Text style={{ color: isActive ? st.text : '#374151', fontSize: 12, fontWeight: isActive ? '700' : '500' }}>
+                                {s.charAt(0).toUpperCase() + s.slice(1)}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {/* ── Shiprocket Fulfillment Section ── */}
+                    <Text style={[styles.modalTitle, { fontSize: 14, marginTop: 20, marginBottom: 8 }]}>
+                      Shiprocket Fulfillment
+                    </Text>
+
+                    {!hasShiprocketData(selectedOrder) && (
+                      <View style={styles.dimensionsBox}>
+                        <Text style={styles.dimensionsBoxTitle}>Package Dimensions</Text>
+                        <View style={styles.dimensionsRow}>
+                          <View style={styles.dimField}>
+                            <Text style={styles.dimLabel}>Weight (kg)</Text>
+                            <TextInput
+                              style={styles.dimInput}
+                              keyboardType="numeric"
+                              value={packageWeight}
+                              onChangeText={setPackageWeight}
+                            />
+                          </View>
+                          <View style={styles.dimField}>
+                            <Text style={styles.dimLabel}>Length (cm)</Text>
+                            <TextInput
+                              style={styles.dimInput}
+                              keyboardType="numeric"
+                              value={packageLength}
+                              onChangeText={setPackageLength}
+                            />
+                          </View>
+                          <View style={styles.dimField}>
+                            <Text style={styles.dimLabel}>Width (cm)</Text>
+                            <TextInput
+                              style={styles.dimInput}
+                              keyboardType="numeric"
+                              value={packageBreadth}
+                              onChangeText={setPackageBreadth}
+                            />
+                          </View>
+                          <View style={styles.dimField}>
+                            <Text style={styles.dimLabel}>Height (cm)</Text>
+                            <TextInput
+                              style={styles.dimInput}
+                              keyboardType="numeric"
+                              value={packageHeight}
+                              onChangeText={setPackageHeight}
+                            />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    <View style={{ gap: 8, marginTop: 4 }}>
+                      {/* Step 1: Create Shipment */}
+                      <TouchableOpacity
+                        style={[
+                          styles.shipActionBtn,
+                          hasShiprocketData(selectedOrder) ? styles.shipActionBtnDone : styles.shipActionBtnPrimary,
+                        ]}
+                        onPress={() => handleCreateShipment(selectedOrder.id)}
+                        disabled={hasShiprocketData(selectedOrder) || shiprocketLoading}
+                      >
+                        {shiprocketLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={[
+                            styles.shipActionBtnText,
+                            hasShiprocketData(selectedOrder) && styles.shipActionBtnTextDone,
+                          ]}>
+                            {hasShiprocketData(selectedOrder) ? '✓ Shipment Created' : 'Create Shiprocket Shipment'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Step 2: Assign Courier & Generate AWB */}
+                      {hasShiprocketData(selectedOrder) && !hasAWB(selectedOrder) && (
+                        <TouchableOpacity
+                          style={[styles.shipActionBtn, styles.shipActionBtnPrimary]}
+                          onPress={() => handleAssignCourier(selectedOrder.id)}
+                          disabled={shiprocketLoading}
+                        >
+                          {shiprocketLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={styles.shipActionBtnText}>Assign Courier & Generate AWB</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Step 3: Download Label & Request Pickup */}
+                      {hasAWB(selectedOrder) && (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.shipActionBtn, styles.shipActionBtnSecondary]}
+                            onPress={() => handleDownloadLabel(selectedOrder.id)}
+                            disabled={shiprocketLoading}
+                          >
+                            <Ionicons name="document-text-outline" size={16} color="#A37217" style={{ marginRight: 4 }} />
+                            <Text style={styles.shipActionBtnTextSecondary}>Download Shipping Label</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.shipActionBtn,
+                              selectedOrder.shipment_status === 'pickup_scheduled' ? styles.shipActionBtnDone : styles.shipActionBtnPrimary,
+                            ]}
+                            onPress={() => handleSchedulePickup(selectedOrder.id)}
+                            disabled={shiprocketLoading || selectedOrder.shipment_status === 'pickup_scheduled'}
+                          >
+                            <Ionicons
+                              name="calendar-outline"
+                              size={16}
+                              color={selectedOrder.shipment_status === 'pickup_scheduled' ? '#2E5D34' : '#FFFFFF'}
+                              style={{ marginRight: 4 }}
+                            />
+                            <Text style={[
+                              styles.shipActionBtnText,
+                              selectedOrder.shipment_status === 'pickup_scheduled' && styles.shipActionBtnTextDone,
+                            ]}>
+                              {selectedOrder.shipment_status === 'pickup_scheduled' ? '✓ Pickup Scheduled' : 'Request Pickup'}
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+
+                      {/* Step 4: Reset Shipment */}
+                      {hasShiprocketData(selectedOrder) && (
+                        <TouchableOpacity
+                          style={[styles.shipActionBtn, styles.shipActionBtnDanger]}
+                          onPress={() => handleResetShipment(selectedOrder.id)}
+                          disabled={shiprocketLoading}
+                        >
+                          <Text style={styles.shipActionBtnTextDanger}>
+                            {shiprocketLoading ? 'Resetting...' : 'Reset & Recreate Shipment'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Shiprocket Details Summary Box */}
+                    {hasShiprocketData(selectedOrder) && (
+                      <View style={styles.shipDetailsBox}>
+                        <Text style={styles.shipDetailItem}>
+                          <Text style={{ fontWeight: '700' }}>Shiprocket Order ID: </Text>
+                          {selectedOrder.shiprocket_order_id || '—'}
+                        </Text>
+                        <Text style={styles.shipDetailItem}>
+                          <Text style={{ fontWeight: '700' }}>Shipment ID: </Text>
+                          {selectedOrder.shiprocket_shipment_id || '—'}
+                        </Text>
+                        {selectedOrder.awb_number ? (
+                          <Text style={styles.shipDetailItem}>
+                            <Text style={{ fontWeight: '700' }}>AWB Number: </Text>
+                            {selectedOrder.awb_number} ({selectedOrder.courier_name || 'Courier'})
+                          </Text>
+                        ) : null}
+                        {selectedOrder.tracking_url ? (
+                          <TouchableOpacity
+                            style={{ marginTop: 6 }}
+                            onPress={() => Linking.openURL(selectedOrder.tracking_url!)}
+                          >
+                            <Text style={{ color: '#2D4B34', fontWeight: '700', fontSize: 12 }}>
+                              Track Order →
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
+        </View>
+      </SafeAreaView>
+    </>
   );
-};
+}
 
-const styles = StyleSheet.create<Styles>({
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FAFAFA',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  filterSection: {
-    backgroundColor: '#fff',
-    padding: 16,
+  container: { flex: 1, backgroundColor: '#FAFAFA' },
+
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E5E7EB',
   },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
+
+  body: { flex: 1, paddingHorizontal: 12, paddingTop: 12 },
+
+  // Stat cards
+  statRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
   },
-  pickerContainer: {
-    marginVertical: 8,
-    backgroundColor: '#fff',
-  },
-  picker: {
-    width: '100%',
-    backgroundColor: '#f8f9fa',
-    ...Platform.select({
-      android: {
-        paddingHorizontal: 10,
-      },
-      ios: {
-        paddingHorizontal: 10,
-      }
-    })
-  },
-  ordersList: {
+  statCard: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  scrollContent: {
-    paddingBottom: Platform.OS === 'ios' ? 100 : 120, // Extra padding to ensure content is accessible above navigation buttons
-    flexGrow: 1,
-  },
-  loadingContainer: {
-    flex: 1,
+  statIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    marginBottom: 6,
   },
-  noOrders: {
-    textAlign: 'center',
-    marginTop: 24,
-    fontSize: 16,
-    color: '#666',
-  },
-  orderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  orderHeader: {
+  statLabel: { fontSize: 11, color: '#6B7280', fontWeight: '500' },
+  statValue: { fontSize: 20, fontWeight: '800', color: '#111827', marginVertical: 2 },
+  statTrend: { fontSize: 10, fontWeight: '600' },
+
+  // Search + filters
+  searchRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    gap: 8,
+    marginBottom: 10,
   },
-  orderHeaderLeft: {
+  searchBox: {
     flex: 1,
-  },
-  orderTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginRight: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
   },
-  orderId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  orderDate: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  statusBadge: {
+  searchInput: { flex: 1, fontSize: 13, color: '#111827' },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 9,
   },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  orderDetails: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+  filterBtnText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+
+  filterPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
   },
-  customerInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-  },
-  infoRow: {
+  filterPill: {
     flexDirection: 'row',
-    marginBottom: 8,
-  },
-  infoLabel: {
-    width: 80,
-    fontSize: 14,
-    color: '#666',
-  },
-  infoValue: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-  },
-  itemsContainer: {
-    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  orderItem: {
+  filterPillText: { fontSize: 12, color: '#374151', fontWeight: '500' },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#2D4B34',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  exportBtnText: { fontSize: 12, color: '#FFFFFF', fontWeight: '600' },
+
+  // Order row
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  orderStatusIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  orderInfo: { flex: 1.5, minWidth: 0 },
+  orderIdText: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  orderCustomer: { fontSize: 12, color: '#374151', marginTop: 2 },
+  orderEmail: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+
+  orderMiddle: { flex: 1.2, alignItems: 'flex-end', minWidth: 0 },
+  orderAmount: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  orderPayPaid: { fontSize: 11, color: '#374151', marginTop: 2 },
+  orderPayMethod: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+
+  orderRight: { flex: 1.5, alignItems: 'flex-end', minWidth: 0 },
+  statusBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 3,
+  },
+  statusBadgeText: { fontSize: 11, fontWeight: '700' },
+  fulfillmentText: { fontSize: 10, color: '#6B7280', marginTop: 2 },
+  orderDate: { fontSize: 10, color: '#9CA3AF', marginTop: 1 },
+
+  orderActions: { alignItems: 'center', justifyContent: 'center', paddingLeft: 4 },
+
+  // Pagination
+  paginationContainer: {
+    paddingVertical: 16,
+    gap: 8,
+  },
+  paginationInfo: { fontSize: 12, color: '#6B7280', textAlign: 'center' },
+  paginationControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  pageBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageBtnActive: { backgroundColor: '#2D4B34', borderColor: '#2D4B34' },
+  pageBtnText: { fontSize: 12, color: '#374151', fontWeight: '600' },
+  pageBtnActiveText: { color: '#FFFFFF' },
+
+  // Bottom nav
+  bottomTabBar: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: Platform.OS === 'ios' ? 76 : 60,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingBottom: Platform.OS === 'ios' ? 16 : 0,
+  },
+  tabItem: { alignItems: 'center', justifyContent: 'center' },
+  tabLabel: { fontSize: 10, fontWeight: '500', color: '#6B7280', marginTop: 2 },
+  tabLabelActive: { color: '#2D4B34', fontWeight: '700' },
+
+  // Modals
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12 },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  modalOptionActive: { backgroundColor: '#EAF6ED' },
+  modalOptionText: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  modalOptionTextActive: { color: '#2D4B34', fontWeight: '700' },
+
+  // Detail rows
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#F3F4F6',
   },
-  itemDetails: {
+  detailLabel: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  detailValue: { fontSize: 13, color: '#111827', fontWeight: '600', textAlign: 'right', flex: 1, marginLeft: 16 },
+
+  updateStatusBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Shiprocket Styles
+  dimensionsBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 10,
+  },
+  dimensionsBoxTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  dimensionsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  dimField: {
     flex: 1,
   },
-  itemName: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
+  dimLabel: {
+    fontSize: 9,
+    color: '#6B7280',
+    marginBottom: 2,
   },
-  itemQuantity: {
-    fontSize: 12,
-    color: '#666',
-  },
-  itemPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  summaryContainer: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  dimInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    paddingHorizontal: 6,
     paddingVertical: 4,
+    fontSize: 12,
+    color: '#111827',
+    textAlign: 'center',
   },
-  summaryLabel: {
+  shipActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  shipActionBtnPrimary: {
+    backgroundColor: '#2D4B34',
+  },
+  shipActionBtnSecondary: {
+    backgroundColor: '#FAF3E5',
+    borderWidth: 1,
+    borderColor: '#EBEBE3',
+  },
+  shipActionBtnDone: {
+    backgroundColor: '#E0E0E0',
+  },
+  shipActionBtnDanger: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  shipActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  shipActionBtnTextDone: {
+    color: '#777777',
+  },
+  shipActionBtnTextSecondary: {
+    color: '#A37217',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  shipActionBtnTextDanger: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  shipDetailsBox: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 4,
+  },
+  shipDetailItem: {
+    fontSize: 11,
+    color: '#374151',
+  },
+
+  // Export Modal Styles
+  presetPill: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  presetPillText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  datePickerBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF6ED',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D1E7D6',
+    gap: 6,
+  },
+  datePickerBtnText: {
+    fontSize: 12,
+    color: '#2D4B34',
+    fontWeight: '600',
+  },
+  exportSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2D4B34',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  exportSubmitBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: 14,
-    color: '#333',
-  },
-  discountText: {
-    color: '#28a745',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    marginTop: 8,
-    paddingTop: 8,
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  totalValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
   },
 });
-
-const AdminOrders = () => {
-  try {
-    return (
-      <ErrorBoundary>
-        <AdminOrdersInner />
-      </ErrorBoundary>
-    );
-  } catch (error) {
-    console.error('Fatal error in AdminOrders:', error);
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#ff4444', fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
-          An error occurred. Please restart the app.
-        </Text>
-      </SafeAreaView>
-    );
-  }
-};
-
-export default AdminOrders; 

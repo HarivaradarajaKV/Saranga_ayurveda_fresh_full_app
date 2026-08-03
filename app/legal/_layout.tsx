@@ -25,12 +25,19 @@ export default function LegalLayout() {
         }}
       />
       <Stack.Screen
-        name="refund"
+        name="return"
         options={{
           headerShown: false,
           title: 'Return & Cancellation Policy',
         }}
       />
+      <Stack.Screen
+        name="refund"
+        options={{
+          headerShown: false,
+          title: 'Refund Policy',
+        }}
+      />
     </Stack>
   );
-} 
+}

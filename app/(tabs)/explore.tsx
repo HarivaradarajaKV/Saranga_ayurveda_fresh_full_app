@@ -15,7 +15,9 @@ import {
   Keyboard,
   Animated,
   useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -332,7 +334,14 @@ const ExploreCategoryNavigation: React.FC<ExploreCategoryNavigationProps> = ({
           disabled={categoryLoading}
         >
           <View style={[styles.catImageWrap, selected && styles.catImageWrapSelected]}>
-            <Image source={{ uri: imageUrl }} style={styles.catImage} resizeMode="cover" />
+            <ExpoImage
+              source={{ uri: imageUrl }}
+              style={styles.catImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              priority="high"
+              transition={120}
+            />
           </View>
           <Text style={[styles.catLabel, selected && styles.catLabelSelected]} numberOfLines={2}>
             {cat.name}
@@ -401,25 +410,26 @@ const ExploreScreen = () => {
   }, [navigation, isFocused, scrollToTop]);
 
   // Pre-fetch ALL products on mount so search is instant
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const res = await apiService.get('/products?limit=200');
-        let list: Product[] = [];
-        if (res.data?.products && Array.isArray(res.data.products)) {
-          list = res.data.products;
-        } else if (Array.isArray(res.data)) {
-          list = res.data;
-        }
-        setAllProducts(list);
-        setProductsLoaded(true);
-      } catch (err) {
-        console.error('[ExploreSearch] Failed to fetch products:', err);
-        setProductsLoaded(true);
+  const loadExploreProducts = useCallback(async () => {
+    try {
+      const res = await apiService.get('/products?limit=200');
+      let list: Product[] = [];
+      if (res.data?.products && Array.isArray(res.data.products)) {
+        list = res.data.products;
+      } else if (Array.isArray(res.data)) {
+        list = res.data;
       }
-    };
-    fetchAll();
+      setAllProducts(list);
+      setProductsLoaded(true);
+    } catch (err) {
+      console.error('[ExploreSearch] Failed to fetch products:', err);
+      setProductsLoaded(true);
+    }
   }, []);
+
+  useEffect(() => {
+    loadExploreProducts();
+  }, [loadExploreProducts]);
 
   // Load recent searches
   useEffect(() => {
@@ -513,6 +523,18 @@ const ExploreScreen = () => {
     Keyboard.dismiss();
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadExploreProducts();
+    } catch (e) {
+      console.error('Error refreshing explore page:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadExploreProducts]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -523,6 +545,14 @@ const ExploreScreen = () => {
         contentContainerStyle={{ paddingBottom: bottomTabHeight + 20 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#2b3a1a"
+            colors={['#2b3a1a']}
+          />
+        }
       >
         <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center', flex: 1 }}>
         {/* ── Brand heading + single category row ── */}

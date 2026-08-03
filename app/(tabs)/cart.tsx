@@ -13,6 +13,7 @@ import {
   StatusBar,
   SafeAreaView,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -275,6 +276,16 @@ export default function CartPage() {
     lastFocusedState.current = isFocused;
   }, [isFocused]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await new Promise(r => setTimeout(r, 600));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   const allProductIds = items.filter(item => item.stock_quantity > 0).map(item => item.id);
   const isAllSelected = allProductIds.length > 0 && allProductIds.every(id => selectedItems.includes(id));
 
@@ -316,6 +327,14 @@ export default function CartPage() {
               }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor="#2b3a1a"
+                  colors={['#2b3a1a']}
+                />
+              }
             >
               {items.length === 0 ? (
                 <View style={styles.emptyContainer}>

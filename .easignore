@@ -1,0 +1,35 @@
+# Exclude Web Application and Backend API from mobile builds
+/webapp/
+/backend/
+
+# Dependencies & Build Caches
+node_modules/
+.expo/
+.next/
+dist/
+web-build/
+build/
+coverage/
+
+# Android / iOS Native Build Caches
+android/app/build/
+android/.gradle/
+android/.cxx/
+ios/Pods/
+ios/build/
+
+# Logs, docs, and temporary files
+*.log
+doctor_output.txt
+scratch/
+LOCAL_BACKEND_SETUP.md
+Requirements.md
+SDK_54_UPDATE_SUMMARY.md
+THEME_DETAILS.md
+EXPO_SDK_54_MIGRATION.md
+scripts/
+
+# OS & IDE files
+.DS_Store
+.vscode/
+.idea/

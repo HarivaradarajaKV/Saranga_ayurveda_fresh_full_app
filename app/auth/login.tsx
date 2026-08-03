@@ -133,7 +133,7 @@ export default function LoginScreen() {
             },
             {
               text: 'Save',
-              onPress: async (enteredName) => {
+              onPress: async (enteredName?: string) => {
                 const finalName = enteredName?.trim();
                 if (finalName) {
                   try {
@@ -223,10 +223,26 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [error, setError] = useState('');
+  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    async function checkAppleAuth() {
+      try {
+        if (Platform.OS === 'ios' && AppleAuthentication && typeof AppleAuthentication.isAvailableAsync === 'function') {
+          const avail = await AppleAuthentication.isAvailableAsync();
+          setIsAppleAvailable(avail);
+        }
+      } catch (err) {
+        console.warn('Apple Authentication check error:', err);
+        setIsAppleAvailable(false);
+      }
+    }
+    checkAppleAuth();
+  }, []);
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -515,7 +531,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               {/* Apple Sign In Button (iOS only) */}
-              {Platform.OS === 'ios' && (
+              {isAppleAvailable && (
                 <AppleAuthentication.AppleAuthenticationButton
                   buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                   buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}

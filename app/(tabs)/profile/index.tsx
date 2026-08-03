@@ -228,7 +228,7 @@ export default function ProfilePage() {
               await AsyncStorage.removeItem('name');
               await AsyncStorage.removeItem('user_name');
               setIsLoggedIn(false);
-              router.replace('/auth/login');
+              router.replace('/(tabs)');
             } catch (error) {
               Alert.alert('Error', 'Failed to logout. Please try again.');
             } finally {

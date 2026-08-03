@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { apiService } from './services/api';
+import { authEvents } from './services/authEvents';
 
 interface Address {
   id: number;
@@ -48,25 +49,36 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const hasInitializedRef = useRef(false);
   const fetchInProgressRef = useRef(false);
 
-  // Load cached addresses and check auth status on mount - ONLY ONCE
+  // Sync addresses on mount and whenever user logs in / auth state changes
   useEffect(() => {
-    // Prevent multiple initializations
-    if (hasInitializedRef.current) {
-      return;
-    }
-
-    const initAddresses = async () => {
-      hasInitializedRef.current = true;
-      const cached = await loadCachedAddresses();
-      if (!cached) {
-        await checkAuthAndFetchAddresses();
+    const syncAddressAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('auth_token');
+        if (token) {
+          fetchInProgressRef.current = false;
+          const cached = await loadCachedAddresses();
+          if (!cached) {
+            await fetchAddresses();
+          }
+        } else {
+          setAddresses([]);
+          await AsyncStorage.removeItem(ADDRESSES_CACHE_KEY);
+        }
+      } catch (e) {
+        console.error('[AddressContext] Sync auth error:', e);
       }
     };
-    
-    initAddresses();
-    
-    // NO setInterval - we only fetch once on mount
-    // If addresses need to be refreshed, components should call fetchAddresses() explicitly
+
+    syncAddressAuth();
+
+    const unsubscribe = authEvents.subscribe(() => {
+      fetchInProgressRef.current = false;
+      syncAddressAuth();
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const loadCachedAddresses = async () => {

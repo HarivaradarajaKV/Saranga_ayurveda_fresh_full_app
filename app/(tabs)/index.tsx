@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, TouchableHighlight, Dimensions, StyleSheet, Platform, ActivityIndicator, Modal, Animated, TouchableWithoutFeedback, Linking, Easing, Switch, Keyboard, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, TouchableHighlight, Dimensions, StyleSheet, Platform, ActivityIndicator, Modal, Animated, TouchableWithoutFeedback, Linking, Easing, Switch, Keyboard, Alert, useWindowDimensions, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { Image as ExpoImage } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWishlist } from '../WishlistContext';
@@ -49,101 +50,8 @@ const SLIDE_DATA = [
   },
 ];
 
-const BANNER_DATA = [
-  {
-    id: 119,
-    image: require('../assets/images/argan_shampoo_banner.png'),
-    name: 'Argan Shampoo'
-  },
-  {
-    id: 136,
-    image: require('../assets/images/charcoal_facewash_banner.png'),
-    name: 'Charcoal and Vitamin C Foaming Facewash'
-  },
-  {
-    id: 130,
-    image: require('../assets/images/teatree_facewash_banner.png'),
-    name: 'Tea Tree and Neem Foaming Facewash'
-  },
-  {
-    id: 196,
-    image: require('../assets/images/intimate_wash_banner.png'),
-    name: 'Intimate Wash'
-  },
-  {
-    id: 117,
-    image: require('../assets/images/hibiscus_shampoo_banner.png'),
-    name: 'Hibiscus Chickpea Shampoo'
-  },
-  {
-    id: 137,
-    image: require('../assets/images/aloevera_gel_banner.png'),
-    name: 'Alovera Gel'
-  },
-  {
-    id: 123,
-    image: require('../assets/images/pomegranate_lipbalm_banner.png'),
-    name: 'Pomegranate Lip balm'
-  }
-];
-
-const BOTTOM_BANNER_DATA = [
-  {
-    id: 152,
-    image: require('../assets/images/kumkumadi_taila_banner.png'),
-    name: 'Kumkumadi Taila'
-  },
-  {
-    id: 188,
-    image: require('../assets/images/eyebrow_oil_banner.png'),
-    name: 'Eye Brow Oil'
-  },
-  {
-    id: 145,
-    image: require('../assets/images/charcoal_soap_banner.png'),
-    name: 'Charcoal Soap'
-  },
-  {
-    id: 151,
-    image: require('../assets/images/hair_serum_banner.png'),
-    name: 'Hair Growth Serum'
-  },
-  {
-    id: 189,
-    image: require('../assets/images/vitc_serum_banner.png'),
-    name: 'Vitamin C Serum'
-  },
-  {
-    id: 150,
-    image: require('../assets/images/saffron_soap_banner.png'),
-    name: 'Milk and Saffron Bar'
-  },
-  {
-    id: 164,
-    image: require('../assets/images/hair_pack_banner.png'),
-    name: 'Hair Pack'
-  },
-  {
-    id: 191,
-    image: require('../assets/images/beard_oil_banner.png'),
-    name: 'Beard Growth Oil'
-  },
-  {
-    id: 196,
-    image: require('../assets/images/intimate_wash_new_banner.png'),
-    name: 'Intimate Wash'
-  },
-  {
-    id: 130,
-    image: require('../assets/images/teatree_facewash_new_banner.png'),
-    name: 'Tea Tree and Neem Foaming Facewash'
-  },
-  {
-    id: 156,
-    image: require('../assets/images/blueberry_facepack_banner.png'),
-    name: 'Blueberry and Vitamin C Face Pack'
-  }
-];
+const BANNER_DATA: any[] = [];
+const BOTTOM_BANNER_DATA: any[] = [];
 
 
 interface ProductCardProps {
@@ -421,6 +329,23 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
     });
   };
 
+  useEffect(() => {
+    if (categories && Array.isArray(categories)) {
+      const urlsToPrefetch: string[] = [];
+      categories.forEach(cat => {
+        const imageUrl = cat.image_url
+          ? apiService.getFullImageUrl(cat.image_url)
+          : getCategoryImage(normalizeCategoryName(cat.name), 'tile');
+        if (imageUrl) {
+          urlsToPrefetch.push(imageUrl);
+        }
+      });
+      if (urlsToPrefetch.length > 0) {
+        ExpoImage.prefetch(urlsToPrefetch);
+      }
+    }
+  }, [categories]);
+
   return (
     <ScrollView
       ref={scrollViewRef}
@@ -433,20 +358,24 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
           ? apiService.getFullImageUrl(category.image_url)
           : getCategoryImage(normalizeCategoryName(category.name), 'tile');
         const isSelected = selectedCategory === category.id;
+        const currentAnim = categoryAnims[index];
+        const currentScale = scaleAnims[index] || new Animated.Value(1);
 
         return (
           <Animated.View
             key={category.id}
             style={[
               {
-                opacity: categoryAnims[index],
+                opacity: currentAnim ? currentAnim : 1,
                 transform: [
-                  { scale: scaleAnims[index] },
+                  { scale: currentScale },
                   {
-                    translateY: categoryAnims[index].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [30, 0]
-                    })
+                    translateY: currentAnim
+                      ? currentAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [30, 0]
+                        })
+                      : 0
                   },
                   { translateX: wiggleAnim }
                 ]
@@ -463,10 +392,13 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
                 isSelected && styles.selectedCategoryCircle,
                 { width: dCategoryIconSize, height: dCategoryIconSize, borderRadius: dCategoryRadius }
               ]}>
-                <Image
+                <ExpoImage
                   source={{ uri: imageUrl }}
                   style={[styles.categoryImage, { borderRadius: dCategoryRadius }]}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  priority="high"
+                  transition={120}
                 />
                 {isSelected && (
                   <View style={[styles.selectedOverlay, { borderRadius: dCategoryRadius }]} />
@@ -588,6 +520,12 @@ const LegalInformation: React.FC = () => {
         onPress={() => router.push('/legal/shipping')}
       >
         <Text style={styles.legalText}>Shipping Policy</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.legalLink}
+        onPress={() => router.push('/legal/return')}
+      >
+        <Text style={styles.legalText}>Return & Cancellation Policy</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.legalLink}
@@ -2432,6 +2370,100 @@ const formatPrice = (price: number | undefined | null): string => {
   return Number(price).toFixed(2);
 };
 
+// Popup overlay styles
+const popupStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#111',
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 480,
+    aspectRatio: 3 / 4,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+    elevation: 25,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerImg: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  body: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    paddingTop: 36,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 6,
+    lineHeight: 28,
+  },
+  desc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  ctaBtn: {
+    backgroundColor: '#2E5D34',
+    paddingVertical: 14,
+    paddingHorizontal: 38,
+    borderRadius: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  ctaText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+});
+
+
+
 // Helper to normalize category names for image lookup
 const normalizeCategoryName = (name: string) => {
   // Map common variations to their standard form
@@ -2475,6 +2507,9 @@ const Page = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>('');
   const [showNewDealsPopup, setShowNewDealsPopup] = useState(false);
+  // Active popup state (fetched from backend)
+  const [activePopup, setActivePopup] = useState<any>(null);
+  const [showActivePopup, setShowActivePopup] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
   const slideshowRef = useRef<ScrollView>(null);
 
@@ -2565,6 +2600,8 @@ const Page = () => {
   const [currentBottomBannerIndex, setCurrentBottomBannerIndex] = useState(0);
   const isBottomUserInteracting = useRef(false);
   const bottomInteractionTimeoutRef = useRef<any>(null);
+  const [dbBottomBanners, setDbBottomBanners] = useState<any[]>([]);
+  const [dbTopBanners, setDbTopBanners] = useState<any[]>([]);
 
   const resetBottomUserInteraction = () => {
     if (bottomInteractionTimeoutRef.current) {
@@ -2707,6 +2744,32 @@ const Page = () => {
       loadUserName();
     }
   }, [isMenuOpen, isAuthenticated]);
+
+  // Load cached home screen data instantly (< 50ms) on app launch
+  useEffect(() => {
+    const initCachedData = async () => {
+      try {
+        const cached = await AsyncStorage.getItem('cached_home_data_v2');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.allProducts && Array.isArray(parsed.allProducts) && parsed.allProducts.length > 0) {
+            setAllProducts(parsed.allProducts);
+            setFilteredProducts(parsed.allProducts);
+            setRecommendedProducts(parsed.allProducts.slice(0, 5));
+            setLoading(false);
+          }
+          if (parsed.newArrivalProducts) setNewArrivalProducts(parsed.newArrivalProducts);
+          if (parsed.bestSellerProducts) setBestSellerProducts(parsed.bestSellerProducts);
+          if (parsed.dbTopBanners) setDbTopBanners(parsed.dbTopBanners);
+          if (parsed.dbBottomBanners) setDbBottomBanners(parsed.dbBottomBanners);
+          if (parsed.activeCombos) setActiveCombos(parsed.activeCombos);
+        }
+      } catch (e) {
+        console.error('Error reading cached home data:', e);
+      }
+    };
+    initCachedData();
+  }, []);
 
   // Function to check if a combo is active based on dates
   const isComboActive = (combo: any): boolean => {
@@ -2885,92 +2948,79 @@ const Page = () => {
     }
   }, [activeCombos]);
 
-  // Fetch products only when authenticated
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
+  const fetchAllHomeDataFast = React.useCallback(async () => {
+    try {
+      const [pRes, naRes, bsRes, tbRes, bbRes, comboRes] = await Promise.all([
+        apiService.get(`${apiService.ENDPOINTS.PRODUCTS}?limit=1000`).catch(() => ({ data: null })),
+        apiService.get('/products/new-arrivals').catch(() => ({ data: null })),
+        apiService.get('/products/best-sellers').catch(() => ({ data: null })),
+        apiService.get('/banners?platform=mobile&section=top').catch(() => ({ data: null })),
+        apiService.get('/banners?platform=mobile&section=bottom').catch(() => ({ data: null })),
+        apiService.getCombos().catch(() => ({ data: null }))
+      ]);
 
-        // Fetch all products by using a high limit to get all products at once
-        // This ensures the Core Collection can cycle through ALL products
-        const response = await apiService.get(`${apiService.ENDPOINTS.PRODUCTS}?limit=1000`);
+      let productsData: Product[] = [];
+      if (pRes?.data?.products) productsData = pRes.data.products;
+      else if (Array.isArray(pRes?.data)) productsData = pRes.data;
 
-        if (response.error) {
-          console.error('API Error:', response.error);
-          throw new Error(response.error);
-        }
-
-        // Handle the response data
-        let productsData: Product[] = [];
-        if (response.data?.products) {
-          productsData = response.data.products;
-        } else if (Array.isArray(response.data)) {
-          productsData = response.data;
-        }
-
-        console.log(`[Core Collection] Fetched ${productsData.length} products from backend`);
-        console.log(`[Core Collection] Product IDs:`, productsData.map(p => p.id).slice(0, 20));
-
+      if (productsData.length > 0) {
         setAllProducts(productsData);
         setFilteredProducts(productsData);
-
-        // Set recommended products (for now, we'll use the most recent products)
-        const recommended = [...productsData]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 5);
-        setRecommendedProducts(recommended);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setAllProducts([]);
-        setFilteredProducts([]);
-        setRecommendedProducts([]);
-      } finally {
-        setLoading(false);
+        setRecommendedProducts(productsData.slice(0, 5));
       }
-    };
 
-    fetchProducts();
+      let arrivals: Product[] = [];
+      if (naRes?.data?.products) arrivals = naRes.data.products;
+      else if (Array.isArray(naRes?.data)) arrivals = naRes.data;
+      setNewArrivalProducts(arrivals);
+
+      let sellers: Product[] = [];
+      if (bsRes?.data?.products) sellers = bsRes.data.products;
+      else if (Array.isArray(bsRes?.data)) sellers = bsRes.data;
+      setBestSellerProducts(sellers);
+
+      const topBanners = Array.isArray(tbRes?.data) ? tbRes.data : [];
+      setDbTopBanners(topBanners);
+
+      const bottomBanners = Array.isArray(bbRes?.data) ? bbRes.data : [];
+      setDbBottomBanners(bottomBanners);
+
+      let displayCombos: any[] = [];
+      if (Array.isArray(comboRes?.data)) {
+        displayCombos = comboRes.data.filter((c: any) => isComboActive(c));
+      }
+      setActiveCombos(displayCombos);
+
+      // Save to local cache in background for instant < 50ms next app launch
+      AsyncStorage.setItem('cached_home_data_v2', JSON.stringify({
+        allProducts: productsData,
+        newArrivalProducts: arrivals,
+        bestSellerProducts: sellers,
+        dbTopBanners: topBanners,
+        dbBottomBanners: bottomBanners,
+        activeCombos: displayCombos,
+      })).catch(() => {});
+
+    } catch (e) {
+      console.error('Fast fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Fetch new arrivals from dedicated endpoint
   useEffect(() => {
-    const fetchNewArrivals = async () => {
-      try {
-        const response = await apiService.get('/products/new-arrivals');
-        let arrivals: Product[] = [];
-        if (response.data?.products) {
-          arrivals = response.data.products;
-        } else if (Array.isArray(response.data)) {
-          arrivals = response.data;
-        }
-        setNewArrivalProducts(arrivals);
-      } catch (error) {
-        console.error('Error fetching new arrivals:', error);
-        setNewArrivalProducts([]);
-      }
-    };
-    fetchNewArrivals();
-  }, []);
+    if (isFocused) {
+      fetchAllHomeDataFast();
+    }
+  }, [isFocused, fetchAllHomeDataFast]);
 
-  // Fetch best sellers from dedicated endpoint
-  useEffect(() => {
-    const fetchBestSellers = async () => {
-      try {
-        const response = await apiService.get('/products/best-sellers');
-        let sellers: Product[] = [];
-        if (response.data?.products) {
-          sellers = response.data.products;
-        } else if (Array.isArray(response.data)) {
-          sellers = response.data;
-        }
-        setBestSellerProducts(sellers);
-      } catch (error) {
-        console.error('Error fetching best sellers:', error);
-        setBestSellerProducts([]);
-      }
-    };
-    fetchBestSellers();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchAllHomeDataFast();
+    setRefreshing(false);
+  }, [fetchAllHomeDataFast]);
 
   // Update core products display to cycle through all products circularly
   useEffect(() => {
@@ -3199,6 +3249,67 @@ const Page = () => {
         pathname: "/(product)/[id]",
         params: { id: productId.toString() }
       });
+    }
+  };
+
+  const handleDbBannerPress = (banner: any) => {
+    if (!banner) return;
+    const linkType = banner.link_type;
+    const linkValue = banner.link_value;
+
+    if (linkType === 'product' && linkValue) {
+      const productId = parseInt(linkValue, 10);
+      if (!isNaN(productId)) {
+        const product = allProducts.find(p => p.id === productId);
+        if (product) {
+          const cleanProduct = {
+            ...product,
+            price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+            offer_percentage: product.offer_percentage || 0,
+            average_rating: product.average_rating || 0,
+            review_count: product.review_count || 0
+          };
+          router.push({
+            pathname: "/(product)/[id]",
+            params: {
+              id: productId.toString(),
+              productData: JSON.stringify(cleanProduct)
+            }
+          });
+        } else {
+          router.push({
+            pathname: "/(product)/[id]",
+            params: { id: productId.toString() }
+          });
+        }
+      }
+    } else if (linkType === 'category' && linkValue) {
+      const categoryId = parseInt(linkValue, 10);
+      if (!isNaN(categoryId)) {
+        const category = mainCategories.find(cat => cat.id === categoryId);
+        router.push({
+          pathname: "/category/[id]",
+          params: {
+            id: categoryId.toString(),
+            name: category?.name || 'Category'
+          }
+        });
+      }
+    } else if (linkType === 'offer' && linkValue) {
+      router.push({
+        pathname: "/deals/combo-detail/[id]",
+        params: { id: linkValue }
+      });
+    } else if (linkType === 'custom' && linkValue) {
+      if (linkValue.startsWith('http://') || linkValue.startsWith('https://')) {
+        Linking.openURL(linkValue).catch(err => console.error('Failed to open URL:', err));
+      } else {
+        try {
+          router.push(linkValue as any);
+        } catch (err) {
+          console.error('Failed to route custom link:', err);
+        }
+      }
     }
   };
 
@@ -3436,7 +3547,7 @@ const Page = () => {
                 await AsyncStorage.removeItem('name');
                 await AsyncStorage.removeItem('user_name');
                 setIsAuthenticated(false);
-                router.replace('/auth/login');
+                router.replace('/(tabs)');
               }}
               activeOpacity={0.7}
             >
@@ -3537,11 +3648,12 @@ const Page = () => {
     }
   }, [textWidth]);
 
-  // Auto-scroll the new banner slideshow every 5 seconds
+  // Auto-scroll the top banner slideshow every 5 seconds
   useEffect(() => {
+    if (dbTopBanners.length === 0) return;
     const timer = setInterval(() => {
       if (!isUserInteracting.current) {
-        const nextIndex = (currentBannerIndex + 1) % BANNER_DATA.length;
+        const nextIndex = (currentBannerIndex + 1) % dbTopBanners.length;
         setCurrentBannerIndex(nextIndex);
         bannerScrollViewRef.current?.scrollTo({
           x: nextIndex * (screenWidth - 24),
@@ -3551,13 +3663,14 @@ const Page = () => {
     }, 5000);
 
     return () => clearInterval(timer);
-  }, [currentBannerIndex]);
+  }, [currentBannerIndex, dbTopBanners.length]);
 
   // Auto-scroll the bottom banner slideshow every 5 seconds
   useEffect(() => {
+    if (dbBottomBanners.length === 0) return;
     const timer = setInterval(() => {
       if (!isBottomUserInteracting.current) {
-        const nextIndex = (currentBottomBannerIndex + 1) % BOTTOM_BANNER_DATA.length;
+        const nextIndex = (currentBottomBannerIndex + 1) % dbBottomBanners.length;
         setCurrentBottomBannerIndex(nextIndex);
         bottomBannerScrollViewRef.current?.scrollTo({
           x: nextIndex * (screenWidth - 24),
@@ -3567,7 +3680,7 @@ const Page = () => {
     }, 5000);
 
     return () => clearInterval(timer);
-  }, [currentBottomBannerIndex]);
+  }, [currentBottomBannerIndex, dbBottomBanners.length]);
 
 
   const scrollToRecommended = () => {
@@ -3580,7 +3693,7 @@ const Page = () => {
 
   const handleViewDeals = () => {
     setShowNewDealsPopup(false);
-    router.push('/deals/combo-offers');
+    router.push('/(tabs)/explore' as any);
   };
 
   const handleSearchSubmit = () => {
@@ -3608,6 +3721,76 @@ const Page = () => {
     };
     loadSearchHistory();
   }, []);
+
+  // Fetch active popup — runs once on mount with instant local caching & image pre-fetching
+  useEffect(() => {
+    const fetchActivePopup = async () => {
+      try {
+        const token = await AsyncStorage.getItem('auth_token');
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Check local cache for instant popup display on app launch
+        const cachedStr = await AsyncStorage.getItem('cached_active_popup');
+        if (cachedStr) {
+          const cachedPopup = JSON.parse(cachedStr);
+          if (cachedPopup?.id) {
+            let shouldShowCached = true;
+            if (token) {
+              const dayKey = `popup_day_${cachedPopup.id}`;
+              const stored = await AsyncStorage.getItem(dayKey);
+              if (stored === today) shouldShowCached = false;
+            }
+            if (shouldShowCached) {
+              if (cachedPopup.image_url) {
+                const imgUri = cachedPopup.image_url.startsWith('http')
+                  ? cachedPopup.image_url
+                  : apiService.getFullImageUrl(cachedPopup.image_url);
+                Image.prefetch(imgUri).catch(() => {});
+              }
+              setActivePopup(cachedPopup);
+              setShowActivePopup(true);
+            }
+          }
+        }
+
+        // Fetch fresh popup from backend
+        const res = await apiService.get('/popups/active');
+        const popup = res.data;
+        if (!popup || !popup.id) {
+          setShowActivePopup(false);
+          setActivePopup(null);
+          await AsyncStorage.removeItem('cached_active_popup');
+          return;
+        }
+
+        // Pre-fetch popup image into device memory/disk
+        if (popup.image_url) {
+          const imgUri = popup.image_url.startsWith('http')
+            ? popup.image_url
+            : apiService.getFullImageUrl(popup.image_url);
+          Image.prefetch(imgUri).catch(() => {});
+        }
+
+        // Save fresh popup to local cache
+        await AsyncStorage.setItem('cached_active_popup', JSON.stringify(popup));
+
+        let shouldShow = true;
+        if (token) {
+          const dayKey = `popup_day_${popup.id}`;
+          const stored = await AsyncStorage.getItem(dayKey);
+          if (stored === today) shouldShow = false;
+        }
+
+        if (shouldShow) {
+          setActivePopup(popup);
+          setShowActivePopup(true);
+        }
+      } catch {
+        // Silently ignore popup fetch errors
+      }
+    };
+    fetchActivePopup();
+  }, []); // Only run once on mount
 
   // Add effect to reset drawer when screen comes into focus
   useEffect(() => {
@@ -3655,10 +3838,94 @@ const Page = () => {
 
   return (
     <View style={styles.container}>
+
+      {/* ── ACTIVE POPUP OVERLAY MODAL ── */}
+      <Modal
+        visible={showActivePopup && !!activePopup}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActivePopup(false)}
+      >
+        <TouchableWithoutFeedback onPress={async () => {
+          // Only mark dismissed for logged-in users; guests see it again next open
+          if (isAuthenticated && activePopup?.id) {
+            const today = new Date().toISOString().slice(0, 10);
+            await AsyncStorage.setItem(`popup_day_${activePopup.id}`, today);
+          }
+          setShowActivePopup(false);
+        }}>
+          <View style={popupStyles.overlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={popupStyles.card}>
+                {/* Close button */}
+                <TouchableOpacity
+                  style={popupStyles.closeBtn}
+                  onPress={async () => {
+                    if (isAuthenticated && activePopup?.id) {
+                      const today = new Date().toISOString().slice(0, 10);
+                      await AsyncStorage.setItem(`popup_day_${activePopup.id}`, today);
+                    }
+                    setShowActivePopup(false);
+                  }}
+                >
+                  <Ionicons name="close" size={20} color="#444" />
+                </TouchableOpacity>
+
+                {/* Banner Image — shown immediately, Supabase URL used directly */}
+                {activePopup?.image_url ? (
+                  <Image
+                    source={{
+                      uri: activePopup.image_url.startsWith('http')
+                        ? activePopup.image_url
+                        : apiService.getFullImageUrl(activePopup.image_url)
+                    }}
+                    style={popupStyles.bannerImg}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                {/* Body — CTA button only, popup name/title hidden from user screen */}
+                <View style={popupStyles.body}>
+
+                  {/* CTA Button */}
+                  <TouchableOpacity
+                    style={popupStyles.ctaBtn}
+                    activeOpacity={0.85}
+                    onPress={async () => {
+                      // Mark dismissed for today if logged in
+                      if (isAuthenticated && activePopup?.id) {
+                        const today = new Date().toISOString().slice(0, 10);
+                        await AsyncStorage.setItem(`popup_day_${activePopup.id}`, today);
+                      }
+                      setShowActivePopup(false);
+
+                      // Irrespective of the link, redirect to explore screen
+                      router.push('/(tabs)/explore' as any);
+                    }}
+                  >
+                    <Text style={popupStyles.ctaText}>
+                      {activePopup?.button_text || 'Claim Yours Now'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <ScrollView
         ref={scrollViewRef}
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#2b3a1a"
+            colors={['#2b3a1a']}
+          />
+        }
         contentContainerStyle={{
           paddingBottom: bottomTabHeight + 20 // Add extra 20 for spacing
         }}
@@ -3803,72 +4070,74 @@ const Page = () => {
                 )}
               </View>
 
-              {/* Banner Slideshow Section */}
-              <View style={[styles.bannerContainer, { height: bannerHeight }]}>
-                <ScrollView
-                  ref={bannerScrollViewRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  snapToInterval={screenWidth - 24}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                  onScroll={(event) => {
-                    const xOffset = event.nativeEvent.contentOffset.x;
-                    const slideWidth = screenWidth - 24;
-                    if (slideWidth > 0) {
-                      const index = Math.round(xOffset / slideWidth);
-                      const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
+              {/* Dynamic Top Banner Slideshow Section */}
+              {dbTopBanners.length > 0 && (
+                <View style={[styles.bannerContainer, { height: bannerHeight }]}>
+                  <ScrollView
+                    ref={bannerScrollViewRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    snapToInterval={screenWidth - 24}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    onScroll={(event) => {
+                      const xOffset = event.nativeEvent.contentOffset.x;
+                      const slideWidth = screenWidth - 24;
+                      if (slideWidth > 0) {
+                        const index = Math.round(xOffset / slideWidth);
+                        const validIndex = Math.min(Math.max(0, index), dbTopBanners.length - 1);
+                        if (currentBannerIndex !== validIndex) {
+                          setCurrentBannerIndex(validIndex);
+                        }
+                      }
+                    }}
+                    scrollEventThrottle={16}
+                    onMomentumScrollEnd={(event) => {
+                      const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
+                      const validIndex = Math.min(Math.max(0, index), dbTopBanners.length - 1);
                       if (currentBannerIndex !== validIndex) {
                         setCurrentBannerIndex(validIndex);
                       }
-                    }
-                  }}
-                  scrollEventThrottle={16}
-                  onMomentumScrollEnd={(event) => {
-                    const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
-                    const validIndex = Math.min(Math.max(0, index), BANNER_DATA.length - 1);
-                    if (currentBannerIndex !== validIndex) {
-                      setCurrentBannerIndex(validIndex);
-                    }
-                  }}
-                  onScrollBeginDrag={() => {
-                    isUserInteracting.current = true;
-                  }}
-                  onScrollEndDrag={resetUserInteraction}
-                  onTouchStart={() => {
-                    isUserInteracting.current = true;
-                  }}
-                  onTouchEnd={resetUserInteraction}
-                  style={{ width: screenWidth - 24 }}
-                >
-                  {BANNER_DATA.map((banner) => (
-                    <TouchableOpacity
-                      key={banner.id}
-                      activeOpacity={0.95}
-                      onPress={() => handleBannerPress(banner.id)}
-                      style={{ width: screenWidth - 24, height: bannerHeight }}
-                    >
-                      <Image
-                        source={banner.image}
-                        style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                    }}
+                    onScrollBeginDrag={() => {
+                      isUserInteracting.current = true;
+                    }}
+                    onScrollEndDrag={resetUserInteraction}
+                    onTouchStart={() => {
+                      isUserInteracting.current = true;
+                    }}
+                    onTouchEnd={resetUserInteraction}
+                    style={{ width: screenWidth - 24 }}
+                  >
+                    {dbTopBanners.map((banner) => (
+                      <TouchableOpacity
+                        key={banner.id}
+                        activeOpacity={0.95}
+                        onPress={() => handleDbBannerPress(banner)}
+                        style={{ width: screenWidth - 24, height: bannerHeight }}
+                      >
+                        <Image
+                          source={{ uri: apiService.getFullImageUrl(banner.image_url) }}
+                          style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
 
-                <View style={styles.bannerDotsContainer}>
-                  {BANNER_DATA.map((_, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.bannerDot,
-                        currentBannerIndex === idx && styles.bannerDotActive
-                      ]}
-                    />
-                  ))}
+                  <View style={styles.bannerDotsContainer}>
+                    {dbTopBanners.map((_, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.bannerDot,
+                          currentBannerIndex === idx && styles.bannerDotActive
+                        ]}
+                      />
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {videos.length > 0 && (
                 <ScrollView
@@ -3998,21 +4267,20 @@ const Page = () => {
                 </ScrollView>
               </View>
 
-              {/* New Combo Offers Section */}
-              <View style={styles.comboSection}>
-                <SectionHeader title="Combo Offers" />
+              {/* New Combo Offers Section - Active only when combo offers exist in admin */}
+              {activeCombos.length > 0 && (
+                <View style={styles.comboSection}>
+                  <SectionHeader title="Combo Offers" />
 
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalScrollContent}
-                  snapToInterval={horizontalCardWidth}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                >
-                  {/* Dynamic Combo Cards - Show up to 2 latest active combos */}
-                  {activeCombos.length > 0 ? (
-                    activeCombos.map((combo, index) => {
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalScrollContent}
+                    snapToInterval={horizontalCardWidth}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                  >
+                    {activeCombos.map((combo, index) => {
                       // Calculate prices
                       const calculateTotalPrice = () => {
                         return (combo.items || []).reduce((sum: number, item: any) => {
@@ -4099,9 +4367,13 @@ const Page = () => {
                               overflow: 'hidden',
                             }}>
                               {comboImages.length > 0 ? (
-                                <Image
+                                <ExpoImage
                                   source={{ uri: apiService.getFullImageUrl(comboImages[0]) }}
-                                  style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                                  style={{ width: '100%', height: '100%' }}
+                                  contentFit="contain"
+                                  cachePolicy="memory-disk"
+                                  priority="high"
+                                  transition={120}
                                 />
                               ) : (
                                 <Ionicons name="image-outline" size={32} color="#999" />
@@ -4154,144 +4426,79 @@ const Page = () => {
                           </TouchableOpacity>
                         </Animated.View>
                       );
-                    })
-                  ) : (
-                    // Fallback: Show placeholder when no active combos
-                    <View style={[styles.horizontalProductItem, { width: horizontalCardWidth }]}>
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#fff',
-                          borderRadius: 12,
-                          elevation: 4,
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.1,
-                          shadowRadius: 4,
-                          height: horizontalCardHeight,
-                          overflow: 'hidden',
-                          marginHorizontal: 6,
-                          marginVertical: 10,
-                          borderWidth: 1,
-                          borderColor: '#f0f0f0',
-                        }}
-                        onPress={() => router.push('/deals/combo-offers')}
-                      >
-                        <View style={{
-                          width: '100%',
-                          aspectRatio: 1,
-                          backgroundColor: '#f8f9fa',
-                          borderTopLeftRadius: 12,
-                          borderTopRightRadius: 12,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          overflow: 'hidden',
-                        }}>
-                          <Ionicons name="gift-outline" size={32} color="#999" />
-                        </View>
-
-                        <View style={{
-                          paddingVertical: 4,
-                          paddingHorizontal: 6,
-                          flex: 1,
-                          justifyContent: 'space-between',
-                        }}>
-                          <View>
-
-                            <Text style={{
-                              fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-                              fontSize: 13,
-                              fontWeight: 'bold',
-                              color: '#333333',
-                              lineHeight: 18,
-                              marginBottom: 4,
-                            }} numberOfLines={2}>Check Out Our Combo Offers</Text>
-                          </View>
-                          <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginTop: 'auto',
-                          }}>
-                            <Text style={{
-                              fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-                              fontSize: 15,
-                              fontWeight: 'bold',
-                              color: '#333333',
-                            }}>View Offers</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </ScrollView>
-              </View>
+                    })}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Bottom Banner Slideshow Section */}
-              <View style={[styles.bannerContainer, { height: bannerHeight }]}>
-                <ScrollView
-                  ref={bottomBannerScrollViewRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  snapToInterval={screenWidth - 24}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                  onScroll={(event) => {
-                    const xOffset = event.nativeEvent.contentOffset.x;
-                    const slideWidth = screenWidth - 24;
-                    if (slideWidth > 0) {
-                      const index = Math.round(xOffset / slideWidth);
-                      const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
+              {dbBottomBanners.length > 0 && (
+                <View style={[styles.bannerContainer, { height: bannerHeight }]}>
+                  <ScrollView
+                    ref={bottomBannerScrollViewRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    snapToInterval={screenWidth - 24}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    onScroll={(event) => {
+                      const xOffset = event.nativeEvent.contentOffset.x;
+                      const slideWidth = screenWidth - 24;
+                      if (slideWidth > 0) {
+                        const index = Math.round(xOffset / slideWidth);
+                        const validIndex = Math.min(Math.max(0, index), dbBottomBanners.length - 1);
+                        if (currentBottomBannerIndex !== validIndex) {
+                          setCurrentBottomBannerIndex(validIndex);
+                        }
+                      }
+                    }}
+                    scrollEventThrottle={16}
+                    onMomentumScrollEnd={(event) => {
+                      const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
+                      const validIndex = Math.min(Math.max(0, index), dbBottomBanners.length - 1);
                       if (currentBottomBannerIndex !== validIndex) {
                         setCurrentBottomBannerIndex(validIndex);
                       }
-                    }
-                  }}
-                  scrollEventThrottle={16}
-                  onMomentumScrollEnd={(event) => {
-                    const index = Math.round(event.nativeEvent.contentOffset.x / (screenWidth - 24));
-                    const validIndex = Math.min(Math.max(0, index), BOTTOM_BANNER_DATA.length - 1);
-                    if (currentBottomBannerIndex !== validIndex) {
-                      setCurrentBottomBannerIndex(validIndex);
-                    }
-                  }}
-                  onScrollBeginDrag={() => {
-                    isBottomUserInteracting.current = true;
-                  }}
-                  onScrollEndDrag={resetBottomUserInteraction}
-                  onTouchStart={() => {
-                    isBottomUserInteracting.current = true;
-                  }}
-                  onTouchEnd={resetBottomUserInteraction}
-                  style={{ width: screenWidth - 24 }}
-                >
-                  {BOTTOM_BANNER_DATA.map((banner) => (
-                    <TouchableOpacity
-                      key={banner.id}
-                      activeOpacity={0.95}
-                      onPress={() => handleBottomBannerPress(banner.id)}
-                      style={{ width: screenWidth - 24, height: bannerHeight }}
-                    >
-                      <Image
-                        source={banner.image}
-                        style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                    }}
+                    onScrollBeginDrag={() => {
+                      isBottomUserInteracting.current = true;
+                    }}
+                    onScrollEndDrag={resetBottomUserInteraction}
+                    onTouchStart={() => {
+                      isBottomUserInteracting.current = true;
+                    }}
+                    onTouchEnd={resetBottomUserInteraction}
+                    style={{ width: screenWidth - 24 }}
+                  >
+                    {dbBottomBanners.map((banner) => (
+                      <TouchableOpacity
+                        key={banner.id}
+                        activeOpacity={0.95}
+                        onPress={() => handleDbBannerPress(banner)}
+                        style={{ width: screenWidth - 24, height: bannerHeight }}
+                      >
+                        <Image
+                          source={{ uri: apiService.getFullImageUrl(banner.image_url) }}
+                          style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
 
-                <View style={styles.bannerDotsContainer}>
-                  {BOTTOM_BANNER_DATA.map((_, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.bannerDot,
-                        currentBottomBannerIndex === idx && styles.bannerDotActive
-                      ]}
-                    />
-                  ))}
+                  <View style={styles.bannerDotsContainer}>
+                    {dbBottomBanners.map((_, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.bannerDot,
+                          currentBottomBannerIndex === idx && styles.bannerDotActive
+                        ]}
+                      />
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Our Story Banner Section */}
               <View style={styles.ourStoryBannerCard}>
@@ -4636,10 +4843,13 @@ const Page = () => {
                                   })}
                                 >
                                   <View style={[styles.concernIconContainer, { width: screenWidth * 0.24, height: screenWidth * 0.24 }]}>
-                                    <Image
+                                    <ExpoImage
                                       source={{ uri: category.image }}
                                       style={styles.concernCircleImage}
-                                      resizeMode="cover"
+                                      contentFit="cover"
+                                      cachePolicy="memory-disk"
+                                      priority="high"
+                                      transition={120}
                                     />
                                   </View>
                                   <Text style={styles.concernText}>{category.name}</Text>
@@ -4815,7 +5025,7 @@ const Page = () => {
                       { title: 'Terms & Conditions', route: '/legal/terms' },
                       { title: 'Privacy Policy', route: '/legal/privacy-policy' },
                       { title: 'Shipping and Delivery Policy', route: '/legal/shipping' },
-                      { title: 'Return/Cancellation Policy', route: '/legal/refund' },
+                      { title: 'Return & Cancellation Policy', route: '/legal/return' },
                       { title: 'Refund Policy', route: '/legal/refund' },
                       { title: 'FAQs', route: '/faq' },
                       { title: 'Help', route: '/help' }
@@ -4830,6 +5040,8 @@ const Page = () => {
                             router.push('/legal/terms');
                           } else if (item.route === '/legal/shipping') {
                             router.push('/legal/shipping');
+                          } else if (item.route === '/legal/return') {
+                            router.push('/legal/return');
                           } else if (item.route === '/legal/refund') {
                             router.push('/legal/refund');
                           } else if (item.route === '/faq') {

@@ -204,7 +204,7 @@ export default function NewProduct() {
                 options={{
                     title: 'Add New Product',
                     headerStyle: {
-                        backgroundColor: '#1a1a1a',
+                        backgroundColor: '#2D4B34',
                     },
                     headerTintColor: '#fff',
                     headerTitleStyle: {

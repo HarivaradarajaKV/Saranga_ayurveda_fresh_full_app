@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { apiService } from './services/api';
 import { authEvents } from './services/authEvents';
 
@@ -130,7 +131,8 @@ const WishlistProvider: React.FC<WishlistProviderProps> = ({ children }) => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token || !userId) {
-        throw new Error('User not authenticated');
+        router.push('/auth/login');
+        return;
       }
 
       // Check if already in wishlist

@@ -90,6 +90,27 @@ export default function AdminLayout() {
                 }} 
             />
             <Stack.Screen 
+                name="invoices" 
+                options={{ 
+                    title: 'Invoice Records',
+                    animation: 'slide_from_right',
+                }} 
+            />
+            <Stack.Screen 
+                name="invoice-form" 
+                options={{ 
+                    title: 'Invoice Form',
+                    animation: 'slide_from_right',
+                }} 
+            />
+            <Stack.Screen 
+                name="invoice-detail" 
+                options={{ 
+                    title: 'Invoice Detail',
+                    animation: 'slide_from_right',
+                }} 
+            />
+            <Stack.Screen 
                 name="profile" 
                 options={{ 
                     title: 'Admin Profile',

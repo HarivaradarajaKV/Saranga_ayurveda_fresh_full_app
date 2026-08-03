@@ -22,7 +22,7 @@ export default function AdminProfile() {
             if (response.error) {
                 throw new Error(response.error);
             }
-            router.replace('/auth/login');
+            router.replace('/(tabs)');
         } catch (error) {
             Alert.alert('Error', 'Failed to logout. Please try again.');
         } finally {

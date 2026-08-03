@@ -17,6 +17,7 @@ import {
   Animated,
   Share,
   useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -107,6 +108,34 @@ export default function ProductPage() {
   const [productData, setProductData] = useState<Product | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (id) {
+        const response = await apiService.get(`${apiService.ENDPOINTS.PRODUCTS}/${id}`);
+        if (response.data) {
+          const raw = response.data.product || response.data;
+          setProductData({
+            ...raw,
+            price: typeof raw.price === 'string' ? parseFloat(raw.price) : raw.price,
+            offer_percentage: raw.offer_percentage || 0,
+            average_rating: raw.average_rating || 0,
+            review_count: raw.review_count || 0
+          });
+        }
+        const revRes = await apiService.get(`/products/${id}/reviews`);
+        if (revRes.data?.reviews) {
+          setReviews(revRes.data.reviews);
+        }
+      }
+    } catch (e) {
+      console.error('Error refreshing product:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id]);
   const [currentUserId, setCurrentUserId] = useState<number | undefined>();
   const [selectedShade, setSelectedShade] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
@@ -580,6 +609,14 @@ export default function ProductPage() {
           style={styles.container}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#2b3a1a"
+              colors={['#2b3a1a']}
+            />
+          }
         >
 
           {/* Header */}
@@ -905,7 +942,10 @@ export default function ProductPage() {
               )}
 
               {/* Ingredients */}
-              {productData.ingredients && (
+              {Boolean(
+                productData.ingredients && 
+                (typeof productData.ingredients === 'string' ? productData.ingredients.trim() !== '' : productData.ingredients.length > 0)
+              ) && (
                 <View style={styles.accordionSection}>
                   <TouchableOpacity
                     style={styles.accordionHeader}

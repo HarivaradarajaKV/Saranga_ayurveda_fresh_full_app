@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Animated, Platform, useWindowDimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image as RNImage, Animated, Platform, useWindowDimensions, Alert, RefreshControl, ScrollView } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -272,7 +273,7 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
         }),
       ]).start();
 
-      Alert.alert('Success', 'Combo added to cart!');
+      // Combo added to cart
     } catch (error) {
       console.error('Error adding combo to cart:', error);
       Alert.alert('Error', 'Failed to add combo to cart. Please try again.');
@@ -316,7 +317,7 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
         <View style={styles.comboProductsRow}>
           {comboImages.length > 0 ? (
             comboImages.map((img, idx) => (
-              <Image
+              <ExpoImage
                 key={idx}
                 source={{ uri: apiService.getFullImageUrl(img) }}
                 style={[
@@ -324,7 +325,10 @@ const ComboCard = ({ item, index, router }: { item: any; index: number; router: 
                   comboImages.length === 1 ? { width: '100%', height: 180 } : null,
                   idx === comboImages.length - 1 && styles.lastImage
                 ]}
-                resizeMode={comboImages.length === 1 ? "cover" : "contain"}
+                contentFit={comboImages.length === 1 ? "cover" : "contain"}
+                cachePolicy="memory-disk"
+                priority="high"
+                transition={120}
               />
             ))
           ) : (
@@ -471,8 +475,26 @@ export default function ComboOffersPage() {
     setLoading(true);
     const res = await apiService.getCombos();
     if (res.data) {
+      const comboList = res.data as any[];
       // Show all combos (active, upcoming, expired)
-      setCombos(res.data as any[]);
+      setCombos(comboList);
+
+      // Fast pre-fetch combo images into disk/memory cache for instant rendering
+      try {
+        const urlsToPrefetch = comboList.flatMap((item: any) => [
+          item.image_url,
+          item.image_url2,
+          item.image_url3,
+          item.image_url4,
+        ]).filter((img): img is string => typeof img === 'string' && img.length > 0)
+          .map((img: string) => apiService.getFullImageUrl(img));
+
+        if (urlsToPrefetch.length > 0) {
+          ExpoImage.prefetch(urlsToPrefetch);
+        }
+      } catch (e) {
+        // Pre-fetch error ignored silently
+      }
 
       // Animate list entrance
       Animated.parallel([
@@ -497,6 +519,13 @@ export default function ComboOffersPage() {
   const bottomTabBarHeight = 60 + Math.max(insets.bottom, 4);
   const bottomPadding = bottomTabBarHeight + 16;
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, []);
+
   return (
     <>
       <Stack.Screen
@@ -519,10 +548,15 @@ export default function ComboOffersPage() {
             <Text style={styles.loadingText}>Loading combo offers...</Text>
           </View>
         ) : combos.length === 0 ? (
-          <View style={styles.emptyContainer}>
+          <ScrollView
+            contentContainerStyle={styles.emptyContainer}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#694d21" colors={['#694d21']} />
+            }
+          >
             <Ionicons name="gift-outline" size={64} color="#999" />
             <Text style={styles.emptyText}>No combo offers available</Text>
-          </View>
+          </ScrollView>
         ) : (
           <Animated.View
             style={{
@@ -539,6 +573,14 @@ export default function ComboOffersPage() {
               keyExtractor={(item) => String(item.id)}
               contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor="#694d21"
+                  colors={['#694d21']}
+                />
+              }
               renderItem={({ item, index }) => (
                 <ComboCard item={item} index={index} router={router} />
               )}

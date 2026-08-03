@@ -48,9 +48,15 @@ export default function HelpAndSupport() {
           <Ionicons name="chevron-forward" size={18} color="#2b3a1a" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.linkItem} onPress={() => router.push('/legal/refund')} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.linkItem} onPress={() => router.push('/legal/return')} activeOpacity={0.8}>
           <Ionicons name="refresh-outline" size={20} color="#2b3a1a" />
-          <Text style={styles.linkText}>Return/Refund Policy</Text>
+          <Text style={styles.linkText}>Return & Cancellation Policy</Text>
+          <Ionicons name="chevron-forward" size={18} color="#2b3a1a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.linkItem} onPress={() => router.push('/legal/refund')} activeOpacity={0.8}>
+          <Ionicons name="card-outline" size={20} color="#2b3a1a" />
+          <Text style={styles.linkText}>Refund Policy</Text>
           <Ionicons name="chevron-forward" size={18} color="#2b3a1a" />
         </TouchableOpacity>
       </ScrollView>

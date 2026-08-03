@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { apiService } from './services/api';
+import { authEvents } from './services/authEvents';
 
 export interface Order {
   id: string;
@@ -169,13 +170,38 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Load cached orders on mount
+  // Load cached orders on mount and sync on login / auth change
   useEffect(() => {
     mountedRef.current = true;
-    loadCachedOrders();
+
+    const syncOrderAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('auth_token');
+        if (token) {
+          fetchInProgressRef.current = false;
+          const cached = await loadCachedOrders();
+          if (!cached) {
+            await fetchOrders();
+          }
+        } else {
+          clearOrdersState();
+          await AsyncStorage.removeItem(ORDERS_CACHE_KEY);
+        }
+      } catch (e) {
+        console.error('[OrderContext] Sync auth error:', e);
+      }
+    };
+
+    syncOrderAuth();
+
+    const unsubscribe = authEvents.subscribe(() => {
+      fetchInProgressRef.current = false;
+      syncOrderAuth();
+    });
+
     return () => {
       mountedRef.current = false;
-      // Cancel any in-flight requests
+      unsubscribe();
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;

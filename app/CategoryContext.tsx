@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { Image } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { apiService } from './services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCategoryImage } from './constants/categoryImages';
+
+const normalizeCategoryName = (name: string): string => {
+    if (!name) return '';
+    return name.trim();
+};
 
 interface Category {
     id: number;
@@ -34,16 +42,37 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
     const [error, setError] = useState<string | null>(null);
     const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
+    const prefetchImages = React.useCallback((catList: Category[]) => {
+        try {
+            const urls: string[] = [];
+            catList.forEach(cat => {
+                if (cat.image_url) {
+                    urls.push(apiService.getFullImageUrl(cat.image_url));
+                }
+                const tileUrl = getCategoryImage(normalizeCategoryName(cat.name), 'tile');
+                if (tileUrl) {
+                    urls.push(tileUrl);
+                }
+            });
+            const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
+            if (uniqueUrls.length > 0) {
+                ExpoImage.prefetch(uniqueUrls);
+            }
+        } catch (e) {
+            // Silently ignore prefetch errors
+        }
+    }, []);
+
     const loadCachedCategories = React.useCallback(async () => {
         try {
             const cachedData = await AsyncStorage.getItem(CATEGORIES_CACHE_KEY);
             if (cachedData) {
                 const { categories: cachedCategories, timestamp } = JSON.parse(cachedData);
-                const now = Date.now();
-                if (now - timestamp < CACHE_EXPIRY_TIME) {
+                if (Array.isArray(cachedCategories) && cachedCategories.length > 0) {
                     setCategories(cachedCategories);
-                    setLastFetchTime(timestamp);
-                    setLoading(false);
+                    setLastFetchTime(timestamp || Date.now());
+                    setLoading(false); // Instantly display category images!
+                    prefetchImages(cachedCategories);
                     return true;
                 }
             }
@@ -52,17 +81,18 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
             console.error('Error loading cached categories:', err);
             return false;
         }
-    }, []);
+    }, [prefetchImages]);
 
     const fetchCategories = React.useCallback(async (forceRefresh: boolean = false) => {
         const now = Date.now();
-        // Don't fetch if we've fetched recently (within last 5 minutes) unless forced
-        if (!forceRefresh && now - lastFetchTime < CACHE_EXPIRY_TIME) {
+        if (!forceRefresh && now - lastFetchTime < CACHE_EXPIRY_TIME && categories.length > 0) {
             return;
         }
 
         try {
-            setLoading(true);
+            if (categories.length === 0) {
+                setLoading(true);
+            }
             const response = await apiService.getCategories();
 
             if (response.error) {
@@ -70,47 +100,32 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
             }
             const fetchedCategories = response.data as Category[] || [];
 
-            // If no categories were fetched, try to fetch from cache or show error
-            if (fetchedCategories.length === 0) {
-                // Try to load from cache as fallback
-                const cachedData = await AsyncStorage.getItem(CATEGORIES_CACHE_KEY);
-                if (cachedData) {
-                    const { categories: cachedCategories } = JSON.parse(cachedData);
-                    console.log('CategoryContext: Cache hit. Count:', cachedCategories.length);
-                    setCategories(cachedCategories);
-                } else {
-                    // Only throw if we truly have nothing
-                    if (categories.length === 0) {
-                        throw new Error('No categories available and no cached data found');
-                    }
-                }
-            } else {
-                console.log('CategoryContext: API fetch success. Count:', fetchedCategories.length);
+            if (fetchedCategories.length > 0) {
                 setCategories(fetchedCategories);
+                prefetchImages(fetchedCategories);
+                await AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify({
+                    categories: fetchedCategories,
+                    timestamp: now
+                }));
             }
             setLastFetchTime(now);
             setError(null);
-
-            // Cache the fetched categories
-            await AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify({
-                categories: fetchedCategories,
-                timestamp: now
-            }));
         } catch (err) {
             console.error('Error fetching categories:', err);
-            setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+            if (categories.length === 0) {
+                setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+            }
         } finally {
             setLoading(false);
         }
-    }, [categories.length, lastFetchTime]);
+    }, [categories.length, lastFetchTime, prefetchImages]);
 
     // Initial load from cache and fetch
     useEffect(() => {
         const initializeCategories = async () => {
-            const hasCachedData = await loadCachedCategories();
-            if (!hasCachedData) {
-                await fetchCategories();
-            }
+            const loadedFromCache = await loadCachedCategories();
+            // Fetch fresh categories silently in background
+            fetchCategories(true);
         };
         initializeCategories();
     }, [loadCachedCategories, fetchCategories]);

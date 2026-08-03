@@ -13,6 +13,18 @@ config.resolver.assetExts.push(
   'jpg'
 );
 
+// Ignore temporary dot-directories inside node_modules (e.g., .expo-image-*)
+const existingBlockList = config.resolver.blockList;
+const blockListArray = Array.isArray(existingBlockList)
+  ? existingBlockList
+  : existingBlockList
+  ? [existingBlockList]
+  : [];
+config.resolver.blockList = [/node_modules[\/\\]\..*/, ...blockListArray];
+
+// Disable Watchman on Windows to prevent "Failed to start watch mode" timeout errors
+config.resolver.useWatchman = false;
+
 // Increase max workers for faster bundling
 config.maxWorkers = 2;
 

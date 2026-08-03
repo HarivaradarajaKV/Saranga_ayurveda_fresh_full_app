@@ -12,6 +12,8 @@ import {
   Platform,
   StatusBar,
   useWindowDimensions,
+  RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,6 +168,18 @@ export default function WishlistPage() {
     }
   };
 
+  const [refreshing, setRefreshing] = React.useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadWishlistItems();
+    } catch (e) {
+      console.error('Error refreshing wishlist:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   if (!wishlist?.length) {
     return (
       <>
@@ -179,7 +193,18 @@ export default function WishlistPage() {
             headerShadowVisible: false,
           }}
         />
-        <View style={styles.container}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#2b3a1a"
+              colors={['#2b3a1a']}
+            />
+          }
+        >
           {/* Background Gradient */}
           <LinearGradient
             colors={['#f8f6f0', '#faf8f3', '#FFFFFF']}
@@ -221,12 +246,12 @@ export default function WishlistPage() {
                 colors={['#2b3a1a', '#1e2912']}
                 style={styles.exploreButtonGradient}
               >
-                <Text style={styles.exploreButtonText}>Explore Collection</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.exploreButtonIcon} />
+                <Text style={styles.exploreButtonText}>Start Exploring</Text>
+                <Ionicons name="sparkles" size={20} color="#fff" style={styles.exploreButtonIcon} />
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
-        </View>
+        </ScrollView>
       </>
     );
   }
@@ -278,6 +303,14 @@ export default function WishlistPage() {
             key={numColumns}
             numColumns={numColumns}
             columnWrapperStyle={styles.columnWrapper}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#2b3a1a"
+                colors={['#2b3a1a']}
+              />
+            }
             contentContainerStyle={{
               paddingBottom: bottomTabHeight + 20,
               paddingHorizontal: 8,

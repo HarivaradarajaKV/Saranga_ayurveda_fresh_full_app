@@ -185,7 +185,6 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '', headerBackTitle: '' }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
-      <Stack.Screen name="home" options={{ title: 'Saranga Ayurveda', headerShown: true }} />
     </Stack>
   );
 }

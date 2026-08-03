@@ -348,11 +348,12 @@ const CheckoutPage = () => {
   const fetchAvailableCoupons = async () => {
     try {
       const response = await apiService.getCoupons();
-      if (response.data) {
+      if (response.data && Array.isArray(response.data)) {
         // Filter out inactive coupons and those that have expired
+        const now = new Date();
         const validCoupons = response.data.filter((coupon: Coupon) => {
-          const isActive = coupon.is_active;
-          const hasNotExpired = new Date(coupon.end_date) > new Date();
+          const isActive = coupon.is_active !== false;
+          const hasNotExpired = !coupon.end_date || new Date(coupon.end_date) > now;
           return isActive && hasNotExpired;
         });
         setCoupons(validCoupons);

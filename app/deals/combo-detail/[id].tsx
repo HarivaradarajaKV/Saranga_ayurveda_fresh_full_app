@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  Image,
+  Image as RNImage,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -13,9 +13,11 @@ import {
   useWindowDimensions,
   Dimensions,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api';
 import { useCart } from '../../CartContext';
 
@@ -192,6 +194,25 @@ export default function ComboDetailPage() {
         }
       }
 
+      if (comboDataToUse) {
+        try {
+          const urlsToPrefetch = [
+            comboDataToUse.image_url,
+            comboDataToUse.image_url2,
+            comboDataToUse.image_url3,
+            comboDataToUse.image_url4,
+            ...(comboDataToUse.items || []).map((i: any) => i.image_url),
+          ].filter((img): img is string => typeof img === 'string' && img.length > 0)
+            .map((img: string) => apiService.getFullImageUrl(img));
+
+          if (urlsToPrefetch.length > 0) {
+            ExpoImage.prefetch(urlsToPrefetch);
+          }
+        } catch (e) {
+          // Ignore prefetch errors
+        }
+      }
+
       setCombo(comboDataToUse);
     } catch (error) {
       console.error('Error loading combo:', error);
@@ -287,6 +308,12 @@ export default function ComboDetailPage() {
 
   const handleAddToCart = async () => {
     if (!combo) return;
+
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) {
+      router.push('/auth/login');
+      return;
+    }
 
     const status = getComboStatus(combo);
     if (status !== 'active') {
@@ -507,9 +534,7 @@ export default function ComboDetailPage() {
         ]),
       ]).start();
 
-      Alert.alert('Success', 'Combo added to cart!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      router.back();
     } catch (error) {
       console.error('Error adding combo to cart:', error);
       Alert.alert('Error', 'Failed to add combo to cart');
@@ -613,10 +638,13 @@ export default function ComboDetailPage() {
                       : null
                   ]}
                 >
-                  <Image
+                  <ExpoImage
                     source={{ uri: apiService.getFullImageUrl(img) }}
                     style={styles.imageGridImg}
-                    resizeMode={comboImages.length === 1 ? 'contain' : 'cover'}
+                    contentFit={comboImages.length === 1 ? 'contain' : 'cover'}
+                    cachePolicy="memory-disk"
+                    priority="high"
+                    transition={120}
                   />
                 </View>
               ))}
@@ -629,15 +657,17 @@ export default function ComboDetailPage() {
               <Ionicons name="gift" size={24} color="#694d21" style={styles.titleIcon} />
               <Text style={styles.title}>{combo.title || 'Combo Offer'}</Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-              <Ionicons
-                name={status === 'active' ? 'checkmark-circle' : status === 'upcoming' ? 'time' : 'close-circle'}
-                size={14}
-                color="#fff"
-                style={{ marginRight: 4 }}
-              />
-              <Text style={styles.statusText}>{statusText}</Text>
-            </View>
+            {status !== 'active' && (
+              <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                <Ionicons
+                  name={status === 'upcoming' ? 'time' : 'close-circle'}
+                  size={14}
+                  color="#fff"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.statusText}>{statusText}</Text>
+              </View>
+            )}
           </Animated.View>
 
           {/* Description */}
@@ -712,16 +742,16 @@ export default function ComboDetailPage() {
                   ]}
                 >
                   <View style={styles.productImageContainer}>
-                    <Image
+                    <ExpoImage
                       source={{
                         uri: apiService.getFullImageUrl(item.image_url || ''),
                       }}
                       style={styles.productImage}
-                      resizeMode="contain"
+                      contentFit="contain"
+                      cachePolicy="memory-disk"
+                      priority="high"
+                      transition={120}
                     />
-                    <View style={styles.quantityBadge}>
-                      <Text style={styles.quantityText}>{itemQuantity}</Text>
-                    </View>
                   </View>
                   <View style={styles.productInfo}>
                     <Text style={styles.productName}>
