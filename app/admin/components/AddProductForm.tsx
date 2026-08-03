@@ -45,7 +45,7 @@ export const normalizeFileType = (uri: string, type?: string): 'image' | 'gif' |
 
     if (typeStr.includes('gif') || ext === 'gif') return 'gif';
     if (typeStr.includes('video') || ['mp4', 'mov', 'avi', 'webm'].includes(ext)) return 'video';
-    if (typeStr.includes('image') || ['jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext)) return 'image';
+    if (typeStr.includes('image') || ['jpg', 'jpeg', 'png', 'webp', 'avif', 'heic'].includes(ext)) return 'image';
     if (typeStr.includes('pdf') || typeStr.includes('word') || typeStr.includes('excel') || typeStr.includes('sheet') || typeStr.includes('text') || ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'].includes(ext)) return 'document';
     
     return 'image';
